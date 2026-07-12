@@ -230,6 +230,8 @@ export default function ChatScreen() {
     await supabase.from('conversations').update({ status: s }).eq('id', id)
     setConv(prev => ({ ...prev, status: s }))
     setShowStatus(false)
+    // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
+    if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
   }
 
   const assignAgent = async (agentId) => {

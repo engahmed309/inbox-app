@@ -51,6 +51,8 @@ export default function ConversationsScreen() {
   const [loading, setLoading] = useState(true)
   const [showAgentStatus, setShowAgentStatus] = useState(false)
   const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
+  const [agentsList, setAgentsList] = useState([])
+  const [agentFilter, setAgentFilter] = useState('') // '' = بدون فلتر بموظف معين
   const [tags, setTags] = useState([])
   const [selectedTag, setSelectedTag] = useState(null)
   const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
@@ -63,10 +65,11 @@ export default function ConversationsScreen() {
 
   const fetchConversations = useCallback(async () => {
     // Agents map
-    const { data: agentsList } = await supabase.from('agents').select('id, name')
+    const { data: agentsData } = await supabase.from('agents').select('id, name').order('name')
     const aMap = {}
-    agentsList?.forEach(a => { aMap[a.id] = a.name })
+    agentsData?.forEach(a => { aMap[a.id] = a.name })
     setAgentsMap(aMap)
+    setAgentsList(agentsData || [])
 
     // Tags
     const { data: tagsList } = await supabase.from('tags').select('*').order('name')
@@ -87,7 +90,11 @@ export default function ConversationsScreen() {
       .order('last_message_at', { ascending: false })
 
     if (channel !== 'all') query = query.eq('platform', channel)
-    if (!canSeeAll || viewMode === 'mine') {
+    if (!canSeeAll) {
+      query = query.eq('assigned_agent_id', agent?.id)
+    } else if (agentFilter) {
+      query = query.eq('assigned_agent_id', agentFilter)
+    } else if (viewMode === 'mine') {
       query = query.eq('assigned_agent_id', agent?.id)
     }
     if (tagContactIds) query = query.in('contact_id', tagContactIds.length ? tagContactIds : ['00000000-0000-0000-0000-000000000000'])
@@ -127,7 +134,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap)
       }
     }
-  }, [status, channel, agent, viewMode, selectedTag, canSeeAll])
+  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll])
 
   useEffect(() => {
     if (!agent) return
@@ -222,17 +229,30 @@ export default function ConversationsScreen() {
         </div>
         {canSeeAll && (
           <div className="flex bg-surface-3 rounded-xl p-0.5 flex-shrink-0">
-            <button onClick={() => setViewMode('all')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+            <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
               <Users size={12} /> الكل
             </button>
-            <button onClick={() => setViewMode('mine')}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+            <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
+              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
               <User size={12} /> بتاعتي
             </button>
           </div>
         )}
       </div>
+
+      {/* فلتر بموظف معين (أدمن بس) */}
+      {agent?.role === 'admin' && (
+        <div className="px-4 py-2 bg-surface-2 border-b border-surface-3">
+          <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)}
+            className="w-full bg-surface-3 rounded-lg px-3 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+            <option value="">فلترة بموظف معين (كل الموظفين)</option>
+            {agentsList.map(a => (
+              <option key={a.id} value={a.id}>{a.name}</option>
+            ))}
+          </select>
+        </div>
+      )}
 
       {/* Tags Filter */}
       {tags.length > 0 && (

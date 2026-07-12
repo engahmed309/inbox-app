@@ -5,7 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
-  MessageSquareText, Search, Paperclip, BarChart3, Facebook, Instagram, Phone
+  MessageSquareText, Search, Paperclip, BarChart3, Facebook, Instagram, Phone, KeyRound
 } from 'lucide-react'
 
 const TABS = [
@@ -68,16 +68,32 @@ export default function SettingsScreen() {
 // ─── Agents Tab ───────────────────────────────────────────
 function AgentsTab() {
   const [agents, setAgents] = useState([])
+  const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
+  const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
 
-  useEffect(() => { loadAgents() }, [])
+  useEffect(() => { loadAgents(); loadCounts() }, [])
 
   const loadAgents = async () => {
     const { data } = await supabase.from('agents').select('*').order('created_at')
     setAgents(data || [])
+  }
+
+  const loadCounts = async () => {
+    const { data } = await supabase.from('conversations').select('assigned_agent_id, status')
+    const map = {}
+    const t = { open: 0, follow_up: 0, closed: 0 }
+    data?.forEach(c => {
+      if (!c.assigned_agent_id) return
+      if (!map[c.assigned_agent_id]) map[c.assigned_agent_id] = { open: 0, follow_up: 0, closed: 0 }
+      if (map[c.assigned_agent_id][c.status] !== undefined) map[c.assigned_agent_id][c.status]++
+      if (t[c.status] !== undefined) t[c.status]++
+    })
+    setCounts(map)
+    setTotals(t)
   }
 
   const addAgent = async () => {
@@ -112,6 +128,23 @@ function AgentsTab() {
     loadAgents()
   }
 
+  const resetPassword = async (id) => {
+    const pass = prompt('اكتب كلمة المرور الجديدة (٦ حروف على الأقل):')
+    if (!pass) return
+    if (pass.length < 6) { alert('لازم ٦ حروف على الأقل'); return }
+    try {
+      const res = await fetch('https://inbox-api.sehawafeya.com/admin/reset-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: id, new_password: pass })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      alert('تم تغيير كلمة المرور بنجاح')
+    } catch (err) {
+      alert('خطأ: ' + err.message)
+    }
+  }
+
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -120,6 +153,13 @@ function AgentsTab() {
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
           <Plus size={14} /> إضافة موظف
         </button>
+      </div>
+
+      {/* إجمالي المحادثات */}
+      <div className="grid grid-cols-3 gap-2">
+        <TotalStat label="مفتوحة" value={totals.open} color="text-success" />
+        <TotalStat label="متابعة" value={totals.follow_up} color="text-follow" />
+        <TotalStat label="مغلقة" value={totals.closed} color="text-fg-muted" />
       </div>
 
       {showAdd && (
@@ -136,7 +176,7 @@ function AgentsTab() {
               <option value="admin">مدير</option>
             </select>
           </div>
-          <InputField label="الحد الأقصى للمحادثات" value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: parseInt(v) })} type="number" />
+          <MaxConversationsField value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: v })} />
           <Toggle
             label="يرى جميع المحادثات"
             value={form.can_see_all_conversations}
@@ -156,21 +196,54 @@ function AgentsTab() {
       )}
 
       {agents.map(ag => (
-        <AgentCard key={ag.id} agent={ag} onEdit={() => setEditId(ag.id)} onDelete={() => deleteAgent(ag.id)} onUpdate={updates => updateAgent(ag.id, updates)} editing={editId === ag.id} />
+        <AgentCard key={ag.id} agent={ag} counts={counts[ag.id]}
+          onEdit={() => setEditId(ag.id)} onDelete={() => deleteAgent(ag.id)}
+          onUpdate={updates => updateAgent(ag.id, updates)}
+          onResetPassword={() => resetPassword(ag.id)}
+          editing={editId === ag.id} />
       ))}
     </div>
   )
 }
 
-function AgentCard({ agent, onEdit, onDelete, onUpdate, editing }) {
+function TotalStat({ label, value, color }) {
+  return (
+    <div className="bg-surface-2 rounded-xl p-3 border border-surface-3 text-center">
+      <p className={`text-xl font-bold ${color}`}>{value}</p>
+      <p className="text-[11px] text-fg-subtle mt-0.5">{label}</p>
+    </div>
+  )
+}
+
+function MaxConversationsField({ value, onChange }) {
+  const unlimited = value == null
+  return (
+    <div>
+      <div className="flex items-center justify-between mb-1">
+        <label className="block text-xs text-fg-muted">الحد الأقصى للمحادثات</label>
+        <button type="button" onClick={() => onChange(unlimited ? 10 : null)}
+          className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${unlimited ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+          {unlimited ? 'غير محدود' : 'محدود'}
+        </button>
+      </div>
+      {!unlimited && (
+        <input type="number" value={value ?? ''} onChange={e => onChange(parseInt(e.target.value) || 0)}
+          className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+      )}
+    </div>
+  )
+}
+
+function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onResetPassword, editing }) {
   const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations })
+  const c = counts || { open: 0, follow_up: 0, closed: 0 }
 
   return (
     <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
       {editing ? (
         <div className="space-y-3">
           <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <InputField label="الحد الأقصى" value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: parseInt(v) })} type="number" />
+          <MaxConversationsField value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: v })} />
           <div>
             <label className="block text-xs text-fg-muted mb-1">الدور</label>
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
@@ -186,25 +259,36 @@ function AgentCard({ agent, onEdit, onDelete, onUpdate, editing }) {
           </div>
         </div>
       ) : (
-        <div className="flex items-center gap-3">
-          <div className="relative">
-            <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center text-fg font-semibold">
-              {agent.name[0]}
+        <div>
+          <div className="flex items-center gap-3">
+            <div className="relative">
+              <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center text-fg font-semibold">
+                {agent.name[0]}
+              </div>
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${agent.status === 'busy' ? 'bg-follow' : agent.is_online ? 'bg-success' : 'bg-fg-subtle'}`} />
             </div>
-            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${agent.status === 'busy' ? 'bg-follow' : agent.is_online ? 'bg-success' : 'bg-fg-subtle'}`} />
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-fg">{agent.name}</p>
+              <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? 'مدير' : 'موظف'}</p>
+              <p className="text-xs text-fg-subtle">الحد: {agent.max_conversations == null ? 'غير محدود' : `${agent.max_conversations} محادثة`}</p>
+            </div>
+            <div className="flex gap-1.5">
+              <button onClick={onResetPassword} title="تغيير كلمة المرور"
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-brand rounded-lg hover:bg-surface-3">
+                <KeyRound size={14} />
+              </button>
+              <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+                <Edit2 size={14} />
+              </button>
+              <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-danger rounded-lg hover:bg-surface-3">
+                <Trash2 size={14} />
+              </button>
+            </div>
           </div>
-          <div className="flex-1">
-            <p className="font-semibold text-sm text-fg">{agent.name}</p>
-            <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? 'مدير' : 'موظف'}</p>
-            <p className="text-xs text-fg-subtle">الحد: {agent.max_conversations} محادثة</p>
-          </div>
-          <div className="flex gap-1.5">
-            <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
-              <Edit2 size={14} />
-            </button>
-            <button onClick={onDelete} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-danger rounded-lg hover:bg-surface-3">
-              <Trash2 size={14} />
-            </button>
+          <div className="flex gap-3 mt-3 pt-3 border-t border-surface-3">
+            <span className="text-[11px] text-success">مفتوحة: {c.open}</span>
+            <span className="text-[11px] text-follow">متابعة: {c.follow_up}</span>
+            <span className="text-[11px] text-fg-subtle">مغلقة: {c.closed}</span>
           </div>
         </div>
       )}
@@ -492,31 +576,43 @@ const RANGE_OPTS = [
   { key: 'week', label: 'آخر ٧ أيام' },
   { key: 'month', label: 'الشهر' },
   { key: 'all', label: 'الكل' },
+  { key: 'custom', label: 'فترة مخصصة' },
 ]
 
 function ReportsTab() {
   const [range, setRange] = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
   const [counts, setCounts] = useState({})
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => { load() }, [range])
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return } // استنى لحد ما يختار التاريخين
+    load()
+  }, [range, customFrom, customTo])
 
-  const getFromDate = () => {
+  const getDateBounds = () => {
     const now = new Date()
-    if (range === 'today') { now.setHours(0, 0, 0, 0); return now.toISOString() }
-    if (range === 'week') { const d = new Date(); d.setDate(d.getDate() - 7); return d.toISOString() }
-    if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return d.toISOString() }
-    return null
+    if (range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
+    if (range === 'week') { const d = new Date(); d.setDate(d.getDate() - 7); return { from: d.toISOString(), to: null } }
+    if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
+    if (range === 'custom') {
+      if (!customFrom || !customTo) return { from: null, to: null }
+      const to = new Date(customTo); to.setHours(23, 59, 59, 999)
+      return { from: new Date(customFrom).toISOString(), to: to.toISOString() }
+    }
+    return { from: null, to: null }
   }
 
   const load = async () => {
     setLoading(true)
-    const from = getFromDate()
+    const { from, to } = getDateBounds()
     const results = {}
     for (const p of PLATFORMS) {
       let q = supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('platform', p.key)
       if (from) q = q.gte('created_at', from)
+      if (to) q = q.lte('created_at', to)
       const { count } = await q
       results[p.key] = count || 0
     }
@@ -538,7 +634,24 @@ function ReportsTab() {
         ))}
       </div>
 
-      {loading ? (
+      {range === 'custom' && (
+        <div className="flex items-center gap-2 bg-surface-2 rounded-xl p-3 border border-surface-3">
+          <div className="flex-1">
+            <label className="block text-xs text-fg-muted mb-1">من</label>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs text-fg-muted mb-1">إلى</label>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+        </div>
+      )}
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+      ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
@@ -574,12 +687,26 @@ function ReportsTab() {
 }
 
 // ─── Round Robin Tab ──────────────────────────────────────
+const DISTRIBUTION_MODES = [
+  { key: 'least_busy', label: 'الأقل محادثات', desc: 'كل محادثة جديدة تروح للموظف اللي عنده أقل عدد محادثات مفتوحة حالياً.' },
+  { key: 'round_robin', label: 'بالتبادل (دوري)', desc: 'المحادثات بتتوزع بالدور على الموظفين المتاحين واحد واحد، وبعد ما يوصل لآخر واحد يرجع من الأول.' },
+]
+
 function RoundRobinTab() {
-  const [config, setConfig] = useState({ enabled: true, default_max: 10 })
+  const [mode, setMode] = useState('least_busy')
+  const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
+  useEffect(() => { load() }, [])
+  const load = async () => {
+    const { data } = await supabase.from('app_settings').select('distribution_mode').eq('id', true).maybeSingle()
+    if (data) setMode(data.distribution_mode)
+  }
+
   const save = async () => {
-    // Store in a settings table or just update agents default
+    setSaving(true)
+    await supabase.from('app_settings').update({ distribution_mode: mode }).eq('id', true)
+    setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -588,31 +715,29 @@ function RoundRobinTab() {
     <div className="p-4 space-y-4">
       <h2 className="font-semibold text-fg">إعدادات التوزيع التلقائي</h2>
 
-      <div className="bg-surface-2 rounded-2xl p-4 space-y-4 border border-surface-3">
-        <Toggle
-          label="تفعيل Round Robin"
-          sublabel="توزيع المحادثات تلقائياً على الموظفين المتاحين"
-          value={config.enabled}
-          onChange={v => setConfig({ ...config, enabled: v })}
-        />
-
-        <InputField
-          label="الحد الافتراضي للمحادثات لكل موظف"
-          value={config.default_max}
-          onChange={v => setConfig({ ...config, default_max: parseInt(v) })}
-          type="number"
-        />
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <label className="block text-xs text-fg-muted mb-1">طريقة التوزيع</label>
+        {DISTRIBUTION_MODES.map(m => (
+          <button key={m.key} onClick={() => setMode(m.key)}
+            className={`w-full text-right p-3 rounded-xl border transition-colors ${mode === m.key ? 'border-brand bg-brand/10' : 'border-surface-3 bg-surface-3'}`}>
+            <div className="flex items-center gap-2">
+              <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${mode === m.key ? 'border-brand bg-brand' : 'border-fg-subtle'}`} />
+              <span className="text-sm text-fg font-medium">{m.label}</span>
+            </div>
+            <p className="text-xs text-fg-subtle mt-1 mr-5.5">{m.desc}</p>
+          </button>
+        ))}
 
         <div className="bg-surface-3 rounded-xl p-3 space-y-1.5 text-xs text-fg-muted">
-          <p className="font-medium text-fg-muted mb-2">آلية التوزيع:</p>
-          <p>١. عند وصول محادثة جديدة</p>
-          <p>٢. يتم تحديد الموظفين المتصلين (Online)</p>
-          <p>٣. استبعاد من وصل للحد الأقصى</p>
-          <p>٤. التعيين للموظف الأقل محادثات مفتوحة</p>
-          <p>٥. لو كل الموظفين ممتلئين → المحادثة تبقى غير معينة</p>
+          <p className="font-medium text-fg-muted mb-2">آلية التوزيع الكاملة:</p>
+          <p>١. عند وصول محادثة جديدة، يتم تحديد الموظفين المتصلين (Online) اللي حالتهم مش "مشغول".</p>
+          <p>٢. استبعاد اللي وصلوا للحد الأقصى (لو عندهم حد محدد).</p>
+          <p>٣. التعيين حسب الطريقة المختارة فوق.</p>
+          <p>٤. لو كل الموظفين ممتلئين، المحادثة تفضل غير معينة مؤقتاً.</p>
+          <p>٥. أول ما موظف يتاح (يفتح شات أو يرجع Online)، المحادثات المستنية بتتوزع عليه تلقائياً.</p>
         </div>
 
-        <button onClick={save}
+        <button onClick={save} disabled={saving}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
           {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
         </button>

@@ -1,5 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, API_URL } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -25,6 +25,10 @@ export function AuthProvider({ children }) {
     if (!agentId) return
     await supabase.from('agents').update({ status }).eq('id', agentId)
     setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online' } : prev)
+    // لما موظف يبقى متاح، حاول توزّع أي محادثات كانت مستنية موظف فاضي
+    if (status === 'online') {
+      fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+    }
   }
 
   useEffect(() => {
