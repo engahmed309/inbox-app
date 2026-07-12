@@ -2,7 +2,13 @@ import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown } from 'lucide-react'
+
+const AGENT_STATUS_OPTS = [
+  { key: 'online', label: 'نشط', dot: 'bg-success' },
+  { key: 'busy', label: 'مشغول', dot: 'bg-follow' },
+  { key: 'offline', label: 'غير متصل', dot: 'bg-slate-500' },
+]
 
 const STATUS_TABS = [
   { key: 'open', label: 'مفتوحة', active: 'text-success border-b-2 border-success' },
@@ -42,7 +48,8 @@ export default function ConversationsScreen() {
   const [channel, setChannel] = useState('all')
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
-  const { agent, signOut } = useAuth()
+  const [showAgentStatus, setShowAgentStatus] = useState(false)
+  const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const navigate = useNavigate()
   const realtimeRef = useRef(null)
 
@@ -133,6 +140,26 @@ export default function ConversationsScreen() {
           </div>
         </div>
         <div className="flex items-center gap-1">
+          <div className="relative">
+            <button onClick={() => setShowAgentStatus(v => !v)}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-slate-200 hover:text-white">
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agent?.status || 'online'))?.dot}`} />
+              {AGENT_STATUS_OPTS.find(s => s.key === (agent?.status || 'online'))?.label}
+              <ChevronDown size={11} />
+            </button>
+            {showAgentStatus && (
+              <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
+                {AGENT_STATUS_OPTS.map(s => (
+                  <button key={s.key}
+                    onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
+                    {s.label}
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
           {agent?.role === 'admin' && (
             <button onClick={() => navigate('/settings')}
               className="w-9 h-9 flex items-center justify-center text-slate-400 hover:text-white rounded-xl hover:bg-surface-3 transition-colors">

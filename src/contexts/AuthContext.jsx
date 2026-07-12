@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from 'react'
+import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import { supabase } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -18,9 +18,13 @@ export function AuthProvider({ children }) {
     return data
   }
 
-  async function setOnline(agentId, status) {
+  const agentRef = useRef(null)
+  useEffect(() => { agentRef.current = agent }, [agent])
+
+  async function setStatus(agentId, status) {
     if (!agentId) return
-    await supabase.from('agents').update({ is_online: status }).eq('id', agentId)
+    await supabase.from('agents').update({ status }).eq('id', agentId)
+    setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online' } : prev)
   }
 
   useEffect(() => {
@@ -29,7 +33,7 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         const ag = await loadAgent(session.user)
         setAgent(ag)
-        if (ag) setOnline(ag.id, true)
+        if (ag) setStatus(ag.id, 'online')
       }
       setLoading(false)
     })
@@ -39,18 +43,20 @@ export function AuthProvider({ children }) {
       if (session?.user) {
         const ag = await loadAgent(session.user)
         setAgent(ag)
-        if (ag) setOnline(ag.id, true)
+        if (ag) setStatus(ag.id, 'online')
       } else {
-        if (agent) setOnline(agent.id, false)
+        if (agentRef.current) setStatus(agentRef.current.id, 'offline')
         setAgent(null)
       }
     })
 
     const handleVisibility = () => {
-      if (agent) setOnline(agent.id, !document.hidden)
+      const ag = agentRef.current
+      if (!ag || ag.status === 'busy') return
+      setStatus(ag.id, document.hidden ? 'offline' : 'online')
     }
     document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('beforeunload', () => agent && setOnline(agent.id, false))
+    window.addEventListener('beforeunload', () => agentRef.current && setStatus(agentRef.current.id, 'offline'))
 
     return () => {
       subscription.unsubscribe()
@@ -65,12 +71,12 @@ export function AuthProvider({ children }) {
   }
 
   const signOut = async () => {
-    if (agent) await setOnline(agent.id, false)
+    if (agent) await setStatus(agent.id, 'offline')
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, agent, loading, signIn, signOut }}>
+    <AuthContext.Provider value={{ user, agent, loading, signIn, signOut, setStatus }}>
       {children}
     </AuthContext.Provider>
   )

@@ -186,7 +186,7 @@ function AgentCard({ agent, onEdit, onDelete, onUpdate, editing }) {
             <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center text-white font-semibold">
               {agent.name[0]}
             </div>
-            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${agent.is_online ? 'bg-success' : 'bg-slate-500'}`} />
+            <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${agent.status === 'busy' ? 'bg-follow' : agent.is_online ? 'bg-success' : 'bg-slate-500'}`} />
           </div>
           <div className="flex-1">
             <p className="font-semibold text-sm text-white">{agent.name}</p>
