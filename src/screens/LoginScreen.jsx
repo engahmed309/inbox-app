@@ -34,16 +34,16 @@ export default function LoginScreen() {
           <div className="w-14 h-14 bg-brand rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand/30">
             <MessageSquare size={28} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-white">صحة وعافية</h1>
-          <p className="text-slate-400 text-sm mt-1">منصة خدمة العملاء</p>
+          <h1 className="text-2xl font-bold text-fg">صحة وعافية</h1>
+          <p className="text-fg-muted text-sm mt-1">منصة خدمة العملاء</p>
         </div>
 
         {/* Form */}
         <form onSubmit={handleSubmit} className="bg-surface-2 rounded-2xl p-6 space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-1.5">البريد الإلكتروني</label>
+            <label className="block text-sm text-fg-muted mb-1.5">البريد الإلكتروني</label>
             <div className="relative">
-              <Mail size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Mail size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input
                 type="email"
                 value={email}
@@ -51,15 +51,15 @@ export default function LoginScreen() {
                 placeholder="example@email.com"
                 required
                 dir="ltr"
-                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 text-fg placeholder-fg-subtle text-sm focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1.5">كلمة المرور</label>
+            <label className="block text-sm text-fg-muted mb-1.5">كلمة المرور</label>
             <div className="relative">
-              <Lock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" />
+              <Lock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input
                 type={showPass ? 'text' : 'password'}
                 value={password}
@@ -67,10 +67,10 @@ export default function LoginScreen() {
                 placeholder="••••••••"
                 required
                 dir="ltr"
-                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 pl-10 text-white placeholder-slate-500 text-sm focus:outline-none focus:ring-2 focus:ring-brand"
+                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 pl-10 text-fg placeholder-fg-subtle text-sm focus:outline-none focus:ring-2 focus:ring-brand"
               />
               <button type="button" onClick={() => setShowPass(!showPass)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 hover:text-slate-300">
+                className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted">
                 {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>

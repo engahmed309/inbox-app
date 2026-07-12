@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
-import { X, Save, User, Globe, Package } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Plus } from 'lucide-react'
+
+const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6', '#06B6D4']
 
 export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
   const [form, setForm] = useState({
@@ -15,6 +17,10 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
   const [customValues, setCustomValues] = useState({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  const [allTags, setAllTags] = useState([])
+  const [contactTags, setContactTags] = useState([])
+  const [showAddTag, setShowAddTag] = useState(false)
+  const [newTagName, setNewTagName] = useState('')
 
   useEffect(() => {
     loadData()
@@ -27,6 +33,9 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
     const { data: defs } = await supabase.from('custom_field_definitions').select('*').order('field_order')
     setCustomFields(defs || [])
 
+    const { data: allTagsData } = await supabase.from('tags').select('*').order('name')
+    setAllTags(allTagsData || [])
+
     if (contact?.id) {
       const { data: vals } = await supabase
         .from('contact_custom_fields')
@@ -35,7 +44,34 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
       const map = {}
       vals?.forEach(v => { map[v.field_definition_id] = v.value })
       setCustomValues(map)
+
+      const { data: ctRows } = await supabase
+        .from('contact_tags').select('tag_id, tags(id, name, color)').eq('contact_id', contact.id)
+      setContactTags((ctRows || []).map(r => r.tags).filter(Boolean))
     }
+  }
+
+  const toggleTag = async (tag) => {
+    const has = contactTags.some(t => t.id === tag.id)
+    if (has) {
+      await supabase.from('contact_tags').delete().eq('contact_id', contact.id).eq('tag_id', tag.id)
+      setContactTags(prev => prev.filter(t => t.id !== tag.id))
+    } else {
+      await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
+      setContactTags(prev => [...prev, tag])
+    }
+  }
+
+  const createTag = async () => {
+    if (!newTagName.trim()) return
+    const color = TAG_COLORS[allTags.length % TAG_COLORS.length]
+    const { data: tag, error } = await supabase.from('tags').insert({ name: newTagName.trim(), color }).select().single()
+    if (error) { alert('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    setAllTags(prev => [...prev, tag])
+    await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
+    setContactTags(prev => [...prev, tag])
+    setNewTagName('')
+    setShowAddTag(false)
   }
 
   const save = async () => {
@@ -70,8 +106,8 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
       <div className="relative w-80 h-full bg-surface-2 flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-surface-3">
-          <span className="font-semibold text-white">بيانات العميل</span>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">
+          <span className="font-semibold text-fg">بيانات العميل</span>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg">
             <X size={18} />
           </button>
         </div>
@@ -83,10 +119,10 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
               <img src={contact.profile_pic} className="w-16 h-16 rounded-full object-cover" alt="" />
             ) : (
               <div className="w-16 h-16 rounded-full bg-surface-3 flex items-center justify-center">
-                <User size={24} className="text-slate-400" />
+                <User size={24} className="text-fg-muted" />
               </div>
             )}
-            <span className="mt-2 text-xs text-slate-400">{contact?.platform_id}</span>
+            <span className="mt-2 text-xs text-fg-muted">{contact?.platform_id}</span>
           </div>
 
           {/* Basic Fields */}
@@ -94,13 +130,46 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
           <Field label="الهاتف" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
           <Field label="الدولة" value={form.country} onChange={v => setForm({ ...form, country: v })} />
 
+          {/* Tags */}
+          <div>
+            <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1.5">
+              <Tag size={12} /> التاجات
+            </label>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map(tag => {
+                const active = contactTags.some(t => t.id === tag.id)
+                return (
+                  <button key={tag.id} onClick={() => toggleTag(tag)}
+                    className="text-xs px-2.5 py-1 rounded-full font-medium transition-colors"
+                    style={active ? { background: tag.color, color: '#fff' } : { background: `${tag.color}33`, color: tag.color }}>
+                    {tag.name}
+                  </button>
+                )
+              })}
+              {showAddTag ? (
+                <div className="flex items-center gap-1">
+                  <input autoFocus value={newTagName} onChange={e => setNewTagName(e.target.value)}
+                    onKeyDown={e => e.key === 'Enter' && createTag()}
+                    placeholder="اسم التاج..."
+                    className="w-24 bg-surface-3 rounded-full px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <button onClick={createTag} className="text-brand text-xs font-semibold">إضافة</button>
+                </div>
+              ) : (
+                <button onClick={() => setShowAddTag(true)}
+                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg">
+                  <Plus size={11} /> تاج جديد
+                </button>
+              )}
+            </div>
+          </div>
+
           {/* Lifecycle */}
           <div>
-            <label className="block text-xs text-slate-400 mb-1">مرحلة الـ Lifecycle</label>
+            <label className="block text-xs text-fg-muted mb-1">مرحلة الـ Lifecycle</label>
             <select
               value={form.lifecycle_stage_id}
               onChange={e => setForm({ ...form, lifecycle_stage_id: e.target.value })}
-              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
             >
               <option value="">— بدون —</option>
               {lifecycles.map(l => (
@@ -110,7 +179,7 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
             {currentStage && (
               <div className="mt-1.5 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: currentStage.color }} />
-                <span className="text-xs text-slate-400">{currentStage.name}</span>
+                <span className="text-xs text-fg-muted">{currentStage.name}</span>
               </div>
             )}
           </div>
@@ -118,16 +187,16 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
           {/* Custom Fields */}
           {customFields.length > 0 && (
             <div>
-              <p className="text-xs text-slate-400 mb-2 font-medium">حقول إضافية</p>
+              <p className="text-xs text-fg-muted mb-2 font-medium">حقول إضافية</p>
               <div className="space-y-3">
                 {customFields.map(f => (
                   <div key={f.id}>
-                    <label className="block text-xs text-slate-400 mb-1">{f.name}</label>
+                    <label className="block text-xs text-fg-muted mb-1">{f.name}</label>
                     {f.field_type === 'select' ? (
                       <select
                         value={customValues[f.id] || ''}
                         onChange={e => setCustomValues({ ...customValues, [f.id]: e.target.value })}
-                        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand"
+                        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
                       >
                         <option value="">— اختر —</option>
                         {(f.options?.choices || []).map(o => (
@@ -139,7 +208,7 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
                         type={f.field_type === 'number' ? 'number' : f.field_type === 'date' ? 'date' : 'text'}
                         value={customValues[f.id] || ''}
                         onChange={e => setCustomValues({ ...customValues, [f.id]: e.target.value })}
-                        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand"
+                        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
                       />
                     )}
                   </div>
@@ -150,12 +219,12 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
 
           {/* Notes */}
           <div>
-            <label className="block text-xs text-slate-400 mb-1">ملاحظات</label>
+            <label className="block text-xs text-fg-muted mb-1">ملاحظات</label>
             <textarea
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
               rows={3}
-              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand resize-none"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-none"
             />
           </div>
         </div>
@@ -179,11 +248,11 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
 function Field({ label, value, onChange }) {
   return (
     <div>
-      <label className="block text-xs text-slate-400 mb-1">{label}</label>
+      <label className="block text-xs text-fg-muted mb-1">{label}</label>
       <input
         value={value || ''}
         onChange={e => onChange(e.target.value)}
-        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-white focus:outline-none focus:ring-1 focus:ring-brand"
+        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
       />
     </div>
   )

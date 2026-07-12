@@ -2,16 +2,49 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  /* Light theme */
+  --color-surface: 255 255 255;
+  --color-surface-2: 244 244 245;
+  --color-surface-3: 228 228 231;
+  --color-fg: 24 24 27;
+  --color-fg-muted: 82 82 91;
+  --color-fg-subtle: 148 148 157;
+  --color-brand: 124 92 252;
+  --color-brand-dark: 99 70 239;
+  --color-brand-light: 167 148 255;
+  --color-success: 13 148 120;
+  --color-warning: 202 138 4;
+  --color-danger: 220 38 38;
+  --color-follow: 217 70 12;
+}
+
+.dark {
+  --color-surface: 22 22 26;
+  --color-surface-2: 33 33 39;
+  --color-surface-3: 54 54 62;
+  --color-fg: 248 248 250;
+  --color-fg-muted: 161 161 170;
+  --color-fg-subtle: 113 113 122;
+  --color-brand: 139 111 255;
+  --color-brand-dark: 114 84 255;
+  --color-brand-light: 176 155 255;
+  --color-success: 45 191 153;
+  --color-warning: 245 158 11;
+  --color-danger: 244 63 94;
+  --color-follow: 249 115 22;
+}
+
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { height: 100%; overflow: hidden; }
-body { font-family: 'Inter', system-ui, sans-serif; background: #0F172A; color: #F8FAFC; }
+body { font-family: 'Inter', system-ui, sans-serif; background: rgb(var(--color-surface)); color: rgb(var(--color-fg)); transition: background-color .15s ease, color .15s ease; }
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #334155; border-radius: 2px; }
+::-webkit-scrollbar-thumb { background: rgb(var(--color-surface-3)); border-radius: 2px; }
 
-.msg-in { background: #1E293B; border-radius: 0 12px 12px 12px; }
-.msg-out { background: #2563EB; border-radius: 12px 0 12px 12px; }
+.msg-in { background: rgb(var(--color-surface-2)); border-radius: 0 12px 12px 12px; }
+.msg-out { background: rgb(var(--color-brand)); border-radius: 12px 0 12px 12px; }
 
 @keyframes slideIn {
   from { transform: translateY(-8px); opacity: 0; }
