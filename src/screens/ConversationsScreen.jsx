@@ -160,7 +160,18 @@ export default function ConversationsScreen() {
       })
       .subscribe()
 
-    return () => realtimeRef.current?.unsubscribe()
+    // نفس الحماية: تحديث فوري لما التاب يرجع ظاهر بعد ما يكون في الخلفية
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchConversations()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      realtimeRef.current?.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
   }, [fetchConversations, agent])
 
   const handleSignOut = async () => {

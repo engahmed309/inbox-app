@@ -175,7 +175,19 @@ export default function ChatScreen() {
       })
       .subscribe()
 
-    return () => realtimeRef.current?.unsubscribe()
+    // لو التاب/التطبيق راح للخلفية (زي فتح تطبيق تاني تبعت منه) وبعدين رجع،
+    // المتصفح ممكن يكون وقف اتصال الـ Realtime، فلما يرجع نجيب أي رسايل فاتت فوراً
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') fetchMessages()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    return () => {
+      realtimeRef.current?.unsubscribe()
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
   }, [id])
 
   // ─── إرسال رسالة (نص و/أو ملف) ─────────────────────────────
