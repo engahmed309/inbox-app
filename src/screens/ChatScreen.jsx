@@ -177,16 +177,20 @@ export default function ChatScreen() {
 
     // لو التاب/التطبيق راح للخلفية (زي فتح تطبيق تاني تبعت منه) وبعدين رجع،
     // المتصفح ممكن يكون وقف اتصال الـ Realtime، فلما يرجع نجيب أي رسايل فاتت فوراً
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchMessages()
-    }
+    const handleVisibility = () => { fetchMessages() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
+
+    // شبكة الضمان: تحديث دوري كل 4 ثواني بالتوازي مع الـ Realtime، عشان أي رسالة
+    // تظهر مهما كان سبب انقطاع الاتصال الحي (شبكة الموبايل، إلخ).
+    // من غير شرط على document.visibilityState لأنه مش موثوق في كل المتصفحات
+    const pollInterval = setInterval(() => { fetchMessages(false) }, 4000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
+      clearInterval(pollInterval)
     }
   }, [id])
 

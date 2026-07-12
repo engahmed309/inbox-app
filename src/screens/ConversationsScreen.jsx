@@ -160,17 +160,17 @@ export default function ConversationsScreen() {
       })
       .subscribe()
 
-    // نفس الحماية: تحديث فوري لما التاب يرجع ظاهر بعد ما يكون في الخلفية
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') fetchConversations()
-    }
+    // نفس الحماية: تحديث فوري لما التاب يرجع ظاهر، وشبكة ضمان دورية كل 5 ثواني
+    const handleVisibility = () => { fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
+    const pollInterval = setInterval(() => { fetchConversations() }, 5000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
+      clearInterval(pollInterval)
     }
   }, [fetchConversations, agent])
 
