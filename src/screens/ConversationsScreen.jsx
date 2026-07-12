@@ -41,6 +41,13 @@ function timeAgo(dateStr) {
   return `${Math.floor(hours / 24)}ي`
 }
 
+// اسم مؤقت مميّز لحد ما يتسجل اسم حقيقي (فيسبوك بيمنع جلب الاسم/الصورة لأغلب الحسابات)
+function displayName(contact) {
+  if (contact?.name) return contact.name
+  if (contact?.platform_id) return `زائر ${contact.platform_id.slice(-4)}`
+  return 'مجهول'
+}
+
 export default function ConversationsScreen() {
   const [conversations, setConversations] = useState([])
   const [agentsMap, setAgentsMap] = useState({})
@@ -85,7 +92,7 @@ export default function ConversationsScreen() {
     // Conversations query
     let query = supabase
       .from('conversations')
-      .select('*, contacts(id, name, profile_pic)')
+      .select('*, contacts(id, name, profile_pic, platform_id)')
       .eq('status', status)
       .order('last_message_at', { ascending: false })
 
@@ -355,7 +362,7 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-semibold text-sm text-fg truncate">{contact?.name || 'مجهول'}</span>
+          <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
           <span className="text-xs text-fg-subtle flex-shrink-0">{timeAgo(conv.last_message_at)}</span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">

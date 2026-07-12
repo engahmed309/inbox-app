@@ -10,6 +10,7 @@ import {
 
 const TABS = [
   { key: 'agents', label: 'الموظفون', icon: Users },
+  { key: 'accounts', label: 'الحسابات المربوطة', icon: Instagram },
   { key: 'lifecycle', label: 'Lifecycle', icon: Tag },
   { key: 'fields', label: 'الحقول', icon: List },
   { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
@@ -55,6 +56,7 @@ export default function SettingsScreen() {
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'agents' && <AgentsTab />}
+        {tab === 'accounts' && <ConnectedAccountsTab />}
         {tab === 'lifecycle' && <LifecycleTab />}
         {tab === 'fields' && <FieldsTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
@@ -292,6 +294,69 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onResetPassword,
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── Connected Accounts Tab ───────────────────────────────
+function ConnectedAccountsTab() {
+  const [ig, setIg] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => { load() }, [])
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch('https://inbox-api.sehawafeya.com/instagram/account')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الاتصال')
+      setIg(data)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      <h2 className="font-semibold text-fg">الحسابات المربوطة</h2>
+
+      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+        <p className="text-xs text-fg-muted mb-3 flex items-center gap-1.5">
+          <Instagram size={13} className="text-pink-400" /> إنستجرام
+        </p>
+        {loading ? (
+          <div className="flex items-center justify-center h-16">
+            <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <p className="text-sm text-danger">{error}</p>
+        ) : ig ? (
+          <div className="flex items-center gap-3">
+            {ig.profile_picture_url ? (
+              <img src={ig.profile_picture_url} alt="" className="w-12 h-12 rounded-full object-cover" />
+            ) : (
+              <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
+                <Instagram size={18} className="text-fg-muted" />
+              </div>
+            )}
+            <div>
+              <p className="text-sm text-fg font-semibold">{ig.name}</p>
+              <p className="text-xs text-fg-muted">@{ig.username}</p>
+            </div>
+          </div>
+        ) : null}
+      </div>
+
+      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+        <p className="text-xs text-fg-muted mb-3 flex items-center gap-1.5">
+          <Facebook size={13} className="text-blue-400" /> فيسبوك
+        </p>
+        <p className="text-sm text-fg-muted">مربوطة عن طريق صفحة العيادة على فيسبوك (Mohamed Saieed).</p>
+      </div>
     </div>
   )
 }

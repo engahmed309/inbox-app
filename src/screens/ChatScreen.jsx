@@ -28,6 +28,13 @@ function formatDate(dateStr) {
   return d.toLocaleDateString('ar')
 }
 
+// اسم مؤقت مميّز لحد ما يتسجل اسم حقيقي (فيسبوك بيمنع جلب الاسم/الصورة لأغلب الحسابات)
+function displayName(contact) {
+  if (contact?.name) return contact.name
+  if (contact?.platform_id) return `زائر ${contact.platform_id.slice(-4)}`
+  return 'مجهول'
+}
+
 export default function ChatScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
@@ -46,6 +53,7 @@ export default function ChatScreen() {
   const [isRecording, setIsRecording] = useState(false)
   const [recordSeconds, setRecordSeconds] = useState(0)
   const [pendingFile, setPendingFile] = useState(null) // { file, url, previewUrl, type, name }
+  const [lightbox, setLightbox] = useState(null) // { type: 'image'|'video', url }
 
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -358,10 +366,13 @@ export default function ChatScreen() {
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-fg truncate">{contact?.name || 'مجهول'}</p>
+            <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
-              <span className="text-xs text-fg-muted truncate">{conv?.agentName || 'غير معين'}</span>
+              <span className="text-xs text-fg-muted truncate">
+                {conv?.agentName || 'غير معين'}
+                {!contact?.name && ' · اضغط لإضافة الاسم'}
+              </span>
             </div>
           </div>
         </button>
@@ -435,7 +446,7 @@ export default function ChatScreen() {
               {items.map((item, i) => item._kind === 'assignment' ? (
                 <AssignmentEvent key={item.id} log={item} />
               ) : (
-                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} />
+                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} onMediaClick={setLightbox} />
               ))}
             </div>
           </div>
@@ -531,6 +542,8 @@ export default function ChatScreen() {
         <ContactSidebar contact={contact} conv={conv}
           onClose={() => setShowSidebar(false)} onUpdate={setContact} />
       )}
+
+      {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
     </div>
   )
 }
@@ -551,7 +564,7 @@ function AssignmentEvent({ log }) {
   )
 }
 
-function MessageBubble({ msg, prev }) {
+function MessageBubble({ msg, prev, onMediaClick }) {
   const isOut = msg.direction === 'outbound'
   const isTemp = msg._temp
   const showTime = !prev ||
@@ -566,9 +579,11 @@ function MessageBubble({ msg, prev }) {
         ${isOut ? 'msg-out text-white' : 'msg-in text-fg'}
         ${isTemp ? 'opacity-50' : 'opacity-100 slide-in'}`}>
         {msg.content_type === 'image' && msg.media_url ? (
-          <img src={msg.media_url} alt="" className="rounded-lg max-w-full max-h-48 object-cover" />
+          <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+            className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
         ) : msg.content_type === 'video' && msg.media_url ? (
-          <video src={msg.media_url} controls className="rounded-lg max-w-full max-h-48" />
+          <video src={msg.media_url} controls onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
+            className="rounded-lg max-w-full max-h-48 cursor-pointer" />
         ) : msg.content_type === 'audio' && msg.media_url ? (
           <audio src={msg.media_url} controls className="max-w-full" style={{ height: 36 }} />
         ) : msg.content_type === 'file' && msg.media_url ? (
@@ -583,6 +598,22 @@ function MessageBubble({ msg, prev }) {
         <span className="text-xs text-fg-subtle mt-0.5 px-1">
           {isTemp ? <span className="animate-pulse">...</span> : <CheckCheck size={12} className="inline" />}
         </span>
+      )}
+    </div>
+  )
+}
+
+function Lightbox({ item, onClose }) {
+  return (
+    <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center" onClick={onClose}>
+      <button onClick={onClose}
+        className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+        <X size={20} />
+      </button>
+      {item.type === 'image' ? (
+        <img src={item.url} alt="" className="max-w-[95vw] max-h-[90vh] object-contain" onClick={e => e.stopPropagation()} />
+      ) : (
+        <video src={item.url} controls autoPlay className="max-w-[95vw] max-h-[90vh]" onClick={e => e.stopPropagation()} />
       )}
     </div>
   )
