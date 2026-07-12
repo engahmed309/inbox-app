@@ -135,6 +135,8 @@ export default function ChatScreen() {
     loadData()
 
     // ─── Realtime ─────────────────────────────────────────
+    // بنستخدم subscription من غير filter سيرفر-سايد ونفلتر يدوي بالـ conversation_id،
+    // لأن الـ filtered subscriptions أحياناً بتفوت أحداث وقت التبديل بين محادثات بسرعة
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
     realtimeRef.current = supabase
       .channel(`messages-${id}-${Date.now()}`)
@@ -142,9 +144,9 @@ export default function ChatScreen() {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
-        filter: `conversation_id=eq.${id}`
       }, (payload) => {
         const newMsg = payload.new
+        if (newMsg.conversation_id !== id) return
         setMessages(prev => {
           // شيل أي temp messages وضيف الحقيقي
           const withoutTemps = prev.filter(m => !m._temp)
@@ -159,14 +161,16 @@ export default function ChatScreen() {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_assignment_log',
-        filter: `conversation_id=eq.${id}`
-      }, () => { fetchMessages(false) })
+      }, (payload) => {
+        if (payload.new.conversation_id !== id) return
+        fetchMessages(false)
+      })
       .on('postgres_changes', {
         event: 'UPDATE',
         schema: 'public',
         table: 'conversations',
-        filter: `id=eq.${id}`
       }, (payload) => {
+        if (payload.new.id !== id) return
         setConv(prev => prev ? { ...prev, ...payload.new } : prev)
       })
       .subscribe()
