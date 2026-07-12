@@ -260,10 +260,22 @@ export default function ChatScreen() {
   }
 
   // ─── تسجيل الرسائل الصوتية ─────────────────────────────
+  // إنستجرام مش بيدعم WebM، فبنفضّل صيغ متوافقة معاه (MP4/AAC) لو المتصفح بيدعمها
+  const AUDIO_MIME_CANDIDATES = ['audio/mp4', 'audio/aac', 'audio/webm']
+  const pickAudioMimeType = () => {
+    for (const type of AUDIO_MIME_CANDIDATES) {
+      if (window.MediaRecorder?.isTypeSupported?.(type)) return type
+    }
+    return '' // خلي المتصفح يختار الافتراضي
+  }
+  const recordMimeRef = useRef('')
+
   const startRecording = async () => {
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
-      const recorder = new MediaRecorder(stream)
+      const mimeType = pickAudioMimeType()
+      recordMimeRef.current = mimeType
+      const recorder = mimeType ? new MediaRecorder(stream, { mimeType }) : new MediaRecorder(stream)
       audioChunksRef.current = []
       recorder.ondataavailable = e => { if (e.data.size > 0) audioChunksRef.current.push(e.data) }
       recorder.start()
@@ -284,8 +296,10 @@ export default function ChatScreen() {
       recorder.stream.getTracks().forEach(t => t.stop())
       setIsRecording(false)
       if (!send) return
-      const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
-      const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
+      const mimeType = recorder.mimeType || recordMimeRef.current || 'audio/webm'
+      const ext = mimeType.includes('mp4') ? 'm4a' : mimeType.includes('aac') ? 'aac' : 'webm'
+      const blob = new Blob(audioChunksRef.current, { type: mimeType })
+      const file = new File([blob], `voice_${Date.now()}.${ext}`, { type: mimeType })
       setPendingFile({ file, url: null, previewUrl: URL.createObjectURL(blob), type: 'audio', name: 'رسالة صوتية' })
     }
     recorder.stop()
