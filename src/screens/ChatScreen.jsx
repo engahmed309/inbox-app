@@ -63,6 +63,8 @@ export default function ChatScreen() {
   const [quickReplyFilter, setQuickReplyFilter] = useState('')
 
   const messagesEndRef = useRef(null)
+  const messagesContainerRef = useRef(null)
+  const messagesCountRef = useRef(0)
   const realtimeRef = useRef(null)
   const fileInputRef = useRef(null)
   const tempIdRef = useRef(null)
@@ -71,9 +73,12 @@ export default function ChatScreen() {
   const recordTimerRef = useRef(null)
   const textareaRef = useRef(null)
 
-  const scrollToBottom = useCallback((smooth = true) => {
+  // بنسكرول الحاوية نفسها بس (scrollTop) مش scrollIntoView، عشان الأخيرة ممكن
+  // "تسرّب" السكرول لصفحة الموبايل كلها وتطيّر الهيدر بره الشاشة
+  const scrollToBottom = useCallback(() => {
     setTimeout(() => {
-      messagesEndRef.current?.scrollIntoView({ behavior: smooth ? 'smooth' : 'auto' })
+      const el = messagesContainerRef.current
+      if (el) el.scrollTop = el.scrollHeight
     }, 30)
   }, [])
 
@@ -84,7 +89,12 @@ export default function ChatScreen() {
       .select('*')
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
-    setMessages(data || [])
+
+    const newMessages = data || []
+    // اسكرول لو فيه رسايل جديدة فعلاً (مش كل مرة الـ polling بيجري)
+    const hasNewOnes = newMessages.length > messagesCountRef.current
+    messagesCountRef.current = newMessages.length
+    setMessages(newMessages)
 
     const { data: logs } = await supabase
       .from('conversation_assignment_log')
@@ -93,10 +103,11 @@ export default function ChatScreen() {
       .order('created_at', { ascending: true })
     setAssignLogs(logs || [])
 
-    if (scroll) scrollToBottom()
+    if (scroll || hasNewOnes) scrollToBottom()
   }, [id, scrollToBottom])
 
   useEffect(() => {
+    messagesCountRef.current = 0 // محادثة جديدة، صفّر العداد عشان السكرول يشتغل صح
     const loadData = async () => {
       // Conversation + Contact
       const { data: convData } = await supabase
@@ -369,9 +380,9 @@ export default function ChatScreen() {
   }, {})
 
   return (
-    <div className="h-full flex flex-col bg-surface">
+    <div className="h-full flex flex-col bg-surface overflow-hidden">
       {/* Header */}
-      <div className="flex items-center gap-3 px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
+      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
         <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg flex-shrink-0">
           <ArrowRight size={20} />
         </button>
@@ -442,7 +453,7 @@ export default function ChatScreen() {
       </div>
 
       {showSearch && (
-        <div className="px-3 py-2 bg-surface-2 border-b border-surface-3">
+        <div className="flex-shrink-0 px-3 py-2 bg-surface-2 border-b border-surface-3">
           <div className="relative">
             <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
@@ -453,7 +464,7 @@ export default function ChatScreen() {
       )}
 
       {/* Messages */}
-      <div className="flex-1 overflow-y-auto px-4 py-3"
+      <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3"
         onClick={() => { setShowStatus(false); setShowAssign(false) }}>
         {Object.entries(groupedMessages).map(([date, items]) => (
           <div key={date}>
@@ -478,7 +489,7 @@ export default function ChatScreen() {
       </div>
 
       {/* Input */}
-      <div className="px-3 py-3 bg-surface-2 border-t border-surface-3 relative">
+      <div className="flex-shrink-0 px-3 py-3 bg-surface-2 border-t border-surface-3 relative">
         {showQuickReplies && filteredQuickReplies.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto">
             {filteredQuickReplies.map(qr => (
