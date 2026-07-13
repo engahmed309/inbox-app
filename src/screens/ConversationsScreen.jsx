@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, Users, User, Tag, Sun, Moon } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -12,9 +12,9 @@ const AGENT_STATUS_OPTS = [
 ]
 
 const STATUS_TABS = [
-  { key: 'open', label: 'مفتوحة', active: 'text-success border-b-2 border-success' },
-  { key: 'follow_up', label: 'متابعة', active: 'text-follow border-b-2 border-follow' },
-  { key: 'closed', label: 'مغلقة', active: 'text-fg-muted border-b-2 border-fg-muted' },
+  { key: 'open', label: 'مفتوحة', active: 'text-success border-b-2 border-success', dot: 'bg-success' },
+  { key: 'follow_up', label: 'متابعة', active: 'text-follow border-b-2 border-follow', dot: 'bg-follow' },
+  { key: 'closed', label: 'مغلقة', active: 'text-fg-muted border-b-2 border-fg-muted', dot: 'bg-slate-500' },
 ]
 
 const CHANNELS = [
@@ -62,6 +62,7 @@ export default function ConversationsScreen() {
   const [agentFilter, setAgentFilter] = useState('') // '' = بدون فلتر بموظف معين
   const [showAgentFilter, setShowAgentFilter] = useState(false)
   const [statusCounts, setStatusCounts] = useState({ open: 0, openUnread: 0, follow_up: 0, closed: 0 })
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const [tags, setTags] = useState([])
   const [selectedTag, setSelectedTag] = useState(null)
   const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
@@ -204,29 +205,61 @@ export default function ConversationsScreen() {
     return nameMatch || msgMatch
   })
 
+  const agentStatusBtn = agent?.status || 'online'
+  const AgentFilterList = ({ vertical }) => (
+    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[180px] overflow-hidden max-h-64 overflow-y-auto'}>
+      <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
+        <Users size={14} className="text-fg-muted flex-shrink-0" />
+        <span className="flex-1">كل الموظفين</span>
+      </button>
+      {agentsList.map(a => {
+        const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
+        return (
+          <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
+            className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
+            <span className="flex-1 truncate">{a.name}</span>
+            <span className="text-[11px] text-fg-subtle flex-shrink-0">{st.label}</span>
+          </button>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="h-full flex flex-col bg-surface">
-      {/* Header */}
-      <div className="flex items-center justify-between px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
-        <div className="flex items-center gap-2">
-          <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-            <MessageSquare size={16} className="text-white" />
+    <div className="h-full flex bg-surface">
+      {/* ─── Desktop Sidebar (respond.io style) ─────────────── */}
+      <div className={`hidden lg:flex flex-col bg-surface-2 border-l border-surface-3 transition-all duration-200 flex-shrink-0 ${sidebarOpen ? 'w-72' : 'w-16'}`}>
+        {/* Logo + collapse toggle */}
+        <div className={`flex items-center gap-2 px-3 pt-4 pb-3 border-b border-surface-3 ${sidebarOpen ? 'justify-between' : 'flex-col-reverse gap-2'}`}>
+          <div className="flex items-center gap-2 min-w-0">
+            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
+              <MessageSquare size={16} className="text-white" />
+            </div>
+            {sidebarOpen && (
+              <div className="min-w-0">
+                <p className="font-bold text-fg text-sm leading-tight truncate">الرسائل</p>
+                <p className="text-xs text-fg-subtle leading-tight truncate">{agent?.name}</p>
+              </div>
+            )}
           </div>
-          <div>
-            <p className="font-bold text-fg text-sm leading-tight">الرسائل</p>
-            <p className="text-xs text-fg-subtle leading-tight">{agent?.name}</p>
-          </div>
+          <button onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'اقفل القايمة' : 'افتح القايمة'}
+            className="w-7 h-7 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            {sidebarOpen ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+          </button>
         </div>
-        <div className="flex items-center gap-1">
+
+        {/* حالة الموظف + الوضع + الإعدادات + خروج */}
+        <div className={`flex border-b border-surface-3 py-2.5 ${sidebarOpen ? 'items-center justify-between px-3' : 'flex-col items-center gap-1.5'}`}>
           <div className="relative">
             <button onClick={() => setShowAgentStatus(v => !v)}
-              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg">
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agent?.status || 'online'))?.dot}`} />
-              {AGENT_STATUS_OPTS.find(s => s.key === (agent?.status || 'online'))?.label}
-              <ChevronDown size={11} />
+              className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg ${sidebarOpen ? 'px-2.5 py-1.5' : 'w-8 h-8 justify-center'}`}>
+              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.dot}`} />
+              {sidebarOpen && <>{AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}<ChevronDown size={11} /></>}
             </button>
             {showAgentStatus && (
-              <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
                 {AGENT_STATUS_OPTS.map(s => (
                   <button key={s.key}
                     onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
@@ -238,153 +271,258 @@ export default function ConversationsScreen() {
               </div>
             )}
           </div>
-          <button onClick={toggleTheme}
-            className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
-            {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-          </button>
-          {agent?.role === 'admin' && (
-            <button onClick={() => navigate('/settings')}
-              className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
-              <Settings size={17} />
+          <div className={`flex items-center gap-1 ${sidebarOpen ? '' : 'flex-col'}`}>
+            <button onClick={toggleTheme}
+              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+              {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
-          )}
-          <button onClick={handleSignOut}
-            className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-danger rounded-xl hover:bg-surface-3 transition-colors">
-            <LogOut size={17} />
-          </button>
+            {agent?.role === 'admin' && (
+              <button onClick={() => navigate('/settings')}
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+                <Settings size={15} />
+              </button>
+            )}
+            <button onClick={handleSignOut}
+              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-danger rounded-lg hover:bg-surface-3 transition-colors">
+              <LogOut size={15} />
+            </button>
+          </div>
         </div>
-      </div>
 
-      {/* Search */}
-      <div className="px-4 py-2.5 bg-surface-2 border-b border-surface-3 flex items-center gap-2">
-        <div className="relative flex-1">
-          <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-          <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
-            className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
-        </div>
-        {canSeeAll && (
-          <div className="flex bg-surface-3 rounded-xl p-0.5 flex-shrink-0">
-            <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-              <Users size={12} /> الكل
-            </button>
-            <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
-              className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-              <User size={12} /> بتاعتي
+        {/* Search + الكل/بتاعتي */}
+        {sidebarOpen ? (
+          <div className="px-3 py-2.5 border-b border-surface-3">
+            <div className="relative">
+              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
+                className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+            </div>
+            {canSeeAll && (
+              <div className="flex bg-surface-3 rounded-xl p-0.5 mt-2">
+                <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+                  <Users size={12} /> الكل
+                </button>
+                <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
+                  className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+                  <User size={12} /> بتاعتي
+                </button>
+              </div>
+            )}
+          </div>
+        ) : (
+          <div className="border-b border-surface-3 py-2.5 flex justify-center">
+            <button onClick={() => setSidebarOpen(true)}
+              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+              <Search size={15} />
             </button>
           </div>
         )}
+
+        {/* فلتر بموظف معين (أدمن بس) */}
+        {agent?.role === 'admin' && sidebarOpen && (
+          <div className="px-3 py-2 border-b border-surface-3 relative">
+            <button onClick={() => setShowAgentFilter(v => !v)}
+              className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
+              {agentFilter ? (
+                <>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
+                  <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
+                </>
+              ) : (
+                <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
+              )}
+              <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
+            </button>
+            {showAgentFilter && <AgentFilterList vertical />}
+          </div>
+        )}
+
+        {/* Status Tabs — عمودي */}
+        <div className="flex-1 overflow-y-auto py-2">
+          {STATUS_TABS.map(t => {
+            const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
+            return (
+              <button key={t.key} onClick={() => setStatus(t.key)} title={t.label}
+                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${sidebarOpen ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === t.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.dot}`} />
+                {sidebarOpen && <span className="flex-1 text-right">{t.label}</span>}
+                {sidebarOpen && count > 0 && (
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
+                    {count}
+                  </span>
+                )}
+              </button>
+            )
+          })}
+        </div>
       </div>
 
-      {/* فلتر بموظف معين (أدمن بس) */}
-      {agent?.role === 'admin' && (
-        <div className="px-4 py-2 bg-surface-2 border-b border-surface-3 relative">
-          <button onClick={() => setShowAgentFilter(v => !v)}
-            className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
-            {agentFilter ? (
-              <>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
-                <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
-              </>
-            ) : (
-              <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
-            )}
-            <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
-          </button>
-
-          {showAgentFilter && (
-            <div className="absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto">
-              <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
-                className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
-                <Users size={14} className="text-fg-muted flex-shrink-0" />
-                <span className="flex-1">كل الموظفين</span>
+      {/* ─── العمود الرئيسي ─────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* الأشرطة دي بتظهر بس على الموبايل، وبتتحول لسايدبار على الشاشات الكبيرة */}
+        <div className="lg:hidden">
+          {/* Header */}
+          <div className="flex items-center justify-between px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
+                <MessageSquare size={16} className="text-white" />
+              </div>
+              <div>
+                <p className="font-bold text-fg text-sm leading-tight">الرسائل</p>
+                <p className="text-xs text-fg-subtle leading-tight">{agent?.name}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="relative">
+                <button onClick={() => setShowAgentStatus(v => !v)}
+                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg">
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.dot}`} />
+                  {AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}
+                  <ChevronDown size={11} />
+                </button>
+                {showAgentStatus && (
+                  <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
+                    {AGENT_STATUS_OPTS.map(s => (
+                      <button key={s.key}
+                        onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={toggleTheme}
+                className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
+                {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
               </button>
-              {agentsList.map(a => {
-                const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
-                return (
-                  <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
-                    className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
-                    <span className="flex-1 truncate">{a.name}</span>
-                    <span className="text-[11px] text-fg-subtle flex-shrink-0">{st.label}</span>
-                  </button>
-                )
-              })}
+              {agent?.role === 'admin' && (
+                <button onClick={() => navigate('/settings')}
+                  className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
+                  <Settings size={17} />
+                </button>
+              )}
+              <button onClick={handleSignOut}
+                className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-danger rounded-xl hover:bg-surface-3 transition-colors">
+                <LogOut size={17} />
+              </button>
+            </div>
+          </div>
+
+          {/* Search */}
+          <div className="px-4 py-2.5 bg-surface-2 border-b border-surface-3 flex items-center gap-2">
+            <div className="relative flex-1">
+              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
+                className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+            </div>
+            {canSeeAll && (
+              <div className="flex bg-surface-3 rounded-xl p-0.5 flex-shrink-0">
+                <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+                  <Users size={12} /> الكل
+                </button>
+                <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
+                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+                  <User size={12} /> بتاعتي
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* فلتر بموظف معين (أدمن بس) */}
+          {agent?.role === 'admin' && (
+            <div className="px-4 py-2 bg-surface-2 border-b border-surface-3 relative">
+              <button onClick={() => setShowAgentFilter(v => !v)}
+                className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
+                {agentFilter ? (
+                  <>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
+                    <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
+                  </>
+                ) : (
+                  <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
+                )}
+                <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
+              </button>
+              {showAgentFilter && <AgentFilterList vertical />}
             </div>
           )}
-        </div>
-      )}
 
-      {/* Tags Filter */}
-      {tags.length > 0 && (
+          {/* Status Tabs */}
+          <div className="flex border-b border-surface-3 bg-surface-2">
+            {STATUS_TABS.map(t => {
+              const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
+              return (
+                <button key={t.key} onClick={() => setStatus(t.key)}
+                  className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${status === t.key ? t.active : 'text-fg-subtle'}`}>
+                  {t.label}
+                  {count > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                      {count}
+                    </span>
+                  )}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+
+        {/* Tags Filter */}
+        {tags.length > 0 && (
+          <div className="flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+            <button onClick={() => setSelectedTag(null)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+              <Tag size={11} /> كل التاجات
+            </button>
+            {tags.map(t => (
+              <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
+                style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
+                {t.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Channel Filter */}
         <div className="flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
-          <button onClick={() => setSelectedTag(null)}
-            className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            <Tag size={11} /> كل التاجات
-          </button>
-          {tags.map(t => (
-            <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
-              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
-              style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
-              <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-              {t.name}
+          {CHANNELS.map(ch => (
+            <button key={ch.key} onClick={() => setChannel(ch.key)}
+              className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+              {ch.icon}
+              {ch.label}
             </button>
           ))}
         </div>
-      )}
 
-      {/* Status Tabs */}
-      <div className="flex border-b border-surface-3 bg-surface-2">
-        {STATUS_TABS.map(t => {
-          const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
-          return (
-            <button key={t.key} onClick={() => setStatus(t.key)}
-              className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${status === t.key ? t.active : 'text-fg-subtle'}`}>
-              {t.label}
-              {count > 0 && (
-                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                  {count > 99 ? '99+' : count}
-                </span>
-              )}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Channel Filter */}
-      <div className="flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
-        {CHANNELS.map(ch => (
-          <button key={ch.key} onClick={() => setChannel(ch.key)}
-            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            {ch.icon}
-            {ch.label}
-          </button>
-        ))}
-      </div>
-
-      {/* List */}
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex items-center justify-center h-40">
-            <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : filtered.length === 0 ? (
-          <div className="flex flex-col items-center justify-center h-40 text-fg-subtle">
-            <MessageSquare size={32} className="mb-2 opacity-20" />
-            <p className="text-sm">لا توجد محادثات</p>
-          </div>
-        ) : (
-          filtered.map(conv => (
-            <ConvCard
-              key={conv.id}
-              conv={conv}
-              agentName={agentsMap[conv.assigned_agent_id]}
-              lastMsg={lastMessages[conv.id]}
-              tags={contactTagsMap[conv.contact_id]}
-              onClick={() => navigate(`/chat/${conv.id}`)}
-            />
-          ))
-        )}
+        {/* List */}
+        <div className="flex-1 overflow-y-auto">
+          {loading ? (
+            <div className="flex items-center justify-center h-40">
+              <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : filtered.length === 0 ? (
+            <div className="flex flex-col items-center justify-center h-40 text-fg-subtle">
+              <MessageSquare size={32} className="mb-2 opacity-20" />
+              <p className="text-sm">لا توجد محادثات</p>
+            </div>
+          ) : (
+            filtered.map(conv => (
+              <ConvCard
+                key={conv.id}
+                conv={conv}
+                agentName={agentsMap[conv.assigned_agent_id]}
+                lastMsg={lastMessages[conv.id]}
+                tags={contactTagsMap[conv.contact_id]}
+                onClick={() => navigate(`/chat/${conv.id}`)}
+              />
+            ))
+          )}
+        </div>
       </div>
     </div>
   )
@@ -433,7 +571,7 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
           </span>
           {conv.unread_count > 0 && (
             <span className="bg-brand text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center flex-shrink-0 pulse-dot">
-              {conv.unread_count > 99 ? '99+' : conv.unread_count}
+              {conv.unread_count}
             </span>
           )}
         </div>
