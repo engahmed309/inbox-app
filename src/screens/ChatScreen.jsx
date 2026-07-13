@@ -361,6 +361,13 @@ export default function ChatScreen() {
     return quickReplies.filter(qr => qr.name.toLowerCase().includes(q)).slice(0, 8)
   }, [quickReplies, quickReplyFilter])
 
+  // اسم الموظف اللي بعت كل رسالة outbound، عشان لو المحادثة اتنقلت بين موظفين نقدر نتراك مين قال إيه
+  const agentsMap = useMemo(() => {
+    const map = {}
+    agents.forEach(a => { map[a.id] = a.name })
+    return map
+  }, [agents])
+
   const currentStatus = STATUS_OPTS.find(s => s.key === conv?.status) || STATUS_OPTS[0]
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : Facebook
 
@@ -478,7 +485,7 @@ export default function ChatScreen() {
               {items.map((item, i) => item._kind === 'assignment' ? (
                 <AssignmentEvent key={item.id} log={item} />
               ) : (
-                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} onMediaClick={setLightbox} />
+                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} onMediaClick={setLightbox} agentsMap={agentsMap} />
               ))}
             </div>
           </div>
@@ -596,16 +603,25 @@ function AssignmentEvent({ log }) {
   )
 }
 
-function MessageBubble({ msg, prev, onMediaClick }) {
+function MessageBubble({ msg, prev, onMediaClick, agentsMap }) {
   const isOut = msg.direction === 'outbound'
   const isTemp = msg._temp
   const showTime = !prev ||
     Math.abs(new Date(msg.created_at) - new Date(prev.created_at)) > 300000
 
+  // اسم الموظف اللي بعت الرسالة دي — بيظهر لما يتغيّر عن اللي قبله عشان نتراك لو المحادثة اتنقلت بين موظفين
+  const senderName = isOut ? agentsMap?.[msg.sent_by_agent_id] : null
+  const showSender = senderName && (!prev || prev.sent_by_agent_id !== msg.sent_by_agent_id)
+
   return (
     <div className={`flex flex-col mb-1 ${isOut ? 'items-end' : 'items-start'}`}>
       {showTime && !isTemp && (
         <span className="text-xs text-fg-subtle mb-1 px-1">{formatTime(msg.created_at)}</span>
+      )}
+      {showSender && !isTemp && (
+        <span className="flex items-center gap-1 text-[11px] text-brand-light mb-0.5 px-1">
+          <User size={10} /> {senderName}
+        </span>
       )}
       <div className={`max-w-[78%] px-3.5 py-2.5 text-sm transition-opacity
         ${isOut ? 'msg-out text-white' : 'msg-in text-fg'}
