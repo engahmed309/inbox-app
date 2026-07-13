@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -63,6 +63,7 @@ export default function ConversationsScreen() {
   const [showAgentFilter, setShowAgentFilter] = useState(false)
   const [statusCounts, setStatusCounts] = useState({ open: 0, openUnread: 0, follow_up: 0, closed: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [unrepliedOnly, setUnrepliedOnly] = useState(false)
   const [tags, setTags] = useState([])
   const [selectedTag, setSelectedTag] = useState(null)
   const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
@@ -107,11 +108,31 @@ export default function ConversationsScreen() {
     }
 
     // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
-    const countsQuery = applyScope(supabase.from('conversations').select('status, unread_count'))
+    const countsQuery = applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at'))
     const { data: countsData } = await countsQuery
+
+    // قراءة كل موظف الشخصية لكل محادثة (عشان نحدد المقروء/غير المقروء على مستوى اليوزر)
+    let readsMap = {}
+    if (agent?.id && countsData?.length) {
+      const allIds = countsData.map(c => c.id)
+      const { data: readsData } = await supabase
+        .from('conversation_reads')
+        .select('conversation_id, read_at')
+        .eq('agent_id', agent.id)
+        .in('conversation_id', allIds)
+      readsData?.forEach(r => { readsMap[r.conversation_id] = r.read_at })
+    }
+    const isUnreadForMe = (c) => {
+      if (!c.unread_count || c.unread_count <= 0) return false
+      const myReadAt = readsMap[c.id]
+      if (!myReadAt) return true
+      if (!c.last_inbound_at) return false
+      return new Date(myReadAt) < new Date(c.last_inbound_at)
+    }
+
     const counts = { open: 0, openUnread: 0, follow_up: 0, closed: 0 }
     countsData?.forEach(c => {
-      if (c.status === 'open') { counts.open++; if (c.unread_count > 0) counts.openUnread++ }
+      if (c.status === 'open') { counts.open++; if (isUnreadForMe(c)) counts.openUnread++ }
       else if (c.status === 'follow_up') counts.follow_up++
       else if (c.status === 'closed') counts.closed++
     })
@@ -120,14 +141,15 @@ export default function ConversationsScreen() {
     // Conversations query
     let query = applyScope(supabase
       .from('conversations')
-      .select('*, contacts(id, name, profile_pic, platform_id)')
+      .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
       .eq('status', status)
       .order('last_message_at', { ascending: false }))
+    if (unrepliedOnly) query = query.gt('unread_count', 0)
 
     const { data, error } = await query
     if (error) { console.error(error); setLoading(false); return }
 
-    const convs = data || []
+    const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
     setConversations(convs)
     setLoading(false)
 
@@ -159,7 +181,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap)
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll])
+  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly])
 
   useEffect(() => {
     if (!agent) return
@@ -489,7 +511,7 @@ export default function ConversationsScreen() {
         )}
 
         {/* Channel Filter */}
-        <div className="flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+        <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
           {CHANNELS.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -497,6 +519,12 @@ export default function ConversationsScreen() {
               {ch.label}
             </button>
           ))}
+          <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
+          <button onClick={() => setUnrepliedOnly(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${unrepliedOnly ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <CircleDot size={11} />
+            بدون رد
+          </button>
         </div>
 
         {/* List */}
@@ -562,14 +590,22 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
       {/* Content */}
       <div className="flex-1 min-w-0">
         <div className="flex items-baseline justify-between gap-2">
-          <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
+          <span className="flex items-center gap-1.5 min-w-0">
+            <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
+            {contact?.lifecycle_stages && (
+              <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
+                style={{ background: contact.lifecycle_stages.color }}>
+                {contact.lifecycle_stages.name}
+              </span>
+            )}
+          </span>
           <span className="text-xs text-fg-subtle flex-shrink-0">{timeAgo(conv.last_message_at)}</span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <span className="text-xs text-fg-muted truncate flex-1">
             {lastMsgText || (agentName ? `@${agentName}` : 'غير معين')}
           </span>
-          {conv.unread_count > 0 && (
+          {conv.myUnread && (
             <span className="bg-brand text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center flex-shrink-0 pulse-dot">
               {conv.unread_count}
             </span>

@@ -58,6 +58,9 @@ export default function ChatScreen() {
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
 
+  const [lifecycles, setLifecycles] = useState([])
+  const [showLifecycle, setShowLifecycle] = useState(false)
+
   const [quickReplies, setQuickReplies] = useState([])
   const [showQuickReplies, setShowQuickReplies] = useState(false)
   const [quickReplyFilter, setQuickReplyFilter] = useState('')
@@ -131,7 +134,12 @@ export default function ChatScreen() {
       await fetchMessages(false)
       scrollToBottom(false)
 
-      // ملحوظة: مبنعملش "mark as read" هنا — المحادثة تفضل غير مقروءة لحد ما نرد فعلياً
+      // ملحوظة: مبنعملش "mark as read" عالمي هنا — المحادثة تفضل غير مقروءة للكل لحد ما نرد فعلياً.
+      // بس بمجرد ما الموظف ده يفتح الشات، نسجّل قراءته الشخصية (خاصة بيه بس)
+      if (agent?.id) {
+        supabase.from('conversation_reads')
+          .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
+      }
 
       // Agents list (لأي agent يقدر يعيّن/يستلم محادثات)
       const { data: ags } = await supabase.from('agents').select('id, name, is_online, status').order('name')
@@ -140,6 +148,10 @@ export default function ChatScreen() {
       // Quick replies
       const { data: qrs } = await supabase.from('quick_replies').select('*').order('name')
       setQuickReplies(qrs || [])
+
+      // Lifecycle stages
+      const { data: lcs } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
+      setLifecycles(lcs || [])
     }
 
     loadData()
@@ -274,6 +286,12 @@ export default function ChatScreen() {
     if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
   }
 
+  const changeLifecycle = async (stageId) => {
+    await supabase.from('contacts').update({ lifecycle_stage_id: stageId || null }).eq('id', contact.id)
+    setContact(prev => prev ? { ...prev, lifecycle_stage_id: stageId || null } : prev)
+    setShowLifecycle(false)
+  }
+
   const assignAgent = async (agentId) => {
     await supabase.from('conversations').update({ assigned_agent_id: agentId }).eq('id', id)
     await supabase.from('conversation_assignment_log').insert({
@@ -369,6 +387,7 @@ export default function ChatScreen() {
   }, [agents])
 
   const currentStatus = STATUS_OPTS.find(s => s.key === conv?.status) || STATUS_OPTS[0]
+  const currentLifecycle = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : Facebook
 
   // ─── دمج الرسائل وسجل التعيين في تايم لاين واحد ─────────────
@@ -395,7 +414,7 @@ export default function ChatScreen() {
           <ArrowRight size={20} />
         </button>
 
-        <button onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-right">
+        <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-right cursor-pointer">
           {contact?.profile_pic ? (
             <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt=""
               onError={e => e.target.style.display = 'none'} />
@@ -405,7 +424,32 @@ export default function ChatScreen() {
             </div>
           )}
           <div className="min-w-0">
-            <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+            <div className="flex items-center gap-1.5">
+              <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+              <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
+                <button onClick={() => setShowLifecycle(v => !v)}
+                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
+                  style={{ background: currentLifecycle?.color || '#64748B' }}>
+                  {currentLifecycle?.name || 'بدون مرحلة'} <ChevronDown size={9} />
+                </button>
+                {showLifecycle && (
+                  <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
+                    <button onClick={() => changeLifecycle(null)}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-500" />
+                      بدون مرحلة
+                    </button>
+                    {lifecycles.map(l => (
+                      <button key={l.id} onClick={() => changeLifecycle(l.id)}
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                        {l.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
               <span className="text-xs text-fg-muted truncate">
@@ -414,7 +458,7 @@ export default function ChatScreen() {
               </span>
             </div>
           </div>
-        </button>
+        </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
           <button onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
