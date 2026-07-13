@@ -131,8 +131,7 @@ export default function ChatScreen() {
       await fetchMessages(false)
       scrollToBottom(false)
 
-      // Mark as read
-      await supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
+      // ملحوظة: مبنعملش "mark as read" هنا — المحادثة تفضل غير مقروءة لحد ما نرد فعلياً
 
       // Agents list (لأي agent يقدر يعيّن/يستلم محادثات)
       const { data: ags } = await supabase.from('agents').select('id, name, is_online, status').order('name')
@@ -165,8 +164,7 @@ export default function ChatScreen() {
           return [...withoutTemps, newMsg]
         })
         scrollToBottom()
-        // Mark as read
-        supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
+        // ملحوظة: مبنعملش mark as read هنا — تفضل غير مقروءة لحد ما نرد فعلياً
       })
       .on('postgres_changes', {
         event: 'INSERT',
@@ -255,6 +253,9 @@ export default function ChatScreen() {
         await sendOne(pf.name || 'ملف', pf.type, url)
       }
       await fetchMessages()
+      // اتردّ فعلاً، دلوقتي بس تتعلّم "مقروءة"
+      await supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
+      setConv(prev => prev ? { ...prev, unread_count: 0 } : prev)
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempId))
       setText(msgText)

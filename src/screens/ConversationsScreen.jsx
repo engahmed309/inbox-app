@@ -60,6 +60,8 @@ export default function ConversationsScreen() {
   const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
   const [agentsList, setAgentsList] = useState([])
   const [agentFilter, setAgentFilter] = useState('') // '' = بدون فلتر بموظف معين
+  const [showAgentFilter, setShowAgentFilter] = useState(false)
+  const [statusCounts, setStatusCounts] = useState({ open: 0, openUnread: 0, follow_up: 0, closed: 0 })
   const [tags, setTags] = useState([])
   const [selectedTag, setSelectedTag] = useState(null)
   const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
@@ -72,7 +74,7 @@ export default function ConversationsScreen() {
 
   const fetchConversations = useCallback(async () => {
     // Agents map
-    const { data: agentsData } = await supabase.from('agents').select('id, name').order('name')
+    const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online').order('name')
     const aMap = {}
     agentsData?.forEach(a => { aMap[a.id] = a.name })
     setAgentsMap(aMap)
@@ -89,22 +91,37 @@ export default function ConversationsScreen() {
       tagContactIds = (ctRows || []).map(r => r.contact_id)
     }
 
+    // فلاتر مشتركة (القناة/الموظف/التاج) بنطبقها على أي كويري
+    const applyScope = (q) => {
+      if (channel !== 'all') q = q.eq('platform', channel)
+      if (!canSeeAll) {
+        q = q.eq('assigned_agent_id', agent?.id)
+      } else if (agentFilter) {
+        q = q.eq('assigned_agent_id', agentFilter)
+      } else if (viewMode === 'mine') {
+        q = q.eq('assigned_agent_id', agent?.id)
+      }
+      if (tagContactIds) q = q.in('contact_id', tagContactIds.length ? tagContactIds : ['00000000-0000-0000-0000-000000000000'])
+      return q
+    }
+
+    // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
+    const countsQuery = applyScope(supabase.from('conversations').select('status, unread_count'))
+    const { data: countsData } = await countsQuery
+    const counts = { open: 0, openUnread: 0, follow_up: 0, closed: 0 }
+    countsData?.forEach(c => {
+      if (c.status === 'open') { counts.open++; if (c.unread_count > 0) counts.openUnread++ }
+      else if (c.status === 'follow_up') counts.follow_up++
+      else if (c.status === 'closed') counts.closed++
+    })
+    setStatusCounts(counts)
+
     // Conversations query
-    let query = supabase
+    let query = applyScope(supabase
       .from('conversations')
       .select('*, contacts(id, name, profile_pic, platform_id)')
       .eq('status', status)
-      .order('last_message_at', { ascending: false })
-
-    if (channel !== 'all') query = query.eq('platform', channel)
-    if (!canSeeAll) {
-      query = query.eq('assigned_agent_id', agent?.id)
-    } else if (agentFilter) {
-      query = query.eq('assigned_agent_id', agentFilter)
-    } else if (viewMode === 'mine') {
-      query = query.eq('assigned_agent_id', agent?.id)
-    }
-    if (tagContactIds) query = query.in('contact_id', tagContactIds.length ? tagContactIds : ['00000000-0000-0000-0000-000000000000'])
+      .order('last_message_at', { ascending: false }))
 
     const { data, error } = await query
     if (error) { console.error(error); setLoading(false); return }
@@ -261,14 +278,40 @@ export default function ConversationsScreen() {
 
       {/* فلتر بموظف معين (أدمن بس) */}
       {agent?.role === 'admin' && (
-        <div className="px-4 py-2 bg-surface-2 border-b border-surface-3">
-          <select value={agentFilter} onChange={e => setAgentFilter(e.target.value)}
-            className="w-full bg-surface-3 rounded-lg px-3 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-            <option value="">فلترة بموظف معين (كل الموظفين)</option>
-            {agentsList.map(a => (
-              <option key={a.id} value={a.id}>{a.name}</option>
-            ))}
-          </select>
+        <div className="px-4 py-2 bg-surface-2 border-b border-surface-3 relative">
+          <button onClick={() => setShowAgentFilter(v => !v)}
+            className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
+            {agentFilter ? (
+              <>
+                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
+                <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
+              </>
+            ) : (
+              <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
+            )}
+            <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
+          </button>
+
+          {showAgentFilter && (
+            <div className="absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto">
+              <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
+                className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
+                <Users size={14} className="text-fg-muted flex-shrink-0" />
+                <span className="flex-1">كل الموظفين</span>
+              </button>
+              {agentsList.map(a => {
+                const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
+                return (
+                  <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
+                    className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
+                    <span className="flex-1 truncate">{a.name}</span>
+                    <span className="text-[11px] text-fg-subtle flex-shrink-0">{st.label}</span>
+                  </button>
+                )
+              })}
+            </div>
+          )}
         </div>
       )}
 
@@ -292,12 +335,20 @@ export default function ConversationsScreen() {
 
       {/* Status Tabs */}
       <div className="flex border-b border-surface-3 bg-surface-2">
-        {STATUS_TABS.map(t => (
-          <button key={t.key} onClick={() => setStatus(t.key)}
-            className={`flex-1 py-2.5 text-sm font-medium transition-colors ${status === t.key ? t.active : 'text-fg-subtle'}`}>
-            {t.label}
-          </button>
-        ))}
+        {STATUS_TABS.map(t => {
+          const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
+          return (
+            <button key={t.key} onClick={() => setStatus(t.key)}
+              className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${status === t.key ? t.active : 'text-fg-subtle'}`}>
+              {t.label}
+              {count > 0 && (
+                <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                  {count > 99 ? '99+' : count}
+                </span>
+              )}
+            </button>
+          )
+        })}
       </div>
 
       {/* Channel Filter */}
