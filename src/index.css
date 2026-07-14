@@ -47,9 +47,7 @@ body, #root {
 }
 body {
   position: fixed;
-  top: var(--app-offset-top, 0px);
-  left: 0;
-  right: 0;
+  inset: 0;
   width: 100%;
   font-family: 'Inter', system-ui, sans-serif;
   background: rgb(var(--color-surface));
