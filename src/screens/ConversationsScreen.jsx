@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -48,6 +48,36 @@ function displayName(contact) {
   return 'مجهول'
 }
 
+// كروم ع الأندرويد بيطلق حدث beforeinstallprompt نقدر نتحكم فيه يدوياً (بدل ما نستنى أيقونة المتصفح التلقائية اللي مش دايماً بتظهر).
+// آيفون/سفاري مفيهوش الحدث ده أصلاً، فبنكتشف iOS ونوريله تعليمات "إضافة إلى الشاشة الرئيسية" يدوي.
+function useInstallPrompt() {
+  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [installed, setInstalled] = useState(
+    () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
+  )
+  const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
+
+  useEffect(() => {
+    const onPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e) }
+    const onInstalled = () => { setInstalled(true); setDeferredPrompt(null) }
+    window.addEventListener('beforeinstallprompt', onPrompt)
+    window.addEventListener('appinstalled', onInstalled)
+    return () => {
+      window.removeEventListener('beforeinstallprompt', onPrompt)
+      window.removeEventListener('appinstalled', onInstalled)
+    }
+  }, [])
+
+  const promptInstall = async () => {
+    if (!deferredPrompt) return
+    deferredPrompt.prompt()
+    await deferredPrompt.userChoice
+    setDeferredPrompt(null)
+  }
+
+  return { canInstall: !installed && (!!deferredPrompt || isIOS), isIOS, promptInstall }
+}
+
 export default function ConversationsScreen() {
   const [conversations, setConversations] = useState([])
   const [agentsMap, setAgentsMap] = useState({})
@@ -70,10 +100,13 @@ export default function ConversationsScreen() {
   const [lifecycles, setLifecycles] = useState([])
   const [lifecycleCounts, setLifecycleCounts] = useState({}) // { stage_id: عدد المحادثات المفتوحة }
   const [selectedLifecycle, setSelectedLifecycle] = useState(null)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [showIosHelp, setShowIosHelp] = useState(false)
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const realtimeRef = useRef(null)
+  const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
 
@@ -258,6 +291,8 @@ export default function ConversationsScreen() {
   })
 
   const agentStatusBtn = agent?.status || 'online'
+  // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
+  const expanded = sidebarOpen || mobileMenuOpen
   const AgentFilterList = ({ vertical }) => (
     <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[180px] overflow-hidden max-h-64 overflow-y-auto'}>
       <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
@@ -281,34 +316,43 @@ export default function ConversationsScreen() {
 
   return (
     <div className="h-full flex bg-surface">
-      {/* ─── Desktop Sidebar (respond.io style) ─────────────── */}
-      <div className={`hidden lg:flex flex-col bg-surface-2 border-l border-surface-3 transition-all duration-200 flex-shrink-0 ${sidebarOpen ? 'w-72' : 'w-16'}`}>
-        {/* Logo + collapse toggle */}
-        <div className={`flex items-center gap-2 px-3 pt-4 pb-3 border-b border-surface-3 ${sidebarOpen ? 'justify-between' : 'flex-col-reverse gap-2'}`}>
+      {/* خلفية معتمة تقفل قائمة الموبايل لو ضُغط عليها */}
+      {mobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setMobileMenuOpen(false)} />
+      )}
+
+      {/* ─── القائمة الجانبية — سايدبار ثابت على الديسكتوب، ودرج منزلق على الموبايل ─── */}
+      <div className={`${mobileMenuOpen ? 'flex' : 'hidden'} lg:flex fixed lg:static inset-y-0 right-0 z-40 lg:z-auto w-72 ${sidebarOpen ? 'lg:w-72' : 'lg:w-16'} flex-col bg-surface-2 border-l border-surface-3 transition-all duration-200 flex-shrink-0`}>
+        {/* Logo + إغلاق (موبايل) / طي (ديسكتوب) */}
+        <div className={`flex items-center gap-2 px-3 pt-4 pb-3 border-b border-surface-3 ${expanded ? 'justify-between' : 'flex-col-reverse gap-2'}`}>
           <div className="flex items-center gap-2 min-w-0">
             <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
               <MessageSquare size={16} className="text-white" />
             </div>
-            {sidebarOpen && (
+            {expanded && (
               <div className="min-w-0">
                 <p className="font-bold text-fg text-sm leading-tight truncate">الرسائل</p>
                 <p className="text-xs text-fg-subtle leading-tight truncate">{agent?.name}</p>
               </div>
             )}
           </div>
+          <button onClick={() => setMobileMenuOpen(false)} title="اقفل"
+            className="lg:hidden w-7 h-7 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
           <button onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'اقفل القايمة' : 'افتح القايمة'}
-            className="w-7 h-7 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            className="hidden lg:flex w-7 h-7 flex-shrink-0 items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             {sidebarOpen ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
           </button>
         </div>
 
         {/* حالة الموظف + الوضع + الإعدادات + خروج */}
-        <div className={`flex border-b border-surface-3 py-2.5 ${sidebarOpen ? 'items-center justify-between px-3' : 'flex-col items-center gap-1.5'}`}>
+        <div className={`flex border-b border-surface-3 py-2.5 ${expanded ? 'items-center justify-between px-3' : 'flex-col items-center gap-1.5'}`}>
           <div className="relative">
             <button onClick={() => setShowAgentStatus(v => !v)}
-              className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg ${sidebarOpen ? 'px-2.5 py-1.5' : 'w-8 h-8 justify-center'}`}>
+              className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg ${expanded ? 'px-2.5 py-1.5' : 'w-8 h-8 justify-center'}`}>
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.dot}`} />
-              {sidebarOpen && <>{AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}<ChevronDown size={11} /></>}
+              {expanded && <>{AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}<ChevronDown size={11} /></>}
             </button>
             {showAgentStatus && (
               <div className="absolute right-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
@@ -323,7 +367,7 @@ export default function ConversationsScreen() {
               </div>
             )}
           </div>
-          <div className={`flex items-center gap-1 ${sidebarOpen ? '' : 'flex-col'}`}>
+          <div className={`flex items-center gap-1 ${expanded ? '' : 'flex-col'}`}>
             <button onClick={toggleTheme}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
@@ -341,8 +385,19 @@ export default function ConversationsScreen() {
           </div>
         </div>
 
+        {/* تثبيت التطبيق — بيظهر بس لو المتصفح مسموحله يثبت أو على آيفون (تعليمات يدوية) */}
+        {canInstall && (
+          <div className={`border-b border-surface-3 ${expanded ? 'px-3 py-2.5' : 'py-2.5 flex justify-center'}`}>
+            <button onClick={() => isIOS ? setShowIosHelp(true) : promptInstall()}
+              className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors ${expanded ? 'w-full justify-center px-2.5 py-2' : 'w-8 h-8 justify-center'}`}>
+              <Download size={14} />
+              {expanded && 'ثبّت التطبيق على الموبايل'}
+            </button>
+          </div>
+        )}
+
         {/* Search + الكل/بتاعتي */}
-        {sidebarOpen ? (
+        {expanded ? (
           <div className="px-3 py-2.5 border-b border-surface-3">
             <div className="relative">
               <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
@@ -372,7 +427,7 @@ export default function ConversationsScreen() {
         )}
 
         {/* فلتر بموظف معين (أدمن بس) */}
-        {agent?.role === 'admin' && sidebarOpen && (
+        {agent?.role === 'admin' && expanded && (
           <div className="px-3 py-2 border-b border-surface-3 relative">
             <button onClick={() => setShowAgentFilter(v => !v)}
               className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
@@ -390,152 +445,18 @@ export default function ConversationsScreen() {
           </div>
         )}
 
-        {/* Status Tabs — عمودي */}
-        <div className={sidebarOpen ? 'flex-shrink-0 py-2' : 'flex-1 overflow-y-auto py-2'}>
-          {STATUS_TABS.map(t => {
-            const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
-            return (
-              <button key={t.key} onClick={() => setStatus(t.key)} title={t.label}
-                className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${sidebarOpen ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === t.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-                <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.dot}`} />
-                {sidebarOpen && <span className="flex-1 text-right">{t.label}</span>}
-                {sidebarOpen && count > 0 && (
-                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
-                    {count}
-                  </span>
-                )}
-              </button>
-            )
-          })}
-        </div>
-
-        {/* Lifecycle — عدد المحادثات المفتوحة في كل مرحلة، والضغط عليها بيفلتر القائمة (بالحالة المختارة حالياً) */}
-        {sidebarOpen && lifecycles.length > 0 && (
-          <div className="flex-1 overflow-y-auto border-t border-surface-3 py-2">
-            <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">اللايف سايكل</p>
-            <button onClick={() => setSelectedLifecycle(null)}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${!selectedLifecycle ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-              <span className="flex-1 text-right">كل المراحل</span>
-            </button>
-            {lifecycles.map(l => (
-              <button key={l.id} onClick={() => setSelectedLifecycle(prev => prev === l.id ? null : l.id)}
-                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                <span className="flex-1 text-right truncate">{l.name}</span>
-                {lifecycleCounts[l.id] > 0 && (
-                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
-                    {lifecycleCounts[l.id]}
-                  </span>
-                )}
-              </button>
-            ))}
-          </div>
-        )}
-      </div>
-
-      {/* ─── العمود الرئيسي ─────────────────────────────────── */}
-      <div className="flex-1 flex flex-col min-w-0">
-        {/* الأشرطة دي بتظهر بس على الموبايل، وبتتحول لسايدبار على الشاشات الكبيرة */}
-        <div className="lg:hidden">
-          {/* Header */}
-          <div className="flex items-center justify-between px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center">
-                <MessageSquare size={16} className="text-white" />
-              </div>
-              <div>
-                <p className="font-bold text-fg text-sm leading-tight">الرسائل</p>
-                <p className="text-xs text-fg-subtle leading-tight">{agent?.name}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-1">
-              <div className="relative">
-                <button onClick={() => setShowAgentStatus(v => !v)}
-                  className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg">
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.dot}`} />
-                  {AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}
-                  <ChevronDown size={11} />
-                </button>
-                {showAgentStatus && (
-                  <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
-                    {AGENT_STATUS_OPTS.map(s => (
-                      <button key={s.key}
-                        onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
-                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
-                        <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button onClick={toggleTheme}
-                className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
-                {theme === 'dark' ? <Sun size={17} /> : <Moon size={17} />}
-              </button>
-              {agent?.role === 'admin' && (
-                <button onClick={() => navigate('/settings')}
-                  className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
-                  <Settings size={17} />
-                </button>
-              )}
-              <button onClick={handleSignOut}
-                className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-danger rounded-xl hover:bg-surface-3 transition-colors">
-                <LogOut size={17} />
-              </button>
-            </div>
-          </div>
-
-          {/* Search */}
-          <div className="px-4 py-2.5 bg-surface-2 border-b border-surface-3 flex items-center gap-2">
-            <div className="relative flex-1">
-              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
-                className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
-            </div>
-            {canSeeAll && (
-              <div className="flex bg-surface-3 rounded-xl p-0.5 flex-shrink-0">
-                <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-                  <Users size={12} /> الكل
-                </button>
-                <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
-                  className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-                  <User size={12} /> بتاعتي
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* فلتر بموظف معين (أدمن بس) */}
-          {agent?.role === 'admin' && (
-            <div className="px-4 py-2 bg-surface-2 border-b border-surface-3 relative">
-              <button onClick={() => setShowAgentFilter(v => !v)}
-                className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
-                {agentFilter ? (
-                  <>
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
-                    <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
-                  </>
-                ) : (
-                  <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
-                )}
-                <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
-              </button>
-              {showAgentFilter && <AgentFilterList vertical />}
-            </div>
-          )}
-
-          {/* Status Tabs */}
-          <div className="flex border-b border-surface-3 bg-surface-2">
+        <div className="flex-1 overflow-y-auto">
+          {/* Status Tabs — عمودي */}
+          <div className={expanded ? 'py-2' : 'py-2'}>
             {STATUS_TABS.map(t => {
               const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
               return (
-                <button key={t.key} onClick={() => setStatus(t.key)}
-                  className={`flex-1 py-2.5 text-sm font-medium transition-colors flex items-center justify-center gap-1.5 ${status === t.key ? t.active : 'text-fg-subtle'}`}>
-                  {t.label}
-                  {count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full min-w-[18px] text-center ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                <button key={t.key} onClick={() => { setStatus(t.key); setMobileMenuOpen(false) }} title={t.label}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${expanded ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === t.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.dot}`} />
+                  {expanded && <span className="flex-1 text-right">{t.label}</span>}
+                  {expanded && count > 0 && (
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
                       {count}
                     </span>
                   )}
@@ -543,11 +464,87 @@ export default function ConversationsScreen() {
               )
             })}
           </div>
+
+          {/* التاجات وقنوات التواصل وفلتر "بدون رد" — موبايل بس، الديسكتوب عارضهم فوق القائمة */}
+          {expanded && (
+            <div className="lg:hidden border-t border-surface-3 py-2 space-y-2">
+              {tags.length > 0 && (
+                <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
+                  <button onClick={() => setSelectedTag(null)}
+                    className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                    <Tag size={11} /> كل التاجات
+                  </button>
+                  {tags.map(t => (
+                    <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
+                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
+                      style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
+                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
+                      {t.name}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="flex items-center gap-2 px-3 overflow-x-auto scrollbar-hide">
+                {CHANNELS.map(ch => (
+                  <button key={ch.key} onClick={() => setChannel(ch.key)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                    {ch.icon}
+                    {ch.label}
+                  </button>
+                ))}
+                <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
+                <button onClick={() => setUnrepliedOnly(v => !v)}
+                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${unrepliedOnly ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                  <CircleDot size={11} />
+                  بدون رد
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* Lifecycle — عدد المحادثات المفتوحة في كل مرحلة، والضغط عليها بيفلتر القائمة (بالحالة المختارة حالياً) */}
+          {expanded && lifecycles.length > 0 && (
+            <div className="border-t border-surface-3 py-2">
+              <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">اللايف سايكل</p>
+              <button onClick={() => { setSelectedLifecycle(null); setMobileMenuOpen(false) }}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${!selectedLifecycle ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                <span className="flex-1 text-right">كل المراحل</span>
+              </button>
+              {lifecycles.map(l => (
+                <button key={l.id} onClick={() => { setSelectedLifecycle(prev => prev === l.id ? null : l.id); setMobileMenuOpen(false) }}
+                  className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                  <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                  <span className="flex-1 text-right truncate">{l.name}</span>
+                  {lifecycleCounts[l.id] > 0 && (
+                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
+                      {lifecycleCounts[l.id]}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* ─── العمود الرئيسي ─────────────────────────────────── */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* شريط علوي مبسّط للموبايل بس — كل الفلاتر واللوايف سايكل والبحث اتنقلوا للقائمة الجانبية */}
+        <div className="lg:hidden flex items-center justify-between px-4 py-3 bg-surface-2 border-b border-surface-3 flex-shrink-0">
+          <button onClick={() => setMobileMenuOpen(true)}
+            className="w-9 h-9 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
+            <Menu size={19} />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_TABS.find(t => t.key === status)?.dot}`} />
+            <p className="font-semibold text-sm text-fg">{STATUS_TABS.find(t => t.key === status)?.label}</p>
+          </div>
+          <div className="w-9 h-9" />
         </div>
 
-        {/* Tags Filter */}
+        {/* Tags Filter (ديسكتوب بس) */}
         {tags.length > 0 && (
-          <div className="flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+          <div className="hidden lg:flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
             <button onClick={() => setSelectedTag(null)}
               className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
               <Tag size={11} /> كل التاجات
@@ -563,27 +560,8 @@ export default function ConversationsScreen() {
           </div>
         )}
 
-        {/* Lifecycle Filter (موبايل بس — الديسكتوب عندة القايمة في السايدبار) */}
-        {lifecycles.length > 0 && (
-          <div className="lg:hidden flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
-            <button onClick={() => setSelectedLifecycle(null)}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedLifecycle ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-              كل المراحل
-            </button>
-            {lifecycles.map(l => (
-              <button key={l.id} onClick={() => setSelectedLifecycle(l.id === selectedLifecycle ? null : l.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedLifecycle === l.id ? 'text-white' : 'text-fg-muted'}`}
-                style={{ background: selectedLifecycle === l.id ? l.color : `${l.color}33` }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: l.color }} />
-                {l.name}
-                {lifecycleCounts[l.id] > 0 && <span className="opacity-75">{lifecycleCounts[l.id]}</span>}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* Channel Filter */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+        {/* Channel Filter (ديسكتوب بس) */}
+        <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
           {CHANNELS.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -624,6 +602,24 @@ export default function ConversationsScreen() {
           )}
         </div>
       </div>
+
+      {/* تعليمات تثبيت آيفون (مفيش API تلقائي في سفاري) */}
+      {showIosHelp && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => setShowIosHelp(false)}>
+          <div className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-96 p-5" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold text-fg mb-3">تثبيت التطبيق على آيفون</p>
+            <ol className="space-y-2 text-sm text-fg-muted list-decimal pr-4">
+              <li className="flex items-center gap-1.5">اضغط زر المشاركة <Share size={14} className="inline text-brand" /> في متصفح سفاري</li>
+              <li>مرّر لتحت واختار "إضافة إلى الشاشة الرئيسية"</li>
+              <li>اضغط "إضافة" في أعلى الشاشة</li>
+            </ol>
+            <button onClick={() => setShowIosHelp(false)}
+              className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white">
+              تمام
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
