@@ -75,7 +75,7 @@ function AgentsTab() {
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
   const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
 
@@ -103,7 +103,6 @@ function AgentsTab() {
   const addAgent = async () => {
     setLoading(true)
     try {
-      // بيبعت دعوة عن طريق الباك اند (Supabase بيبعت إيميل الدعوة تلقائي)
       const res = await fetch(`${API_URL}/admin/create-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -111,9 +110,9 @@ function AgentsTab() {
       })
       if (!res.ok) throw new Error(await res.text())
       setShowAdd(false)
-      setForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+      setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
-      toast.success('اتبعتت دعوة للموظف على إيميله')
+      toast.success('اتضاف الموظف بنجاح')
     } catch (err) {
       toast.error('خطأ: ' + err.message)
     } finally {
@@ -152,10 +151,11 @@ function AgentsTab() {
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg">دعوة موظف جديد</h3>
-          <p className="text-xs text-fg-subtle -mt-2">هيوصله إيميل دعوة، وهيسجل دخول بحساب جوجل بتاعه بنفس الإيميل ده.</p>
+          <h3 className="text-sm font-semibold text-fg">إضافة موظف جديد</h3>
+          <p className="text-xs text-fg-subtle -mt-2">حدد إيميل وباسورد للموظف، وهيقدر يدخل بيهم على طول (أو بجوجل بنفس الإيميل).</p>
           <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <InputField label="البريد الإلكتروني" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" />
+          <InputField label="الباسورد" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" />
           <div>
             <label className="block text-xs text-fg-muted mb-1">الدور</label>
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
@@ -173,7 +173,7 @@ function AgentsTab() {
           <div className="flex gap-2 pt-1">
             <button onClick={addAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
-              {loading ? 'جاري إرسال الدعوة...' : 'إرسال الدعوة'}
+              {loading ? 'جاري الإضافة...' : 'إضافة الموظف'}
             </button>
             <button onClick={() => setShowAdd(false)}
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
