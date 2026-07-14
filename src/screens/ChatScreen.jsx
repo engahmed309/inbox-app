@@ -753,6 +753,12 @@ export default function ChatScreen() {
                 value={text}
                 onChange={e => onTextChange(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Escape') setShowQuickReplies(false) }}
+                onFocus={() => {
+                  // بنكرر السكرول بعد شوية كمان، عشان أنيميشن فتح الكيبورد بياخد وقت أطول من الـ٣٠ مللي
+                  // ثانية العادية، فلو سكرولنا مرة واحدة بس هيبقى قبل ما الكيبورد يخلص يفتح فعلياً
+                  scrollToBottom()
+                  setTimeout(scrollToBottom, 350)
+                }}
                 placeholder="اكتب رسالة... (اكتب / للردود السريعة)"
                 rows={1}
                 className="flex-1 bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none overflow-y-auto min-h-[42px]"

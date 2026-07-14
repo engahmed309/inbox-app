@@ -1,33 +1,9 @@
-import { Suspense, lazy, useEffect } from 'react'
+import { Suspense, lazy } from 'react'
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { useAuth } from './contexts/AuthContext'
 import LoginScreen from './screens/LoginScreen'
 import ConversationsScreen from './screens/ConversationsScreen'
 import ChatScreen from './screens/ChatScreen'
-
-// body{position:fixed} لوحدها مش كفاية على كل متصفحات الأندرويد — بعض المتصفحات بتغيّر حجم
-// الـ layout viewport لما الكيبورد يفتح، وبعضها لأ. بنستخدم visualViewport API (بيعكس المساحة
-// المرئية الفعلية بدقة في كل الحالات) ونحدّث متغيّر CSS بيه، بدل ما نعتمد على 100%/100vh الثابتة
-function useVisualViewportHeight() {
-  useEffect(() => {
-    const vv = window.visualViewport
-    const setHeight = () => {
-      const height = vv?.height || window.innerHeight
-      document.documentElement.style.setProperty('--app-height', `${height}px`)
-    }
-    setHeight()
-    if (vv) {
-      vv.addEventListener('resize', setHeight)
-      vv.addEventListener('scroll', setHeight)
-      return () => {
-        vv.removeEventListener('resize', setHeight)
-        vv.removeEventListener('scroll', setHeight)
-      }
-    }
-    window.addEventListener('resize', setHeight)
-    return () => window.removeEventListener('resize', setHeight)
-  }, [])
-}
 
 // الشاشتين دول (ومعاهم مكتبة الشارتات الخاصة بالتقارير) مش محتاجهم غير الأدمن، فبنأجّل تحميلهم
 // عشان الموظفين العاديين ميحملوش الحجم ده كله كل مرة يفتحوا التطبيق
@@ -56,7 +32,6 @@ function PrivateRoute({ children }) {
 }
 
 export default function App() {
-  useVisualViewportHeight()
   return (
     <Routes>
       <Route path="/login" element={<LoginScreen />} />
