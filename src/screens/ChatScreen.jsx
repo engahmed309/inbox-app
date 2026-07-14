@@ -7,7 +7,7 @@ import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -18,6 +18,15 @@ const STATUS_OPTS = [
 
 const MAX_RECORD_SECONDS = 180 // ٣ دقايق أقصى مدة لتسجيل الرسالة الصوتية
 const MESSAGES_PAGE_SIZE = 50 // بنجيب آخر ٥٠ رسالة بس، والأقدم بتتحمل عند الطلب بزرار "تحميل رسائل أقدم"
+
+// فيسبوك وانستجرام وواتساب كلهم بيطبّقوا "نافذة الـ٢٤ ساعة": من آخر رسالة العميل بعتها، عندنا ٢٤ ساعة
+// نرد فيها برسالة عادية — بعد كده الرد بيترفض (واتساب بيتطلب Template معتمد، فيسبوك/انستجرام بيمنعوا الرد خالص)
+const MESSAGE_WINDOW_HOURS = 24
+const WINDOW_EXPIRED_TEXT = {
+  whatsapp: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — واتساب مايسمحش برسالة عادية دلوقتي، لازم تبعت Template معتمد مسبقاً من ميتا.',
+  instagram: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — انستجرام بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
+  facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
+}
 
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
@@ -114,8 +123,11 @@ export default function ChatScreen() {
     }
 
     setMessages(prev => {
-      const existingIds = new Set(prev.map(m => m.id))
-      const merged = [...prev, ...latest.filter(m => !existingIds.has(m.id))]
+      // شيل أي رسايل مؤقتة (temp) قبل الدمج — دي مجرد placeholder وقت الإرسال، ولازم تستبدل
+      // بالرسالة الحقيقية اللي جايالنا دلوقتي، مش تتراكم جنبها
+      const withoutTemps = prev.filter(m => !m._temp)
+      const existingIds = new Set(withoutTemps.map(m => m.id))
+      const merged = [...withoutTemps, ...latest.filter(m => !existingIds.has(m.id))]
       merged.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       // اسكرول لو فيه رسايل جديدة فعلاً (مش كل مرة الـ polling بيجري)
       const hasNewOnes = merged.length > messagesCountRef.current
@@ -504,6 +516,9 @@ export default function ChatScreen() {
 
   const currentStatus = STATUS_OPTS.find(s => s.key === conv?.status) || STATUS_OPTS[0]
   const currentLifecycle = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)
+  const isWindowExpired = conv?.last_inbound_at
+    ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > MESSAGE_WINDOW_HOURS
+    : false
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : Facebook
 
   // ─── دمج الرسائل وسجل التعيين في تايم لاين واحد ─────────────
@@ -695,6 +710,11 @@ export default function ChatScreen() {
               className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-brand hover:bg-brand-dark text-white rounded-xl transition-colors">
               <Send size={16} />
             </button>
+          </div>
+        ) : isWindowExpired ? (
+          <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
+            <Clock size={18} className="flex-shrink-0 text-follow" />
+            <span>{WINDOW_EXPIRED_TEXT[conv?.platform] || WINDOW_EXPIRED_TEXT.facebook}</span>
           </div>
         ) : (
           <div className="flex flex-col gap-2">
