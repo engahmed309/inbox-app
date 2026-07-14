@@ -280,7 +280,13 @@ export default function ChatScreen() {
         if (payload.new.id !== id) return
         setConv(prev => prev ? { ...prev, ...payload.new } : prev)
       })
-      .subscribe()
+      .subscribe((status) => {
+        // الـ Realtime أحياناً بيقفل الاتصال بصمت (شبكة موبايل، الجهاز نام، إلخ) من غير ما
+        // React يعرف — لو حصل كده نجيب أي رسايل فاتت فوراً بدل ما نستنى الـ polling البطيء
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          fetchMessages(false)
+        }
+      })
 
     // لو التاب/التطبيق راح للخلفية (زي فتح تطبيق تاني تبعت منه) وبعدين رجع،
     // المتصفح ممكن يكون وقف اتصال الـ Realtime، فلما يرجع نجيب أي رسايل فاتت فوراً
@@ -288,10 +294,10 @@ export default function ChatScreen() {
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
-    // شبكة الضمان: تحديث دوري بطيء (كل ٧٥ ثانية) بالتوازي مع الـ Realtime، عشان أي رسالة
-    // تظهر مهما كان سبب انقطاع الاتصال الحي (شبكة الموبايل، إلخ) — Realtime هو المصدر الأساسي
-    // دلوقتي، فمحتاجين بس شبكة أمان بطيئة مش تحديث كل ٤ ثواني اللي كان بيستهلك بيانات زيادة عن اللزوم
-    const pollInterval = setInterval(() => { fetchMessages(false) }, 75000)
+    // شبكة الضمان جوه محادثة مفتوحة: تحديث كل ٦ ثواني (مش زي شاشة القائمة اللي كل ٧٥ ثانية)،
+    // لأن استعلام رسايل محادثة واحدة رخيص جداً، وده بيغطي أي مرة الـ Realtime يفشل بصمت من غير
+    // ما نضطر ننتظر معاه — الموظف واقف فعلياً بيقرا في الشات دي دلوقتي فلازم يكون سريع
+    const pollInterval = setInterval(() => { fetchMessages(false) }, 6000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
