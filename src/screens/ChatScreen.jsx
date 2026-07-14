@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
@@ -14,6 +15,9 @@ const STATUS_OPTS = [
   { key: 'follow_up', label: 'متابعة', color: 'bg-follow' },
   { key: 'closed', label: 'مغلقة', color: 'bg-slate-500' },
 ]
+
+const MAX_RECORD_SECONDS = 180 // ٣ دقايق أقصى مدة لتسجيل الرسالة الصوتية
+const MESSAGES_PAGE_SIZE = 50 // بنجيب آخر ٥٠ رسالة بس، والأقدم بتتحمل عند الطلب بزرار "تحميل رسائل أقدم"
 
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
@@ -40,6 +44,7 @@ export default function ChatScreen() {
   const { id } = useParams()
   const navigate = useNavigate()
   const { agent } = useAuth()
+  const toast = useToast()
 
   const [conv, setConv] = useState(null)
   const [contact, setContact] = useState(null)
@@ -67,9 +72,13 @@ export default function ChatScreen() {
   const [showQuickReplies, setShowQuickReplies] = useState(false)
   const [quickReplyFilter, setQuickReplyFilter] = useState('')
 
+  const [hasMoreMessages, setHasMoreMessages] = useState(false)
+  const [loadingOlder, setLoadingOlder] = useState(false)
+
   const messagesEndRef = useRef(null)
   const messagesContainerRef = useRef(null)
   const messagesCountRef = useRef(0)
+  const firstLoadDoneRef = useRef(false)
   const realtimeRef = useRef(null)
   const fileInputRef = useRef(null)
   const tempIdRef = useRef(null)
@@ -88,18 +97,32 @@ export default function ChatScreen() {
   }, [])
 
   // ─── جيب الرسائل + سجل التعيين من الـ DB ────────────────────────────
+  // بنجيب بس آخر MESSAGES_PAGE_SIZE رسالة (مش كل تاريخ المحادثة) وبندمجهم مع اللي محمّل قبل كده
+  // (زي رسايل أقدم اتحملت بزرار "تحميل رسائل أقدم")، عشان محادثة طويلة العمر متتقلش كل ٤ ثواني كاملة
   const fetchMessages = useCallback(async (scroll = true) => {
     const { data } = await supabase
       .from('messages')
       .select('*')
       .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
+      .limit(MESSAGES_PAGE_SIZE)
 
-    const newMessages = data || []
-    // اسكرول لو فيه رسايل جديدة فعلاً (مش كل مرة الـ polling بيجري)
-    const hasNewOnes = newMessages.length > messagesCountRef.current
-    messagesCountRef.current = newMessages.length
-    setMessages(newMessages)
+    const latest = (data || []).slice().reverse()
+    if (!firstLoadDoneRef.current) {
+      setHasMoreMessages(latest.length === MESSAGES_PAGE_SIZE)
+      firstLoadDoneRef.current = true
+    }
+
+    setMessages(prev => {
+      const existingIds = new Set(prev.map(m => m.id))
+      const merged = [...prev, ...latest.filter(m => !existingIds.has(m.id))]
+      merged.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+      // اسكرول لو فيه رسايل جديدة فعلاً (مش كل مرة الـ polling بيجري)
+      const hasNewOnes = merged.length > messagesCountRef.current
+      messagesCountRef.current = merged.length
+      if (scroll || hasNewOnes) scrollToBottom()
+      return merged
+    })
 
     const { data: logs } = await supabase
       .from('conversation_assignment_log')
@@ -114,12 +137,13 @@ export default function ChatScreen() {
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
     setActivityLogs(activity || [])
-
-    if (scroll || hasNewOnes) scrollToBottom()
   }, [id, scrollToBottom])
 
   useEffect(() => {
     messagesCountRef.current = 0 // محادثة جديدة، صفّر العداد عشان السكرول يشتغل صح
+    firstLoadDoneRef.current = false
+    setHasMoreMessages(false)
+    setMessages([])
     const loadData = async () => {
       // Conversation + Contact
       const { data: convData } = await supabase
@@ -232,6 +256,34 @@ export default function ChatScreen() {
     }
   }, [id])
 
+  // ─── تحميل رسايل أقدم (pagination) ─────────────────────────
+  const loadOlderMessages = async () => {
+    if (loadingOlder || messages.length === 0) return
+    setLoadingOlder(true)
+    const oldest = messages[0]?.created_at
+    const container = messagesContainerRef.current
+    const prevScrollHeight = container?.scrollHeight || 0
+
+    const { data } = await supabase
+      .from('messages')
+      .select('*')
+      .eq('conversation_id', id)
+      .lt('created_at', oldest)
+      .order('created_at', { ascending: false })
+      .limit(MESSAGES_PAGE_SIZE)
+
+    const older = (data || []).slice().reverse()
+    setMessages(prev => [...older, ...prev])
+    messagesCountRef.current += older.length
+    setHasMoreMessages(older.length === MESSAGES_PAGE_SIZE)
+    setLoadingOlder(false)
+
+    // حافظ على مكان السكرول عشان الشاشة متقفزش لما نضيف رسايل قديمة فوق القائمة
+    requestAnimationFrame(() => {
+      if (container) container.scrollTop = container.scrollHeight - prevScrollHeight
+    })
+  }
+
   // ─── إرسال رسالة (نص و/أو ملف) ─────────────────────────────
   const uploadPendingFile = async (pf) => {
     if (pf.url) return pf.url // ملف جاهز من مكتبة الردود السريعة
@@ -274,9 +326,10 @@ export default function ChatScreen() {
     }])
     scrollToBottom()
 
+    let textSent = false
     try {
       // النص والملف مع بعض بيتبعتوا كرسالتين متتاليتين (فيسبوك مايدعمش caption مع الملف)
-      if (msgText) await sendOne(msgText, 'text', null)
+      if (msgText) { await sendOne(msgText, 'text', null); textSent = true }
       if (pf) {
         const url = await uploadPendingFile(pf)
         await sendOne(pf.name || 'ملف', pf.type, url)
@@ -287,9 +340,16 @@ export default function ChatScreen() {
       setConv(prev => prev ? { ...prev, unread_count: 0 } : prev)
     } catch {
       setMessages(prev => prev.filter(m => m.id !== tempId))
-      setText(msgText)
-      setPendingFile(pf)
-      alert('فشل الإرسال')
+      if (textSent) {
+        // النص اتبعت فعلاً وسجّل في القاعدة — منرجعوش عشان مايتبعتش تاني، بس نرجّع الملف عشان يعيد المحاولة بيه بس
+        await fetchMessages()
+        setPendingFile(pf)
+        toast.error('اتبعتت الرسالة النصية، لكن فشل إرسال الملف — جرب تبعته تاني')
+      } else {
+        setText(msgText)
+        setPendingFile(pf)
+        toast.error('فشل الإرسال')
+      }
     } finally {
       setSending(false)
     }
@@ -297,9 +357,15 @@ export default function ChatScreen() {
 
   const changeStatus = async (s) => {
     const oldLabel = currentStatus.label
-    await supabase.from('conversations').update({ status: s }).eq('id', id)
+    const oldStatus = conv?.status
     setConv(prev => ({ ...prev, status: s }))
     setShowStatus(false)
+    const { error } = await supabase.from('conversations').update({ status: s }).eq('id', id)
+    if (error) {
+      setConv(prev => ({ ...prev, status: oldStatus }))
+      toast.error('فشل تغيير حالة المحادثة، حاول تاني')
+      return
+    }
     const newLabel = STATUS_OPTS.find(o => o.key === s)?.label || s
     if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "${newLabel}"`)
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
@@ -308,15 +374,22 @@ export default function ChatScreen() {
 
   const changeLifecycle = async (stageId) => {
     const oldLabel = currentLifecycle?.name || 'بدون مرحلة'
-    await supabase.from('contacts').update({ lifecycle_stage_id: stageId || null }).eq('id', contact.id)
+    const oldStageId = contact?.lifecycle_stage_id
     setContact(prev => prev ? { ...prev, lifecycle_stage_id: stageId || null } : prev)
     setShowLifecycle(false)
+    const { error } = await supabase.from('contacts').update({ lifecycle_stage_id: stageId || null }).eq('id', contact.id)
+    if (error) {
+      setContact(prev => prev ? { ...prev, lifecycle_stage_id: oldStageId } : prev)
+      toast.error('فشل تغيير مرحلة الـ Lifecycle، حاول تاني')
+      return
+    }
     const newLabel = lifecycles.find(l => l.id === stageId)?.name || 'بدون مرحلة'
     if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر مرحلة الـ Lifecycle من "${oldLabel}" إلى "${newLabel}"`)
   }
 
   const assignAgent = async (agentId) => {
-    await supabase.from('conversations').update({ assigned_agent_id: agentId }).eq('id', id)
+    const { error } = await supabase.from('conversations').update({ assigned_agent_id: agentId }).eq('id', id)
+    if (error) { toast.error('فشل تعيين المحادثة، حاول تاني'); return }
     await supabase.from('conversation_assignment_log').insert({
       conversation_id: id, assigned_to: agentId, assigned_by: agent?.id
     })
@@ -355,9 +428,29 @@ export default function ChatScreen() {
       setRecordSeconds(0)
       recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000)
     } catch {
-      alert('لازم تسمح بالوصول للميكروفون')
+      toast.error('لازم تسمح بالوصول للميكروفون')
     }
   }
+
+  // أوقف التسجيل تلقائي لو وصل للحد الأقصى، عشان موظف مايسبش التسجيل شغال بالغلط لفترة طويلة
+  useEffect(() => {
+    if (isRecording && recordSeconds >= MAX_RECORD_SECONDS) {
+      stopRecording(true)
+      toast.info('وصلت لأقصى مدة تسجيل (٣ دقايق)، اتوقف التسجيل تلقائياً')
+    }
+  }, [recordSeconds, isRecording])
+
+  // لو الموظف قفل الشات أو انتقل لصفحة تانية وهو لسه بيسجل، اقفل الميكروفون فوراً (متسبوش الترخيص شغال في الخلفية)
+  useEffect(() => {
+    return () => {
+      const recorder = mediaRecorderRef.current
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stream.getTracks().forEach(t => t.stop())
+        recorder.stop()
+      }
+      clearInterval(recordTimerRef.current)
+    }
+  }, [])
 
   const stopRecording = (send) => {
     const recorder = mediaRecorderRef.current
@@ -542,6 +635,14 @@ export default function ChatScreen() {
       {/* Messages */}
       <div ref={messagesContainerRef} className="flex-1 min-h-0 overflow-y-auto px-4 py-3"
         onClick={() => { setShowStatus(false); setShowAssign(false) }}>
+        {hasMoreMessages && !searchQuery && (
+          <div className="flex justify-center mb-3">
+            <button onClick={loadOlderMessages} disabled={loadingOlder}
+              className="text-xs text-brand font-medium px-3 py-1.5 rounded-full bg-surface-2 hover:bg-surface-3 transition-colors disabled:opacity-50">
+              {loadingOlder ? 'جاري التحميل...' : 'تحميل رسائل أقدم'}
+            </button>
+          </div>
+        )}
         {Object.entries(groupedMessages).map(([date, items]) => (
           <div key={date}>
             <div className="flex items-center gap-2 my-3">

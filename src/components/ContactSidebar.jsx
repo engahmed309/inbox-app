@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
 import { X, Save, User, Globe, Package, Tag, Plus } from 'lucide-react'
 
@@ -10,6 +11,7 @@ const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5
 
 export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
   const { agent } = useAuth()
+  const toast = useToast()
   const [form, setForm] = useState({
     name: contact?.name || '',
     phone: contact?.phone || '',
@@ -75,7 +77,7 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
     if (!newTagName.trim()) return
     const color = TAG_COLORS[allTags.length % TAG_COLORS.length]
     const { data: tag, error } = await supabase.from('tags').insert({ name: newTagName.trim(), color }).select().single()
-    if (error) { alert('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
     setAllTags(prev => [...prev, tag])
     await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
     setContactTags(prev => [...prev, tag])

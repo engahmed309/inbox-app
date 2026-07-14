@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3 } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
@@ -82,12 +83,14 @@ function useInstallPrompt() {
 // شاشة المحادثات دي بتتشال من الـ DOM وتتبني من الأول كل مرة نروح لشات ونرجع (React Router بيعمل unmount/mount)،
 // فبنحتفظ بآخر نتيجة في متغيّر برّه الكومبوننت (بيفضل عايش طول ما التطبيق مفتوح) عشان الرجوع للخلف يبقى فوري
 // من غير سبينر أو إعادة تحميل كاملة — وبرضو بيحتفظ بالفلاتر اللي كانت مختارة قبل ما تدخل الشات.
+const CONVERSATIONS_PAGE_SIZE = 50
+
 const screenCache = {
   status: 'open', channel: 'all', search: '', viewMode: 'all', agentFilter: '',
   selectedTag: null, selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
-  lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [],
+  lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
 }
 
 export default function ConversationsScreen() {
@@ -112,9 +115,11 @@ export default function ConversationsScreen() {
   const [lifecycles, setLifecycles] = useState(screenCache.lifecycles)
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
+  const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
+  const toast = useToast()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
   const realtimeRef = useRef(null)
@@ -122,22 +127,23 @@ export default function ConversationsScreen() {
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
 
-  const fetchConversations = useCallback(async () => {
-    // Agents map
+  // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
+  // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
+  const fetchStaticLists = useCallback(async () => {
     const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online').order('name')
     const aMap = {}
     agentsData?.forEach(a => { aMap[a.id] = a.name })
     setAgentsMap(aMap); screenCache.agentsMap = aMap
     setAgentsList(agentsData || []); screenCache.agentsList = agentsData || []
 
-    // Tags
     const { data: tagsList } = await supabase.from('tags').select('*').order('name')
     setTags(tagsList || []); screenCache.tags = tagsList || []
 
-    // Lifecycle stages
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
     setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
+  }, [])
 
+  const fetchConversations = useCallback(async () => {
     // لو فيه فلتر تاج و/أو مرحلة lifecycle، جيب الـ contacts اللي مطابقة (تقاطع لو الاتنين مفعّلين)
     let scopeContactIds = null
     if (selectedTag) {
@@ -214,16 +220,17 @@ export default function ConversationsScreen() {
     })
     setStatusCounts(counts); screenCache.statusCounts = counts
 
-    // Conversations query
+    // Conversations query — بنجيب أول visibleLimit بس مش كل المحادثات دفعة واحدة (يزيد بـ"تحميل المزيد")
     let query = applyScope(supabase
       .from('conversations')
       .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
-      .order('last_message_at', { ascending: false }))
+      .order('last_message_at', { ascending: false })
+      .range(0, visibleLimit - 1))
     if (status !== 'all') query = query.eq('status', status)
     if (unrepliedOnly) query = query.gt('unread_count', 0)
 
     const { data, error } = await query
-    if (error) { console.error(error); setLoading(false); return }
+    if (error) { console.error(error); toast.error('فشل تحميل المحادثات، حاول تاني'); setLoading(false); return }
 
     const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
     setConversations(convs); screenCache.conversations = convs
@@ -257,7 +264,14 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle])
+  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit])
+
+  // لما الفلاتر تتغيّر (مش أول تحميل للشاشة) نرجّع حد الصفحة لأصله، عشان مانجيبش عدد كبير غير لازم في فلتر تاني
+  const filtersMountedRef = useRef(false)
+  useEffect(() => {
+    if (!filtersMountedRef.current) { filtersMountedRef.current = true; return }
+    setVisibleLimit(CONVERSATIONS_PAGE_SIZE)
+  }, [status, channel, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly])
 
   // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
   useEffect(() => {
@@ -270,7 +284,17 @@ export default function ConversationsScreen() {
     screenCache.selectedLifecycle = selectedLifecycle
     screenCache.unrepliedOnly = unrepliedOnly
     screenCache.sidebarOpen = sidebarOpen
-  }, [status, channel, search, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly, sidebarOpen])
+    screenCache.visibleLimit = visibleLimit
+  }, [status, channel, search, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit])
+
+  // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل ٣٠ ثانية بس
+  // (بدل ما كانت بتتجاب مع كل تحديث لقائمة المحادثات كل ٥ ثواني)
+  useEffect(() => {
+    if (!agent) return
+    fetchStaticLists()
+    const staticInterval = setInterval(fetchStaticLists, 30000)
+    return () => clearInterval(staticInterval)
+  }, [fetchStaticLists, agent])
 
   useEffect(() => {
     if (!agent) return
@@ -615,16 +639,26 @@ export default function ConversationsScreen() {
               <p className="text-sm">لا توجد محادثات</p>
             </div>
           ) : (
-            filtered.map(conv => (
-              <ConvCard
-                key={conv.id}
-                conv={conv}
-                agentName={agentsMap[conv.assigned_agent_id]}
-                lastMsg={lastMessages[conv.id]}
-                tags={contactTagsMap[conv.contact_id]}
-                onClick={() => navigate(`/chat/${conv.id}`)}
-              />
-            ))
+            <>
+              {filtered.map(conv => (
+                <ConvCard
+                  key={conv.id}
+                  conv={conv}
+                  agentName={agentsMap[conv.assigned_agent_id]}
+                  lastMsg={lastMessages[conv.id]}
+                  tags={contactTagsMap[conv.contact_id]}
+                  onClick={() => navigate(`/chat/${conv.id}`)}
+                />
+              ))}
+              {conversations.length >= visibleLimit && (
+                <div className="flex justify-center py-4">
+                  <button onClick={() => setVisibleLimit(v => v + CONVERSATIONS_PAGE_SIZE)}
+                    className="text-xs text-brand font-medium px-4 py-2 rounded-full bg-surface-2 hover:bg-surface-3 transition-colors">
+                    تحميل المزيد
+                  </button>
+                </div>
+              )}
+            </>
           )}
         </div>
       </div>

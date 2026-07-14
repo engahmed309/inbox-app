@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
@@ -67,6 +68,7 @@ export default function SettingsScreen() {
 
 // ─── Agents Tab ───────────────────────────────────────────
 function AgentsTab() {
+  const toast = useToast()
   const [agents, setAgents] = useState([])
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
   const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
@@ -109,8 +111,9 @@ function AgentsTab() {
       setShowAdd(false)
       setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
+      toast.success('تم إضافة الموظف بنجاح')
     } catch (err) {
-      alert('خطأ: ' + err.message)
+      toast.error('خطأ: ' + err.message)
     } finally {
       setLoading(false)
     }
@@ -131,7 +134,7 @@ function AgentsTab() {
   const resetPassword = async (id) => {
     const pass = prompt('اكتب كلمة المرور الجديدة (٦ حروف على الأقل):')
     if (!pass) return
-    if (pass.length < 6) { alert('لازم ٦ حروف على الأقل'); return }
+    if (pass.length < 6) { toast.error('لازم ٦ حروف على الأقل'); return }
     try {
       const res = await fetch('https://inbox-api.sehawafeya.com/admin/reset-password', {
         method: 'POST',
@@ -139,9 +142,9 @@ function AgentsTab() {
         body: JSON.stringify({ agent_id: id, new_password: pass })
       })
       if (!res.ok) throw new Error(await res.text())
-      alert('تم تغيير كلمة المرور بنجاح')
+      toast.success('تم تغيير كلمة المرور بنجاح')
     } catch (err) {
-      alert('خطأ: ' + err.message)
+      toast.error('خطأ: ' + err.message)
     }
   }
 
@@ -509,6 +512,7 @@ function FieldsTab() {
 
 // ─── Quick Replies Tab ────────────────────────────────────
 function QuickRepliesTab({ agent }) {
+  const toast = useToast()
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
   const [showAdd, setShowAdd] = useState(false)
@@ -526,7 +530,7 @@ function QuickRepliesTab({ agent }) {
 
   const add = async () => {
     if (!form.name.trim() || (!form.text.trim() && !file)) {
-      alert('لازم اسم + نص أو ملف على الأقل')
+      toast.error('لازم اسم + نص أو ملف على الأقل')
       return
     }
     setSaving(true)
@@ -549,7 +553,7 @@ function QuickRepliesTab({ agent }) {
       setShowAdd(false)
       load()
     } catch {
-      alert('حصل خطأ أثناء الحفظ')
+      toast.error('حصل خطأ أثناء الحفظ')
     } finally {
       setSaving(false)
     }
