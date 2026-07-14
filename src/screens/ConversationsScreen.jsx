@@ -287,12 +287,11 @@ export default function ConversationsScreen() {
     screenCache.visibleLimit = visibleLimit
   }, [status, channel, search, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit])
 
-  // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل ٣٠ ثانية بس
-  // (بدل ما كانت بتتجاب مع كل تحديث لقائمة المحادثات كل ٥ ثواني)
+  // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل دقيقتين بس
   useEffect(() => {
     if (!agent) return
     fetchStaticLists()
-    const staticInterval = setInterval(fetchStaticLists, 30000)
+    const staticInterval = setInterval(fetchStaticLists, 120000)
     return () => clearInterval(staticInterval)
   }, [fetchStaticLists, agent])
 
@@ -315,11 +314,12 @@ export default function ConversationsScreen() {
       })
       .subscribe()
 
-    // نفس الحماية: تحديث فوري لما التاب يرجع ظاهر، وشبكة ضمان دورية كل 5 ثواني
+    // Realtime هو المصدر الأساسي دلوقتي — الـ polling ده بقى بس شبكة أمان بطيئة (كل ٧٥ ثانية)
+    // لو حصل انقطاع في الـ Realtime لأي سبب، بدل ما كان بيجري كل ٥ ثواني ويستهلك بيانات زيادة عن اللزوم
     const handleVisibility = () => { fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
-    const pollInterval = setInterval(() => { fetchConversations() }, 5000)
+    const pollInterval = setInterval(() => { fetchConversations() }, 75000)
 
     return () => {
       realtimeRef.current?.unsubscribe()

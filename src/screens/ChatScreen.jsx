@@ -263,10 +263,10 @@ export default function ChatScreen() {
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
-    // شبكة الضمان: تحديث دوري كل 4 ثواني بالتوازي مع الـ Realtime، عشان أي رسالة
-    // تظهر مهما كان سبب انقطاع الاتصال الحي (شبكة الموبايل، إلخ).
-    // من غير شرط على document.visibilityState لأنه مش موثوق في كل المتصفحات
-    const pollInterval = setInterval(() => { fetchMessages(false) }, 4000)
+    // شبكة الضمان: تحديث دوري بطيء (كل ٧٥ ثانية) بالتوازي مع الـ Realtime، عشان أي رسالة
+    // تظهر مهما كان سبب انقطاع الاتصال الحي (شبكة الموبايل، إلخ) — Realtime هو المصدر الأساسي
+    // دلوقتي، فمحتاجين بس شبكة أمان بطيئة مش تحديث كل ٤ ثواني اللي كان بيستهلك بيانات زيادة عن اللزوم
+    const pollInterval = setInterval(() => { fetchMessages(false) }, 75000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
