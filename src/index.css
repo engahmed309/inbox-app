@@ -37,7 +37,17 @@
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
 html, body, #root { height: 100%; overflow: hidden; }
-body { font-family: 'Inter', system-ui, sans-serif; background: rgb(var(--color-surface)); color: rgb(var(--color-fg)); transition: background-color .15s ease, color .15s ease; }
+/* position: fixed على الـ body بتمنع المتصفح إنه "يسكرول الصفحة كلها" عشان يورّي مربع الكتابة
+   لما الكيبورد الافتراضي يفتح على الموبايل — ده اللي كان بيطيّر الهيدر بره الشاشة */
+body {
+  position: fixed;
+  inset: 0;
+  width: 100%;
+  font-family: 'Inter', system-ui, sans-serif;
+  background: rgb(var(--color-surface));
+  color: rgb(var(--color-fg));
+  transition: background-color .15s ease, color .15s ease;
+}
 
 ::-webkit-scrollbar { width: 4px; height: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }

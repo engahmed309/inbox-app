@@ -96,6 +96,14 @@ export default function ChatScreen() {
   const recordTimerRef = useRef(null)
   const textareaRef = useRef(null)
 
+  // مربع الكتابة يفرد لحد ما وصل لـ٣-٤ سطور تقريباً وبعد كده يبقى فيه سكرول جواه بدل ما يكبر أكتر
+  useEffect(() => {
+    const el = textareaRef.current
+    if (!el) return
+    el.style.height = 'auto'
+    el.style.height = `${Math.min(el.scrollHeight, 104)}px`
+  }, [text])
+
   // بنسكرول الحاوية نفسها بس (scrollTop) مش scrollIntoView، عشان الأخيرة ممكن
   // "تسرّب" السكرول لصفحة الموبايل كلها وتطيّر الهيدر بره الشاشة
   const scrollToBottom = useCallback(() => {
@@ -744,10 +752,11 @@ export default function ChatScreen() {
                 ref={textareaRef}
                 value={text}
                 onChange={e => onTextChange(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage() } if (e.key === 'Escape') setShowQuickReplies(false) }}
+                onKeyDown={e => { if (e.key === 'Escape') setShowQuickReplies(false) }}
                 placeholder="اكتب رسالة... (اكتب / للردود السريعة)"
                 rows={1}
-                className="flex-1 bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none min-h-[42px] max-h-[120px]"
+                className="flex-1 bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none overflow-y-auto min-h-[42px]"
+                style={{ maxHeight: '104px' }}
               />
               {text.trim() || pendingFile ? (
                 <button onClick={sendMessage} disabled={sending}
