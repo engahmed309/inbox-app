@@ -6,12 +6,13 @@ import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
-  MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound
+  MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
+  Radio, Phone
 } from 'lucide-react'
 
 const TABS = [
   { key: 'agents', label: 'الموظفون', icon: Users },
-  { key: 'accounts', label: 'الحسابات المربوطة', icon: Instagram },
+  { key: 'channels', label: 'القنوات', icon: Radio },
   { key: 'lifecycle', label: 'Lifecycle', icon: Tag },
   { key: 'fields', label: 'الحقول', icon: List },
   { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
@@ -57,7 +58,7 @@ export default function SettingsScreen() {
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'agents' && <AgentsTab />}
-        {tab === 'accounts' && <ConnectedAccountsTab />}
+        {tab === 'channels' && <ChannelsTab />}
         {tab === 'lifecycle' && <LifecycleTab />}
         {tab === 'fields' && <FieldsTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
@@ -305,9 +306,38 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   )
 }
 
-// ─── Connected Accounts Tab ───────────────────────────────
-function ConnectedAccountsTab() {
-  const [ig, setIg] = useState(null)
+// ─── Channels Tab ──────────────────────────────────────────
+const PLATFORM_META = {
+  facebook: { label: 'فيسبوك', icon: Facebook, color: 'text-blue-400' },
+  instagram: { label: 'إنستجرام', icon: Instagram, color: 'text-pink-400' },
+  whatsapp: { label: 'واتساب', icon: Phone, color: 'text-green-400' },
+}
+
+function ChannelsTab() {
+  const [subTab, setSubTab] = useState('connected')
+
+  return (
+    <div className="p-4 space-y-3">
+      <h2 className="font-semibold text-fg">القنوات</h2>
+
+      <div className="flex gap-4 border-b border-surface-3">
+        <button onClick={() => setSubTab('connected')}
+          className={`px-1 pb-2.5 text-sm font-medium transition-colors ${subTab === 'connected' ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
+          القنوات المرتبطة
+        </button>
+        <button onClick={() => setSubTab('connect')}
+          className={`px-1 pb-2.5 text-sm font-medium transition-colors ${subTab === 'connect' ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
+          ربط قناة جديدة
+        </button>
+      </div>
+
+      {subTab === 'connected' ? <ConnectedChannelsList /> : <ConnectNewChannel />}
+    </div>
+  )
+}
+
+function ConnectedChannelsList() {
+  const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -316,10 +346,10 @@ function ConnectedAccountsTab() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch('https://inbox-api.sehawafeya.com/instagram/account')
+      const res = await fetch(`${API_URL}/channels`)
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الاتصال')
-      setIg(data)
+      if (!res.ok) throw new Error(data.error || 'فشل تحميل القنوات')
+      setChannels(data.channels || [])
     } catch (err) {
       setError(err.message)
     } finally {
@@ -327,43 +357,83 @@ function ConnectedAccountsTab() {
     }
   }
 
+  if (loading) return (
+    <div className="flex items-center justify-center h-32">
+      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+  if (error) return (
+    <div className="pt-3 space-y-2">
+      <p className="text-sm text-danger">{error}</p>
+      <button onClick={load} className="text-xs text-brand">إعادة المحاولة</button>
+    </div>
+  )
+
   return (
-    <div className="p-4 space-y-3">
-      <h2 className="font-semibold text-fg">الحسابات المربوطة</h2>
-
-      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-        <p className="text-xs text-fg-muted mb-3 flex items-center gap-1.5">
-          <Instagram size={13} className="text-pink-400" /> إنستجرام
-        </p>
-        {loading ? (
-          <div className="flex items-center justify-center h-16">
-            <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-          </div>
-        ) : error ? (
-          <p className="text-sm text-danger">{error}</p>
-        ) : ig ? (
-          <div className="flex items-center gap-3">
-            {ig.profile_picture_url ? (
-              <img src={ig.profile_picture_url} alt="" className="w-12 h-12 rounded-full object-cover" />
-            ) : (
-              <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
-                <Instagram size={18} className="text-fg-muted" />
+    <div className="space-y-3 pt-1">
+      {['facebook', 'instagram', 'whatsapp'].map(platform => {
+        const ch = channels.find(c => c.platform === platform)
+        const meta = PLATFORM_META[platform]
+        const Icon = meta.icon
+        return (
+          <div key={platform} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+            <div className="flex items-center gap-3">
+              {ch?.avatar_url ? (
+                <img src={ch.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover bg-surface-3"
+                  onError={e => { e.target.style.display = 'none' }} />
+              ) : (
+                <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
+                  <Icon size={18} className={meta.color} />
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-fg font-semibold flex items-center gap-1.5">
+                  <Icon size={12} className={meta.color} /> {meta.label}
+                </p>
+                <p className="text-xs text-fg-muted truncate">{ch?.display_name || 'مش مربوطة'}</p>
               </div>
-            )}
-            <div>
-              <p className="text-sm text-fg font-semibold">{ig.name}</p>
-              <p className="text-xs text-fg-muted">@{ig.username}</p>
+              {ch?.status === 'active' ? (
+                <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-success/15 text-success flex items-center gap-1 flex-shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-success" /> نشطة
+                </span>
+              ) : ch ? (
+                <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-danger/15 text-danger flex items-center gap-1 flex-shrink-0">
+                  <span className="w-1.5 h-1.5 rounded-full bg-danger" /> محتاجة إعادة ربط
+                </span>
+              ) : (
+                <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">
+                  مش مربوطة
+                </span>
+              )}
             </div>
+            {ch?.status_reason && (
+              <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
+            )}
           </div>
-        ) : null}
-      </div>
+        )
+      })}
+    </div>
+  )
+}
 
-      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-        <p className="text-xs text-fg-muted mb-3 flex items-center gap-1.5">
-          <Facebook size={13} className="text-blue-400" /> فيسبوك
-        </p>
-        <p className="text-sm text-fg-muted">مربوطة عن طريق صفحة العيادة على فيسبوك (Mohamed Saieed).</p>
-      </div>
+function ConnectNewChannel() {
+  return (
+    <div className="space-y-3 pt-1">
+      <p className="text-xs text-fg-subtle -mt-1">اختار القناة اللي عايز تربطها. هتتحول لصفحة ميتا تختار منها الصفحة أو الحساب وتوافق على الصلاحيات.</p>
+      {['facebook', 'instagram', 'whatsapp'].map(platform => {
+        const meta = PLATFORM_META[platform]
+        const Icon = meta.icon
+        return (
+          <button key={platform} disabled
+            className="w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 opacity-60 cursor-not-allowed">
+            <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+              <Icon size={16} className={meta.color} />
+            </div>
+            <span className="flex-1 text-right text-sm text-fg font-medium">ربط {meta.label}</span>
+            <span className="text-[11px] text-fg-subtle flex-shrink-0">قريباً</span>
+          </button>
+        )
+      })}
     </div>
   )
 }
