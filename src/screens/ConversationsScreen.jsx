@@ -79,28 +79,39 @@ function useInstallPrompt() {
   return { canInstall: !installed && (!!deferredPrompt || isIOS), isIOS, promptInstall }
 }
 
+// شاشة المحادثات دي بتتشال من الـ DOM وتتبني من الأول كل مرة نروح لشات ونرجع (React Router بيعمل unmount/mount)،
+// فبنحتفظ بآخر نتيجة في متغيّر برّه الكومبوننت (بيفضل عايش طول ما التطبيق مفتوح) عشان الرجوع للخلف يبقى فوري
+// من غير سبينر أو إعادة تحميل كاملة — وبرضو بيحتفظ بالفلاتر اللي كانت مختارة قبل ما تدخل الشات.
+const screenCache = {
+  status: 'open', channel: 'all', search: '', viewMode: 'all', agentFilter: '',
+  selectedTag: null, selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
+  conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
+  statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
+  lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [],
+}
+
 export default function ConversationsScreen() {
-  const [conversations, setConversations] = useState([])
-  const [agentsMap, setAgentsMap] = useState({})
-  const [lastMessages, setLastMessages] = useState({}) // { conv_id: content }
-  const [status, setStatus] = useState('open')
-  const [channel, setChannel] = useState('all')
-  const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [conversations, setConversations] = useState(screenCache.conversations || [])
+  const [agentsMap, setAgentsMap] = useState(screenCache.agentsMap)
+  const [lastMessages, setLastMessages] = useState(screenCache.lastMessages) // { conv_id: content }
+  const [status, setStatus] = useState(screenCache.status)
+  const [channel, setChannel] = useState(screenCache.channel)
+  const [search, setSearch] = useState(screenCache.search)
+  const [loading, setLoading] = useState(screenCache.conversations === null)
   const [showAgentStatus, setShowAgentStatus] = useState(false)
-  const [viewMode, setViewMode] = useState('all') // 'all' | 'mine'
-  const [agentsList, setAgentsList] = useState([])
-  const [agentFilter, setAgentFilter] = useState('') // '' = بدون فلتر بموظف معين
+  const [viewMode, setViewMode] = useState(screenCache.viewMode) // 'all' | 'mine'
+  const [agentsList, setAgentsList] = useState(screenCache.agentsList)
+  const [agentFilter, setAgentFilter] = useState(screenCache.agentFilter) // '' = بدون فلتر بموظف معين
   const [showAgentFilter, setShowAgentFilter] = useState(false)
-  const [statusCounts, setStatusCounts] = useState({ all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 })
-  const [sidebarOpen, setSidebarOpen] = useState(true)
-  const [unrepliedOnly, setUnrepliedOnly] = useState(false)
-  const [tags, setTags] = useState([])
-  const [selectedTag, setSelectedTag] = useState(null)
-  const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
-  const [lifecycles, setLifecycles] = useState([])
-  const [lifecycleCounts, setLifecycleCounts] = useState({}) // { stage_id: عدد المحادثات المفتوحة }
-  const [selectedLifecycle, setSelectedLifecycle] = useState(null)
+  const [statusCounts, setStatusCounts] = useState(screenCache.statusCounts)
+  const [sidebarOpen, setSidebarOpen] = useState(screenCache.sidebarOpen)
+  const [unrepliedOnly, setUnrepliedOnly] = useState(screenCache.unrepliedOnly)
+  const [tags, setTags] = useState(screenCache.tags)
+  const [selectedTag, setSelectedTag] = useState(screenCache.selectedTag)
+  const [contactTagsMap, setContactTagsMap] = useState(screenCache.contactTagsMap) // { contact_id: [tag,...] }
+  const [lifecycles, setLifecycles] = useState(screenCache.lifecycles)
+  const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
+  const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
@@ -116,16 +127,16 @@ export default function ConversationsScreen() {
     const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online').order('name')
     const aMap = {}
     agentsData?.forEach(a => { aMap[a.id] = a.name })
-    setAgentsMap(aMap)
-    setAgentsList(agentsData || [])
+    setAgentsMap(aMap); screenCache.agentsMap = aMap
+    setAgentsList(agentsData || []); screenCache.agentsList = agentsData || []
 
     // Tags
     const { data: tagsList } = await supabase.from('tags').select('*').order('name')
-    setTags(tagsList || [])
+    setTags(tagsList || []); screenCache.tags = tagsList || []
 
     // Lifecycle stages
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
-    setLifecycles(lcStages || [])
+    setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
 
     // لو فيه فلتر تاج و/أو مرحلة lifecycle، جيب الـ contacts اللي مطابقة (تقاطع لو الاتنين مفعّلين)
     let scopeContactIds = null
@@ -169,7 +180,7 @@ export default function ConversationsScreen() {
       if (!sid) return
       lcCounts[sid] = (lcCounts[sid] || 0) + 1
     })
-    setLifecycleCounts(lcCounts)
+    setLifecycleCounts(lcCounts); screenCache.lifecycleCounts = lcCounts
 
     // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
     const countsQuery = applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at'))
@@ -201,7 +212,7 @@ export default function ConversationsScreen() {
       else if (c.status === 'follow_up') counts.follow_up++
       else if (c.status === 'closed') counts.closed++
     })
-    setStatusCounts(counts)
+    setStatusCounts(counts); screenCache.statusCounts = counts
 
     // Conversations query
     let query = applyScope(supabase
@@ -215,7 +226,7 @@ export default function ConversationsScreen() {
     if (error) { console.error(error); setLoading(false); return }
 
     const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
-    setConversations(convs)
+    setConversations(convs); screenCache.conversations = convs
     setLoading(false)
 
     // جيب آخر رسالة لكل محادثة + التاجات
@@ -232,7 +243,7 @@ export default function ConversationsScreen() {
       msgs?.forEach(m => {
         if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m
       })
-      setLastMessages(lastMap)
+      setLastMessages(lastMap); screenCache.lastMessages = lastMap
 
       const contactIds = convs.map(c => c.contact_id).filter(Boolean)
       if (contactIds.length) {
@@ -243,14 +254,29 @@ export default function ConversationsScreen() {
           if (!ctMap[r.contact_id]) ctMap[r.contact_id] = []
           if (r.tags) ctMap[r.contact_id].push(r.tags)
         })
-        setContactTagsMap(ctMap)
+        setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
   }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle])
 
+  // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
+  useEffect(() => {
+    screenCache.status = status
+    screenCache.channel = channel
+    screenCache.search = search
+    screenCache.viewMode = viewMode
+    screenCache.agentFilter = agentFilter
+    screenCache.selectedTag = selectedTag
+    screenCache.selectedLifecycle = selectedLifecycle
+    screenCache.unrepliedOnly = unrepliedOnly
+    screenCache.sidebarOpen = sidebarOpen
+  }, [status, channel, search, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly, sidebarOpen])
+
   useEffect(() => {
     if (!agent) return
-    setLoading(true)
+    // لو عندنا كاش من قبل (يعني ده مش أول فتح للشاشة)، منعملش سبينر ولا نمسح القائمة —
+    // بنوريها زي ما هي فوراً وبنعمل تحديث هادئ في الخلفية بس
+    if (screenCache.conversations === null) setLoading(true)
     fetchConversations()
 
     // Realtime على conversations
