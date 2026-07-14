@@ -4,7 +4,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3 } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, SendHorizontal } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -725,6 +725,12 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
               <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: contact.lifecycle_stages.color }}>
                 {contact.lifecycle_stages.name}
+              </span>
+            )}
+            {!conv.last_inbound_at && (
+              <span title="مفيش رسالة من العميل لسه — المحادثة دي بدأتوها انتوا"
+                className="flex-shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">
+                <SendHorizontal size={9} /> بدأتوها انتم
               </span>
             )}
           </span>
