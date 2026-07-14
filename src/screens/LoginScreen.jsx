@@ -19,7 +19,6 @@ function GoogleIcon(props) {
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const { signInWithGoogle, signInWithPassword, authError } = useAuth()
@@ -68,6 +67,42 @@ export default function LoginScreen() {
             </div>
           )}
 
+          {SHOW_PASSWORD_LOGIN && (
+            <form onSubmit={handlePasswordLogin} className="space-y-3">
+              <input
+                type="email"
+                value={email}
+                onChange={e => setEmail(e.target.value)}
+                placeholder="الإيميل"
+                required
+                className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
+              />
+              <input
+                type="password"
+                value={password}
+                onChange={e => setPassword(e.target.value)}
+                placeholder="الباسورد"
+                required
+                className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
+              />
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-brand hover:bg-brand/90 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
+              >
+                {loading ? 'جاري الدخول...' : 'دخول'}
+              </button>
+            </form>
+          )}
+
+          {SHOW_PASSWORD_LOGIN && (
+            <div className="flex items-center gap-3">
+              <div className="flex-1 h-px bg-surface-3" />
+              <span className="text-xs text-fg-subtle whitespace-nowrap">أو</span>
+              <div className="flex-1 h-px bg-surface-3" />
+            </div>
+          )}
+
           <button
             onClick={handleGoogleLogin}
             disabled={loading}
@@ -79,47 +114,6 @@ export default function LoginScreen() {
               <><GoogleIcon /> تسجيل الدخول بجوجل</>
             )}
           </button>
-
-          {SHOW_PASSWORD_LOGIN && (
-            <>
-              <div className="flex items-center gap-3">
-                <div className="flex-1 h-px bg-surface-3" />
-                <button type="button" onClick={() => { setShowPasswordForm(v => !v); setError('') }}
-                  className="text-xs text-fg-subtle hover:text-fg-muted whitespace-nowrap">
-                  {showPasswordForm ? 'إخفاء الدخول بالإيميل' : 'دخول بالإيميل والباسورد'}
-                </button>
-                <div className="flex-1 h-px bg-surface-3" />
-              </div>
-
-              {showPasswordForm && (
-                <form onSubmit={handlePasswordLogin} className="space-y-3">
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={e => setEmail(e.target.value)}
-                    placeholder="الإيميل"
-                    required
-                    className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
-                  />
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={e => setPassword(e.target.value)}
-                    placeholder="الباسورد"
-                    required
-                    className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
-                  />
-                  <button
-                    type="submit"
-                    disabled={loading}
-                    className="w-full bg-brand hover:bg-brand/90 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
-                  >
-                    {loading ? 'جاري الدخول...' : 'دخول'}
-                  </button>
-                </form>
-              )}
-            </>
-          )}
 
           <p className="text-xs text-fg-subtle text-center leading-relaxed">
             الدخول متاح بس للموظفين المدعوين من الأدمن. لو محتاج حساب، تواصل مع إدارة العيادة.
