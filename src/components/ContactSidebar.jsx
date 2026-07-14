@@ -3,15 +3,17 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
-import { X, Save, User, Globe, Package, Tag, Plus } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Plus, Ban, ShieldCheck, Trash2 } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
 
 const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6', '#06B6D4']
 
-export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
+export default function ContactSidebar({ contact, conv, onClose, onUpdate, onDeleted }) {
   const { agent } = useAuth()
   const toast = useToast()
+  const [blocking, setBlocking] = useState(false)
+  const [deleting, setDeleting] = useState(false)
   const [form, setForm] = useState({
     name: contact?.name || '',
     phone: contact?.phone || '',
@@ -135,6 +137,44 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const toggleBlock = async () => {
+    const newVal = !contact.is_blocked
+    setBlocking(true)
+    const { error } = await supabase.from('contacts').update({ is_blocked: newVal }).eq('id', contact.id)
+    setBlocking(false)
+    if (error) { toast.error('حصل خطأ، حاول تاني'); return }
+    onUpdate({ ...contact, is_blocked: newVal })
+    logActivity(conv?.id, agent?.id, newVal ? 'حظر العميل' : 'ألغى حظر العميل')
+    toast.success(newVal ? 'اتحظر العميل' : 'اتلغى حظر العميل')
+  }
+
+  // بيمسح كل أثر العميل من قاعدة البيانات — المحادثات والرسايل والتاجات والحقول الإضافية، بالترتيب
+  // الصح عشان مايصطدمش بقيود الـ foreign key
+  const deleteContact = async () => {
+    if (!confirm(`متأكد إنك عايز تمسح كل بيانات "${contact?.name || 'العميل ده'}" نهائياً؟ الإجراء ده مينفعش يتراجع فيه.`)) return
+    if (!confirm('تأكيد أخير: هيتم حذف المحادثة وكل الرسايل المرتبطة بالعميل ده نهائياً. متأكد؟')) return
+
+    setDeleting(true)
+    const { data: convs } = await supabase.from('conversations').select('id').eq('contact_id', contact.id)
+    const convIds = (convs || []).map(c => c.id)
+
+    if (convIds.length) {
+      await supabase.from('messages').delete().in('conversation_id', convIds)
+      await supabase.from('conversation_reads').delete().in('conversation_id', convIds)
+      await supabase.from('conversation_assignment_log').delete().in('conversation_id', convIds)
+      await supabase.from('conversation_activity_log').delete().in('conversation_id', convIds)
+      await supabase.from('conversations').delete().in('id', convIds)
+    }
+    await supabase.from('contact_tags').delete().eq('contact_id', contact.id)
+    await supabase.from('contact_custom_fields').delete().eq('contact_id', contact.id)
+    const { error } = await supabase.from('contacts').delete().eq('id', contact.id)
+
+    setDeleting(false)
+    if (error) { toast.error('حصل خطأ أثناء الحذف'); return }
+    toast.success('اتمسحت بيانات العميل')
+    onDeleted?.()
   }
 
   const currentStage = lifecycles.find(l => l.id === form.lifecycle_stage_id)
@@ -266,6 +306,23 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-none"
             />
           </div>
+
+          {/* منطقة خطرة — أدمن بس */}
+          {agent?.role === 'admin' && (
+            <div className="pt-2 border-t border-surface-3 space-y-2">
+              <p className="text-xs text-fg-subtle font-medium">منطقة خطرة</p>
+              <button onClick={toggleBlock} disabled={blocking}
+                className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
+                  contact?.is_blocked ? 'bg-success/10 text-success hover:bg-success/20' : 'bg-warning/10 text-warning hover:bg-warning/20'
+                }`}>
+                {contact?.is_blocked ? <><ShieldCheck size={15} /> إلغاء حظر العميل</> : <><Ban size={15} /> حظر العميل</>}
+              </button>
+              <button onClick={deleteContact} disabled={deleting}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-danger/10 text-danger hover:bg-danger/20 transition-colors disabled:opacity-50">
+                {deleting ? <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" /> : <><Trash2 size={15} /> حذف بيانات العميل نهائياً</>}
+              </button>
+            </div>
+          )}
         </div>
 
         {/* Save Button */}

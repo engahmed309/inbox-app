@@ -7,7 +7,7 @@ import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -566,6 +566,11 @@ export default function ChatScreen() {
           <div className="min-w-0">
             <div className="flex items-center gap-1.5">
               <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+              {contact?.is_blocked && (
+                <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger text-white flex-shrink-0">
+                  <Ban size={9} /> محظور
+                </span>
+              )}
               <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
                 <button onClick={() => setShowLifecycle(v => !v)}
                   className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
@@ -719,6 +724,11 @@ export default function ChatScreen() {
               <Send size={16} />
             </button>
           </div>
+        ) : contact?.is_blocked ? (
+          <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
+            <Ban size={18} className="flex-shrink-0" />
+            <span>العميل ده محظور — مينفعش تبعتله رسايل. تقدر تلغي الحظر من بيانات العميل.</span>
+          </div>
         ) : isWindowExpired ? (
           <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
             <Clock size={18} className="flex-shrink-0 text-follow" />
@@ -785,7 +795,8 @@ export default function ChatScreen() {
 
       {showSidebar && (
         <ContactSidebar contact={contact} conv={conv}
-          onClose={() => setShowSidebar(false)} onUpdate={setContact} />
+          onClose={() => setShowSidebar(false)} onUpdate={setContact}
+          onDeleted={() => navigate('/')} />
       )}
 
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}

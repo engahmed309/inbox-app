@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
-  MessageSquareText, Search, Paperclip, Facebook, Instagram, KeyRound
+  MessageSquareText, Search, Paperclip, Facebook, Instagram, KeyRound, AlertTriangle
 } from 'lucide-react'
 
 const TABS = [
@@ -16,6 +16,7 @@ const TABS = [
   { key: 'fields', label: 'الحقول', icon: List },
   { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
   { key: 'roundrobin', label: 'التوزيع', icon: Settings2 },
+  { key: 'danger', label: 'منطقة خطرة', icon: AlertTriangle },
 ]
 
 export default function SettingsScreen() {
@@ -61,6 +62,7 @@ export default function SettingsScreen() {
         {tab === 'fields' && <FieldsTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
         {tab === 'roundrobin' && <RoundRobinTab />}
+        {tab === 'danger' && <DangerZoneTab />}
       </div>
     </div>
   )
@@ -685,6 +687,77 @@ function RoundRobinTab() {
         <button onClick={save} disabled={saving}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
           {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── Danger Zone ────────────────────────────────────────────
+const WIPE_CONFIRM_PHRASE = 'امسح كل شيء'
+
+function DangerZoneTab() {
+  const toast = useToast()
+  const [confirmText, setConfirmText] = useState('')
+  const [wiping, setWiping] = useState(false)
+  const [done, setDone] = useState(false)
+
+  const wipeAllData = async () => {
+    if (confirmText !== WIPE_CONFIRM_PHRASE) return
+    setWiping(true)
+    try {
+      // بالترتيب الصح عشان مانصطدمش بقيود الـ foreign key
+      await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('conversation_reads').delete().neq('conversation_id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('conversation_assignment_log').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('conversation_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('contact_tags').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('contact_custom_fields').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000')
+      await supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      setDone(true)
+      setConfirmText('')
+      toast.success('اتمسحت كل بيانات المحادثات والعملاء')
+    } catch (err) {
+      toast.error('حصل خطأ أثناء المسح: ' + err.message)
+    } finally {
+      setWiping(false)
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">منطقة خطرة</h2>
+
+      <div className="bg-danger/10 border border-danger/30 rounded-2xl p-4 space-y-3">
+        <div className="flex items-start gap-2">
+          <AlertTriangle size={18} className="text-danger flex-shrink-0 mt-0.5" />
+          <div>
+            <p className="text-sm font-semibold text-danger">مسح كل بيانات المحادثات والعملاء</p>
+            <p className="text-xs text-fg-muted mt-1 leading-relaxed">
+              الإجراء ده هيمسح نهائياً كل المحادثات والرسايل والعملاء والتاجات المرتبطة بيهم — من غير رجوع.
+              الموظفين وإعدادات النظام (التوزيع، الـ Lifecycle، الحقول، الردود السريعة) مش هتتأثر.
+              استخدمه بس لو عايز تبدأ تتبّع المحادثات من الصفر.
+            </p>
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs text-fg-muted mb-1">
+            اكتب "<b>{WIPE_CONFIRM_PHRASE}</b>" عشان تفعّل الزرار
+          </label>
+          <input value={confirmText} onChange={e => { setConfirmText(e.target.value); setDone(false) }}
+            placeholder={WIPE_CONFIRM_PHRASE}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
+        </div>
+
+        <button onClick={wipeAllData} disabled={confirmText !== WIPE_CONFIRM_PHRASE || wiping}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+          {wiping ? (
+            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+          ) : done ? '✓ اتمسحت البيانات' : (
+            <><Trash2 size={15} /> امسح كل بيانات المحادثات والعملاء نهائياً</>
+          )}
         </button>
       </div>
     </div>
