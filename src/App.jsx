@@ -5,27 +5,33 @@ import LoginScreen from './screens/LoginScreen'
 import ConversationsScreen from './screens/ConversationsScreen'
 import ChatScreen from './screens/ChatScreen'
 
-// body{position:fixed} لوحدها مش كفاية على كل متصفحات الأندرويد — بعض المتصفحات بتغيّر حجم
-// الـ layout viewport لما الكيبورد يفتح، وبعضها لأ. بنستخدم visualViewport API (بيعكس المساحة
-// المرئية الفعلية بدقة في كل الحالات) ونحدّث متغيّر CSS بيه، بدل ما نعتمد على 100%/100vh الثابتة
+// body{position:fixed} لوحدها مش كفاية على كل متصفحات الأندرويد — بعض المتصفحات لما الكيبورد يفتح
+// مش بس بتقلل ارتفاع الـ viewport المرئي، كمان بتزحزحه لتحت (offsetTop) عشان تسيب مربع الكتابة
+// فوق الكيبورد. لو متابعناش الإزاحة دي كمان، الـ body التابت (position:fixed) بيفضل مثبّت في
+// مكانه الأصلي (٠،٠) فيبان وكأن الشاشة كلها "بتسكرول" وتطلع الهيدر بره
 function useVisualViewportHeight() {
   useEffect(() => {
     const vv = window.visualViewport
-    const setHeight = () => {
+    const root = document.documentElement
+    const update = () => {
       const height = vv?.height || window.innerHeight
-      document.documentElement.style.setProperty('--app-height', `${height}px`)
+      const offsetTop = vv?.offsetTop || 0
+      root.style.setProperty('--app-height', `${height}px`)
+      root.style.setProperty('--app-offset-top', `${offsetTop}px`)
+      // نضمن إن صفحة الدوكيومنت نفسها مالهاش أي سكرول متراكم برّه الـ body التابت
+      if (window.scrollY !== 0 || window.scrollX !== 0) window.scrollTo(0, 0)
     }
-    setHeight()
+    update()
     if (vv) {
-      vv.addEventListener('resize', setHeight)
-      vv.addEventListener('scroll', setHeight)
+      vv.addEventListener('resize', update)
+      vv.addEventListener('scroll', update)
       return () => {
-        vv.removeEventListener('resize', setHeight)
-        vv.removeEventListener('scroll', setHeight)
+        vv.removeEventListener('resize', update)
+        vv.removeEventListener('scroll', update)
       }
     }
-    window.addEventListener('resize', setHeight)
-    return () => window.removeEventListener('resize', setHeight)
+    window.addEventListener('resize', update)
+    return () => window.removeEventListener('resize', update)
   }, [])
 }
 
