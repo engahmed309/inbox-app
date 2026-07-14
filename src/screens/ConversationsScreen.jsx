@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3 } from 'lucide-react'
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -12,6 +12,7 @@ const AGENT_STATUS_OPTS = [
 ]
 
 const STATUS_TABS = [
+  { key: 'all', label: 'الكل', active: 'text-brand border-b-2 border-brand', dot: 'bg-brand' },
   { key: 'open', label: 'مفتوحة', active: 'text-success border-b-2 border-success', dot: 'bg-success' },
   { key: 'follow_up', label: 'متابعة', active: 'text-follow border-b-2 border-follow', dot: 'bg-follow' },
   { key: 'closed', label: 'مغلقة', active: 'text-fg-muted border-b-2 border-fg-muted', dot: 'bg-slate-500' },
@@ -91,7 +92,7 @@ export default function ConversationsScreen() {
   const [agentsList, setAgentsList] = useState([])
   const [agentFilter, setAgentFilter] = useState('') // '' = بدون فلتر بموظف معين
   const [showAgentFilter, setShowAgentFilter] = useState(false)
-  const [statusCounts, setStatusCounts] = useState({ open: 0, openUnread: 0, follow_up: 0, closed: 0 })
+  const [statusCounts, setStatusCounts] = useState({ all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 })
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [unrepliedOnly, setUnrepliedOnly] = useState(false)
   const [tags, setTags] = useState([])
@@ -193,8 +194,9 @@ export default function ConversationsScreen() {
       return new Date(myReadAt) < new Date(c.last_inbound_at)
     }
 
-    const counts = { open: 0, openUnread: 0, follow_up: 0, closed: 0 }
+    const counts = { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 }
     countsData?.forEach(c => {
+      counts.all++
       if (c.status === 'open') { counts.open++; if (isUnreadForMe(c)) counts.openUnread++ }
       else if (c.status === 'follow_up') counts.follow_up++
       else if (c.status === 'closed') counts.closed++
@@ -205,8 +207,8 @@ export default function ConversationsScreen() {
     let query = applyScope(supabase
       .from('conversations')
       .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
-      .eq('status', status)
       .order('last_message_at', { ascending: false }))
+    if (status !== 'all') query = query.eq('status', status)
     if (unrepliedOnly) query = query.gt('unread_count', 0)
 
     const { data, error } = await query
@@ -373,6 +375,12 @@ export default function ConversationsScreen() {
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
             {agent?.role === 'admin' && (
+              <button onClick={() => navigate('/reports')} title="التقارير"
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+                <BarChart3 size={15} />
+              </button>
+            )}
+            {agent?.role === 'admin' && (
               <button onClick={() => navigate('/settings')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
                 <Settings size={15} />
@@ -396,16 +404,16 @@ export default function ConversationsScreen() {
           </div>
         )}
 
-        {/* Search + الكل/بتاعتي */}
+        {/* بحث (ديسكتوب بس — على الموبايل البحث ظاهر فوق قائمة المحادثات مباشرة) + الكل/بتاعتي */}
         {expanded ? (
           <div className="px-3 py-2.5 border-b border-surface-3">
-            <div className="relative">
+            <div className="hidden lg:block relative">
               <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
                 className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
             </div>
             {canSeeAll && (
-              <div className="flex bg-surface-3 rounded-xl p-0.5 mt-2">
+              <div className="flex bg-surface-3 rounded-xl p-0.5 lg:mt-2">
                 <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
                   className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
                   <Users size={12} /> الكل
@@ -465,39 +473,22 @@ export default function ConversationsScreen() {
             })}
           </div>
 
-          {/* التاجات وقنوات التواصل وفلتر "بدون رد" — موبايل بس، الديسكتوب عارضهم فوق القائمة */}
-          {expanded && (
-            <div className="lg:hidden border-t border-surface-3 py-2 space-y-2">
-              {tags.length > 0 && (
-                <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
-                  <button onClick={() => setSelectedTag(null)}
-                    className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-                    <Tag size={11} /> كل التاجات
-                  </button>
-                  {tags.map(t => (
-                    <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
-                      className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
-                      style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
-                      <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                      {t.name}
-                    </button>
-                  ))}
-                </div>
-              )}
-              <div className="flex items-center gap-2 px-3 overflow-x-auto scrollbar-hide">
-                {CHANNELS.map(ch => (
-                  <button key={ch.key} onClick={() => setChannel(ch.key)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-                    {ch.icon}
-                    {ch.label}
+          {/* التاجات — موبايل بس، الديسكتوب عارضها فوق القائمة */}
+          {expanded && tags.length > 0 && (
+            <div className="lg:hidden border-t border-surface-3 py-2">
+              <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
+                <button onClick={() => setSelectedTag(null)}
+                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                  <Tag size={11} /> كل التاجات
+                </button>
+                {tags.map(t => (
+                  <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
+                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
+                    style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
+                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
+                    {t.name}
                   </button>
                 ))}
-                <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
-                <button onClick={() => setUnrepliedOnly(v => !v)}
-                  className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${unrepliedOnly ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-                  <CircleDot size={11} />
-                  بدون رد
-                </button>
               </div>
             </div>
           )}
@@ -542,6 +533,15 @@ export default function ConversationsScreen() {
           <div className="w-9 h-9" />
         </div>
 
+        {/* البحث — موبايل بس، ظاهر فوق قائمة المحادثات مباشرة (الديسكتوب عنده البحث جوا السايدبار) */}
+        <div className="lg:hidden px-4 py-2.5 bg-surface-2 border-b border-surface-3">
+          <div className="relative">
+            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
+              className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+        </div>
+
         {/* Tags Filter (ديسكتوب بس) */}
         {tags.length > 0 && (
           <div className="hidden lg:flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
@@ -560,8 +560,8 @@ export default function ConversationsScreen() {
           </div>
         )}
 
-        {/* Channel Filter (ديسكتوب بس) */}
-        <div className="hidden lg:flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+        {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض */}
+        <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
           {CHANNELS.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>

@@ -23,8 +23,11 @@ export function AuthProvider({ children }) {
 
   async function setStatus(agentId, status) {
     if (!agentId) return
-    await supabase.from('agents').update({ status }).eq('id', agentId)
-    setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online' } : prev)
+    const now = new Date().toISOString()
+    await supabase.from('agents').update({ status, last_seen_at: now }).eq('id', agentId)
+    // بنسجل كل تغيير حالة في لوج منفصل، عشان نقدر نبني تقرير حضور/غياب لاحقاً (من امتى لحد امتى كان أونلاين كل يوم)
+    supabase.from('agent_status_log').insert({ agent_id: agentId, status, changed_at: now })
+    setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online', last_seen_at: now } : prev)
     // لما موظف يبقى متاح، حاول توزّع أي محادثات كانت مستنية موظف فاضي
     if (status === 'online') {
       fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
