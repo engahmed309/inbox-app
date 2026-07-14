@@ -1,10 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, SendHorizontal } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send } from 'lucide-react'
+
+const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
 const AGENT_STATUS_OPTS = [
   { key: 'online', label: 'نشط', dot: 'bg-success' },
@@ -118,6 +120,12 @@ export default function ConversationsScreen() {
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
+  const [selectionMode, setSelectionMode] = useState(false)
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [showBulkAssign, setShowBulkAssign] = useState(false)
+  const [bulkMessageOpen, setBulkMessageOpen] = useState(false)
+  const [bulkMessageText, setBulkMessageText] = useState('')
+  const [bulkBusy, setBulkBusy] = useState(false)
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const toast = useToast()
   const { theme, toggleTheme } = useTheme()
@@ -332,6 +340,92 @@ export default function ConversationsScreen() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/login')
+  }
+
+  const toggleSelect = (id) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const exitSelectionMode = () => {
+    setSelectionMode(false)
+    setSelectedIds(new Set())
+    setShowBulkAssign(false)
+    setBulkMessageOpen(false)
+  }
+
+  // تغيير جماعي لحالة المحادثات المحددة
+  const bulkChangeStatus = async (newStatus) => {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    setBulkBusy(true)
+    const { error } = await supabase.from('conversations').update({ status: newStatus }).in('id', ids)
+    if (error) { toast.error('فشل تغيير الحالة'); setBulkBusy(false); return }
+    await supabase.from('conversation_activity_log').insert(
+      ids.map(id => ({ conversation_id: id, agent_id: agent?.id, description: `غيّر حالة المحادثة إلى "${STATUS_LABELS[newStatus]}" (تعديل جماعي)` }))
+    )
+    setBulkBusy(false)
+    toast.success(`اتغيرت حالة ${ids.length} محادثة إلى "${STATUS_LABELS[newStatus]}"`)
+    exitSelectionMode()
+    fetchConversations()
+  }
+
+  // تعيين جماعي لموظف
+  const bulkAssign = async (agentId) => {
+    const ids = [...selectedIds]
+    if (!ids.length) return
+    setBulkBusy(true)
+    const { error } = await supabase.from('conversations').update({ assigned_agent_id: agentId }).in('id', ids)
+    if (error) { toast.error('فشل التعيين'); setBulkBusy(false); return }
+    await supabase.from('conversation_assignment_log').insert(
+      ids.map(id => ({ conversation_id: id, assigned_to: agentId, assigned_by: agent?.id }))
+    )
+    setBulkBusy(false)
+    toast.success(`اتعينت ${ids.length} محادثة لـ ${agentsMap[agentId] || 'الموظف'}`)
+    exitSelectionMode()
+    fetchConversations()
+  }
+
+  // رسالة جماعية — بس للمحادثات المفتوحة/متابعة واللي لسه في نافذة الـ٢٤ ساعة، الباقي بيتجاهل ونقول للأدمن كام اتجاهل وليه
+  const bulkSendMessage = async () => {
+    const text = bulkMessageText.trim()
+    if (!text) return
+    setBulkBusy(true)
+
+    const targets = conversations.filter(c => selectedIds.has(c.id))
+    const now = Date.now()
+    const eligible = targets.filter(c => {
+      if (c.status === 'closed') return false
+      if (!c.last_inbound_at) return false
+      return (now - new Date(c.last_inbound_at).getTime()) / 3600000 <= 24
+    })
+    const skipped = targets.length - eligible.length
+
+    let successCount = 0
+    await Promise.all(eligible.map(async c => {
+      try {
+        const res = await fetch(`${API_URL}/reply`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: c.id, content: text, content_type: 'text', agent_id: agent?.id })
+        })
+        if (res.ok) successCount++
+      } catch { /* هنحسبها ضمن اللي فشلت تحت */ }
+    }))
+
+    setBulkBusy(false)
+    setBulkMessageOpen(false)
+    setBulkMessageText('')
+    const failedCount = eligible.length - successCount
+    const parts = [`اتبعتت لـ ${successCount} محادثة`]
+    if (skipped > 0) parts.push(`اتجاهلت ${skipped} (مقفولة أو عدّت الـ٢٤ ساعة)`)
+    if (failedCount > 0) parts.push(`فشلت ${failedCount}`)
+    toast[successCount > 0 ? 'success' : 'error'](parts.join(' — '))
+    exitSelectionMode()
+    fetchConversations()
   }
 
   const filtered = conversations.filter(c => {
@@ -625,6 +719,12 @@ export default function ConversationsScreen() {
             <CircleDot size={11} />
             بدون رد
           </button>
+          <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
+          <button onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectionMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <CheckSquare size={11} />
+            {selectionMode ? 'إلغاء التحديد' : 'تحديد'}
+          </button>
         </div>
 
         {/* List */}
@@ -647,7 +747,10 @@ export default function ConversationsScreen() {
                   agentName={agentsMap[conv.assigned_agent_id]}
                   lastMsg={lastMessages[conv.id]}
                   tags={contactTagsMap[conv.contact_id]}
-                  onClick={() => navigate(`/chat/${conv.id}`)}
+                  selectionMode={selectionMode}
+                  selected={selectedIds.has(conv.id)}
+                  onToggleSelect={() => toggleSelect(conv.id)}
+                  onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
                 />
               ))}
               {conversations.length >= visibleLimit && (
@@ -661,7 +764,68 @@ export default function ConversationsScreen() {
             </>
           )}
         </div>
+
+        {/* شريط العمليات الجماعية */}
+        {selectionMode && selectedIds.size > 0 && (
+          <div className="flex-shrink-0 bg-surface-2 border-t border-surface-3 px-4 py-3 space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-medium text-fg">تم تحديد {selectedIds.size}</span>
+              <button onClick={exitSelectionMode} className="text-xs text-fg-muted hover:text-fg">إلغاء</button>
+            </div>
+            <div className="flex items-center gap-2 flex-wrap">
+              {STATUS_TABS.filter(t => t.key !== 'all').map(t => (
+                <button key={t.key} onClick={() => bulkChangeStatus(t.key)} disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                  <span className={`w-2 h-2 rounded-full ${t.dot}`} /> نقل لـ{t.label}
+                </button>
+              ))}
+              <div className="relative">
+                <button onClick={() => setShowBulkAssign(v => !v)} disabled={bulkBusy}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                  <Users size={12} /> تعيين لموظف <ChevronDown size={11} />
+                </button>
+                {showBulkAssign && (
+                  <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-56 overflow-y-auto">
+                    {agentsList.map(a => (
+                      <button key={a.id} onClick={() => { bulkAssign(a.id); setShowBulkAssign(false) }}
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                        {a.name}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+              <button onClick={() => setBulkMessageOpen(true)} disabled={bulkBusy}
+                className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50">
+                <Send size={12} /> رسالة جماعية
+              </button>
+            </div>
+          </div>
+        )}
       </div>
+
+      {/* Modal الرسالة الجماعية */}
+      {bulkMessageOpen && (
+        <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !bulkBusy && setBulkMessageOpen(false)}>
+          <div className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-96 p-5" onClick={e => e.stopPropagation()}>
+            <p className="font-semibold text-fg mb-1">رسالة جماعية لـ {selectedIds.size} محادثة</p>
+            <p className="text-xs text-fg-subtle mb-3">هتتبعت بس للمحادثات المفتوحة/في المتابعة واللي لسه في نافذة الـ٢٤ ساعة — الباقي هيتجاهل تلقائي.</p>
+            <textarea value={bulkMessageText} onChange={e => setBulkMessageText(e.target.value)}
+              placeholder="اكتب الرسالة..." rows={4}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
+            <div className="flex gap-2 mt-4">
+              <button onClick={() => setBulkMessageOpen(false)} disabled={bulkBusy}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                إلغاء
+              </button>
+              <button onClick={bulkSendMessage} disabled={bulkBusy || !bulkMessageText.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+                {bulkBusy ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'إرسال'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* تعليمات تثبيت آيفون (مفيش API تلقائي في سفاري) */}
       {showIosHelp && (
@@ -684,7 +848,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
+function ConvCard({ conv, agentName, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick }) {
   const contact = conv.contacts
 
   const lastMsgText = lastMsg
@@ -699,7 +863,12 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
 
   return (
     <button onClick={onClick}
-      className="w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-right">
+      className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-right ${selected ? 'bg-brand/10' : ''}`}>
+      {selectionMode && (
+        <span onClick={e => { e.stopPropagation(); onToggleSelect?.() }} className="flex-shrink-0 text-brand">
+          {selected ? <CheckSquare size={20} /> : <Square size={20} className="text-fg-subtle" />}
+        </span>
+      )}
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         {contact?.profile_pic ? (
@@ -725,12 +894,6 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
               <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: contact.lifecycle_stages.color }}>
                 {contact.lifecycle_stages.name}
-              </span>
-            )}
-            {!conv.last_inbound_at && (
-              <span title="مفيش رسالة من العميل لسه — المحادثة دي بدأتوها انتوا"
-                className="flex-shrink-0 flex items-center gap-0.5 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">
-                <SendHorizontal size={9} /> بدأتوها انتم
               </span>
             )}
           </span>

@@ -571,12 +571,6 @@ export default function ChatScreen() {
                   <Ban size={9} /> محظور
                 </span>
               )}
-              {!conv?.last_inbound_at && (
-                <span title="مفيش رسالة من العميل لسه — المحادثة دي بدأتوها انتوا"
-                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow flex-shrink-0">
-                  بدأتوها انتم
-                </span>
-              )}
               <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
                 <button onClick={() => setShowLifecycle(v => !v)}
                   className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
