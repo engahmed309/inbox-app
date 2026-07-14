@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX } from 'lucide-react'
 
 const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
@@ -32,6 +32,31 @@ const PLATFORM_ICONS = {
   facebook: <Facebook size={12} className="text-blue-400" />,
   instagram: <Instagram size={12} className="text-pink-400" />,
   whatsapp: <Phone size={12} className="text-green-400" />,
+}
+
+function AgentAvatar({ agent, size = 22 }) {
+  const [broken, setBroken] = useState(false)
+  const name = agent?.name || agent?.full_name || ''
+  const src = agent?.avatar_url
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        style={{ width: size, height: size }}
+        className="rounded-full object-cover flex-shrink-0 bg-surface-3"
+        onError={() => setBroken(true)}
+      />
+    )
+  }
+  return (
+    <span
+      style={{ width: size, height: size, fontSize: size * 0.45 }}
+      className="rounded-full bg-brand/20 text-brand font-bold flex items-center justify-center flex-shrink-0"
+    >
+      {name ? name[0] : '?'}
+    </span>
+  )
 }
 
 function timeAgo(dateStr) {
@@ -93,6 +118,7 @@ const screenCache = {
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
   lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
+  agentOpenCounts: {}, unassignedOpenCount: 0,
 }
 
 export default function ConversationsScreen() {
@@ -116,6 +142,8 @@ export default function ConversationsScreen() {
   const [contactTagsMap, setContactTagsMap] = useState(screenCache.contactTagsMap) // { contact_id: [tag,...] }
   const [lifecycles, setLifecycles] = useState(screenCache.lifecycles)
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
+  const [agentOpenCounts, setAgentOpenCounts] = useState(screenCache.agentOpenCounts) // { agent_id: عدد المحادثات المفتوحة المعينة له }
+  const [unassignedOpenCount, setUnassignedOpenCount] = useState(screenCache.unassignedOpenCount)
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -138,9 +166,9 @@ export default function ConversationsScreen() {
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
   const fetchStaticLists = useCallback(async () => {
-    const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online').order('name')
+    const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online, avatar_url').order('name')
     const aMap = {}
-    agentsData?.forEach(a => { aMap[a.id] = a.name })
+    agentsData?.forEach(a => { aMap[a.id] = { name: a.name, avatar_url: a.avatar_url } })
     setAgentsMap(aMap); screenCache.agentsMap = aMap
     setAgentsList(agentsData || []); screenCache.agentsList = agentsData || []
 
@@ -169,6 +197,8 @@ export default function ConversationsScreen() {
       if (channel !== 'all') q = q.eq('platform', channel)
       if (!canSeeAll) {
         q = q.eq('assigned_agent_id', agent?.id)
+      } else if (agentFilter === 'unassigned') {
+        q = q.is('assigned_agent_id', null)
       } else if (agentFilter) {
         q = q.eq('assigned_agent_id', agentFilter)
       } else if (viewMode === 'mine') {
@@ -195,6 +225,22 @@ export default function ConversationsScreen() {
       lcCounts[sid] = (lcCounts[sid] || 0) + 1
     })
     setLifecycleCounts(lcCounts); screenCache.lifecycleCounts = lcCounts
+
+    // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس، من غير فلتر الموظف
+    // نفسه، عشان نقدر نقارن كل الموظفين مع بعض في قائمة الفلتر
+    if (canSeeAll) {
+      let agentCountQuery = supabase.from('conversations').select('assigned_agent_id').eq('status', 'open')
+      if (channel !== 'all') agentCountQuery = agentCountQuery.eq('platform', channel)
+      const { data: agentCountData } = await agentCountQuery
+      const aCounts = {}
+      let unassigned = 0
+      agentCountData?.forEach(c => {
+        if (c.assigned_agent_id) aCounts[c.assigned_agent_id] = (aCounts[c.assigned_agent_id] || 0) + 1
+        else unassigned++
+      })
+      setAgentOpenCounts(aCounts); screenCache.agentOpenCounts = aCounts
+      setUnassignedOpenCount(unassigned); screenCache.unassignedOpenCount = unassigned
+    }
 
     // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
     const countsQuery = applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at'))
@@ -384,7 +430,7 @@ export default function ConversationsScreen() {
       ids.map(id => ({ conversation_id: id, assigned_to: agentId, assigned_by: agent?.id }))
     )
     setBulkBusy(false)
-    toast.success(`اتعينت ${ids.length} محادثة لـ ${agentsMap[agentId] || 'الموظف'}`)
+    toast.success(`اتعينت ${ids.length} محادثة لـ ${agentsMap[agentId]?.name || 'الموظف'}`)
     exitSelectionMode()
     fetchConversations()
   }
@@ -440,7 +486,7 @@ export default function ConversationsScreen() {
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
   const expanded = sidebarOpen || mobileMenuOpen
   const AgentFilterList = ({ vertical }) => (
-    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-64 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[180px] overflow-hidden max-h-64 overflow-y-auto'}>
+    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
       <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
         className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
         <Users size={14} className="text-fg-muted flex-shrink-0" />
@@ -451,12 +497,23 @@ export default function ConversationsScreen() {
         return (
           <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
             className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
-            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
+            <span className="relative flex-shrink-0">
+              <AgentAvatar agent={a} size={22} />
+              <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
+            </span>
             <span className="flex-1 truncate">{a.name}</span>
-            <span className="text-[11px] text-fg-subtle flex-shrink-0">{st.label}</span>
+            <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة معينة له">{agentOpenCounts[a.id] || 0}</span>
           </button>
         )
       })}
+      <button onClick={() => { setAgentFilter('unassigned'); setShowAgentFilter(false) }}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'unassigned' ? 'bg-surface-3' : ''}`}>
+        <span className="w-[22px] h-[22px] rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 text-fg-subtle">
+          <UserX size={12} />
+        </span>
+        <span className="flex-1 truncate text-fg-muted">غير معينة</span>
+        <span className="text-[11px] text-fg-subtle flex-shrink-0">{unassignedOpenCount}</span>
+      </button>
     </div>
   )
 
@@ -583,9 +640,14 @@ export default function ConversationsScreen() {
           <div className="px-3 py-2 border-b border-surface-3 relative">
             <button onClick={() => setShowAgentFilter(v => !v)}
               className="w-full flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2 text-xs text-fg hover:bg-surface-3/80 transition-colors">
-              {agentFilter ? (
+              {agentFilter === 'unassigned' ? (
                 <>
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === (agentsList.find(a => a.id === agentFilter)?.status || 'offline'))?.dot}`} />
+                  <UserX size={14} className="text-fg-muted flex-shrink-0" />
+                  <span className="flex-1 text-right truncate">غير معينة</span>
+                </>
+              ) : agentFilter ? (
+                <>
+                  <AgentAvatar agent={agentsList.find(a => a.id === agentFilter)} size={16} />
                   <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
                 </>
               ) : (
@@ -744,7 +806,7 @@ export default function ConversationsScreen() {
                 <ConvCard
                   key={conv.id}
                   conv={conv}
-                  agentName={agentsMap[conv.assigned_agent_id]}
+                  assignedAgent={agentsMap[conv.assigned_agent_id]}
                   lastMsg={lastMessages[conv.id]}
                   tags={contactTagsMap[conv.contact_id]}
                   selectionMode={selectionMode}
@@ -848,7 +910,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ conv, agentName, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick }) {
+function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick }) {
   const contact = conv.contacts
 
   const lastMsgText = lastMsg
@@ -901,7 +963,7 @@ function ConvCard({ conv, agentName, lastMsg, tags, selectionMode, selected, onT
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <span className="text-xs text-fg-muted truncate flex-1">
-            {lastMsgText || (agentName ? `@${agentName}` : 'غير معين')}
+            {lastMsgText || (assignedAgent?.name ? `@${assignedAgent.name}` : 'غير معين')}
           </span>
           {conv.myUnread && (
             <span className="bg-brand text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center flex-shrink-0 pulse-dot">
@@ -909,8 +971,11 @@ function ConvCard({ conv, agentName, lastMsg, tags, selectionMode, selected, onT
             </span>
           )}
         </div>
-        {agentName && (
-          <p className="text-xs text-fg-subtle mt-0.5 truncate">@{agentName}</p>
+        {assignedAgent?.name && (
+          <div className="flex items-center gap-1 mt-1">
+            <AgentAvatar agent={assignedAgent} size={14} />
+            <p className="text-xs text-fg-subtle truncate">{assignedAgent.name}</p>
+          </div>
         )}
         {tags?.length > 0 && (
           <div className="flex gap-1 mt-1 flex-wrap">

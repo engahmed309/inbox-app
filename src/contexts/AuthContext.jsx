@@ -52,10 +52,25 @@ export function AuthProvider({ children }) {
       setAuthError('الحساب ده مش مدعو لاستخدام النظام. تواصل مع الأدمن عشان يضيفك.')
       return
     }
+
+    // بنزامن الاسم والصورة من حساب جوجل كل مرة يسجل دخول، عشان هويته في النظام تفضل مطابقة لحسابه الحقيقي
+    const meta = session.user.user_metadata || {}
+    const googleName = meta.full_name || meta.name
+    const googleAvatar = meta.avatar_url || meta.picture
+    const updates = {}
+    if (googleName && googleName !== ag.name) updates.name = googleName
+    if (googleAvatar && googleAvatar !== ag.avatar_url) updates.avatar_url = googleAvatar
+
+    let finalAgent = ag
+    if (Object.keys(updates).length) {
+      const { data: updated } = await supabase.from('agents').update(updates).eq('id', ag.id).select().single()
+      if (updated) finalAgent = updated
+    }
+
     setAuthError('')
     setUser(session.user)
-    setAgent(ag)
-    setStatus(ag.id, 'online')
+    setAgent(finalAgent)
+    setStatus(finalAgent.id, 'online')
   }
 
   useEffect(() => {

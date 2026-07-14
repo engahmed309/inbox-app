@@ -28,6 +28,31 @@ const WINDOW_EXPIRED_TEXT = {
   facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
 }
 
+function AgentAvatar({ agent, size = 20 }) {
+  const [broken, setBroken] = useState(false)
+  const name = agent?.name || ''
+  const src = agent?.avatar_url
+  if (src && !broken) {
+    return (
+      <img
+        src={src}
+        alt={name}
+        style={{ width: size, height: size }}
+        className="rounded-full object-cover flex-shrink-0 bg-surface-3"
+        onError={() => setBroken(true)}
+      />
+    )
+  }
+  return (
+    <span
+      style={{ width: size, height: size, fontSize: size * 0.45 }}
+      className="rounded-full bg-brand/20 text-brand font-bold flex items-center justify-center flex-shrink-0"
+    >
+      {name ? name[0] : '?'}
+    </span>
+  )
+}
+
 function formatTime(dateStr) {
   return new Date(dateStr).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
 }
@@ -179,8 +204,8 @@ export default function ChatScreen() {
       // Agent name
       if (convData?.assigned_agent_id) {
         const { data: ag } = await supabase
-          .from('agents').select('name').eq('id', convData.assigned_agent_id).single()
-        if (ag) setConv(prev => ({ ...prev, agentName: ag.name }))
+          .from('agents').select('name, avatar_url').eq('id', convData.assigned_agent_id).single()
+        if (ag) setConv(prev => ({ ...prev, agentName: ag.name, agentAvatarUrl: ag.avatar_url }))
       }
 
       // Messages + Assignment log
@@ -195,7 +220,7 @@ export default function ChatScreen() {
       }
 
       // Agents list (لأي agent يقدر يعيّن/يستلم محادثات)
-      const { data: ags } = await supabase.from('agents').select('id, name, is_online, status').order('name')
+      const { data: ags } = await supabase.from('agents').select('id, name, is_online, status, avatar_url').order('name')
       setAgents(ags || [])
 
       // Quick replies
@@ -414,7 +439,7 @@ export default function ChatScreen() {
       conversation_id: id, assigned_to: agentId, assigned_by: agent?.id
     })
     const ag = agents.find(a => a.id === agentId)
-    setConv(prev => ({ ...prev, agentName: ag?.name, assigned_agent_id: agentId }))
+    setConv(prev => ({ ...prev, agentName: ag?.name, agentAvatarUrl: ag?.avatar_url, assigned_agent_id: agentId }))
     setShowAssign(false)
     fetchMessages(false)
   }
@@ -597,6 +622,9 @@ export default function ChatScreen() {
             </div>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
+              {conv?.agentName && (
+                <AgentAvatar agent={{ name: conv.agentName, avatar_url: conv.agentAvatarUrl }} size={14} />
+              )}
               <span className="text-xs text-fg-muted truncate">
                 {conv?.agentName || 'غير معين'}
                 {!contact?.name && ' · اضغط لإضافة الاسم'}
@@ -621,7 +649,10 @@ export default function ChatScreen() {
                 {agents.map(ag => (
                   <button key={ag.id} onClick={() => assignAgent(ag.id)}
                     className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right">
-                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${ag.status === 'busy' ? 'bg-follow' : ag.is_online ? 'bg-success' : 'bg-slate-500'}`} />
+                    <span className="relative flex-shrink-0">
+                      <AgentAvatar agent={ag} size={18} />
+                      <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${ag.status === 'busy' ? 'bg-follow' : ag.is_online ? 'bg-success' : 'bg-slate-500'}`} />
+                    </span>
                     {ag.name}
                   </button>
                 ))}
