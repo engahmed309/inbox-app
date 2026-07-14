@@ -1,4 +1,5 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import { MessageSquare } from 'lucide-react'
 
@@ -21,7 +22,14 @@ export default function LoginScreen() {
   const [error, setError] = useState('')
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
-  const { signInWithGoogle, signInWithPassword, authError } = useAuth()
+  const { user, signInWithGoogle, signInWithPassword, authError } = useAuth()
+  const navigate = useNavigate()
+
+  // بعد نجاح الدخول بالإيميل والباسورد، مفيش أي حاجة بتحول المستخدم لصفحة التطبيق تلقائي
+  // (عكس جوجل اللي بيعمل ريدايركت كامل للصفحة)، فلازم نوديه إحنا بمجرد ما الـ user يتظبط
+  useEffect(() => {
+    if (user) navigate('/', { replace: true })
+  }, [user])
 
   const handleGoogleLogin = async () => {
     setError('')
