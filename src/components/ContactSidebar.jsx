@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+import { logActivity } from '../lib/activityLog'
 import { X, Save, User, Globe, Package, Tag, Plus } from 'lucide-react'
+
+const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
 
 const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6', '#06B6D4']
 
 export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
+  const { agent } = useAuth()
   const [form, setForm] = useState({
     name: contact?.name || '',
     phone: contact?.phone || '',
@@ -15,6 +20,7 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
   const [lifecycles, setLifecycles] = useState([])
   const [customFields, setCustomFields] = useState([])
   const [customValues, setCustomValues] = useState({})
+  const [originalCustomValues, setOriginalCustomValues] = useState({})
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
   const [allTags, setAllTags] = useState([])
@@ -44,6 +50,7 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
       const map = {}
       vals?.forEach(v => { map[v.field_definition_id] = v.value })
       setCustomValues(map)
+      setOriginalCustomValues(map)
 
       const { data: ctRows } = await supabase
         .from('contact_tags').select('tag_id, tags(id, name, color)').eq('contact_id', contact.id)
@@ -56,9 +63,11 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
     if (has) {
       await supabase.from('contact_tags').delete().eq('contact_id', contact.id).eq('tag_id', tag.id)
       setContactTags(prev => prev.filter(t => t.id !== tag.id))
+      logActivity(conv?.id, agent?.id, `أزال تاج "${tag.name}" من العميل`)
     } else {
       await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
       setContactTags(prev => [...prev, tag])
+      logActivity(conv?.id, agent?.id, `أضاف تاج "${tag.name}" للعميل`)
     }
   }
 
@@ -76,6 +85,29 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
 
   const save = async () => {
     setSaving(true)
+
+    // قارن القيم القديمة بالجديدة قبل الحفظ عشان نسجل التغييرات في نشاط المحادثة
+    const changes = []
+    for (const key of ['name', 'phone', 'country', 'notes']) {
+      const oldVal = contact?.[key] || ''
+      const newVal = form[key] || ''
+      if (oldVal !== newVal) {
+        changes.push(`غيّر ${FIELD_LABELS[key]} من "${oldVal || '—'}" إلى "${newVal || '—'}"`)
+      }
+    }
+    if ((contact?.lifecycle_stage_id || '') !== (form.lifecycle_stage_id || '')) {
+      const oldName = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)?.name || 'بدون مرحلة'
+      const newName = lifecycles.find(l => l.id === form.lifecycle_stage_id)?.name || 'بدون مرحلة'
+      changes.push(`غيّر مرحلة الـ Lifecycle من "${oldName}" إلى "${newName}"`)
+    }
+    for (const f of customFields) {
+      const oldVal = originalCustomValues[f.id] || ''
+      const newVal = customValues[f.id] || ''
+      if (oldVal !== newVal) {
+        changes.push(`غيّر ${f.name} من "${oldVal || '—'}" إلى "${newVal || '—'}"`)
+      }
+    }
+
     const { data: updated } = await supabase
       .from('contacts')
       .update(form)
@@ -91,6 +123,11 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate }) {
         field_definition_id: fieldId,
         value
       }, { onConflict: 'contact_id,field_definition_id' })
+    }
+    setOriginalCustomValues(customValues)
+
+    for (const change of changes) {
+      logActivity(conv?.id, agent?.id, change)
     }
 
     setSaving(false)

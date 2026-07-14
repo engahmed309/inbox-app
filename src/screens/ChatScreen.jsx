@@ -3,6 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import ContactSidebar from '../components/ContactSidebar'
+import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
   User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog
@@ -44,6 +45,7 @@ export default function ChatScreen() {
   const [contact, setContact] = useState(null)
   const [messages, setMessages] = useState([])
   const [assignLogs, setAssignLogs] = useState([])
+  const [activityLogs, setActivityLogs] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [showStatus, setShowStatus] = useState(false)
@@ -105,6 +107,13 @@ export default function ChatScreen() {
       .eq('conversation_id', id)
       .order('created_at', { ascending: true })
     setAssignLogs(logs || [])
+
+    const { data: activity } = await supabase
+      .from('conversation_activity_log')
+      .select('*')
+      .eq('conversation_id', id)
+      .order('created_at', { ascending: true })
+    setActivityLogs(activity || [])
 
     if (scroll || hasNewOnes) scrollToBottom()
   }, [id, scrollToBottom])
@@ -182,6 +191,14 @@ export default function ChatScreen() {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_assignment_log',
+      }, (payload) => {
+        if (payload.new.conversation_id !== id) return
+        fetchMessages(false)
+      })
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'conversation_activity_log',
       }, (payload) => {
         if (payload.new.conversation_id !== id) return
         fetchMessages(false)
@@ -279,17 +296,23 @@ export default function ChatScreen() {
   }
 
   const changeStatus = async (s) => {
+    const oldLabel = currentStatus.label
     await supabase.from('conversations').update({ status: s }).eq('id', id)
     setConv(prev => ({ ...prev, status: s }))
     setShowStatus(false)
+    const newLabel = STATUS_OPTS.find(o => o.key === s)?.label || s
+    if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "${newLabel}"`)
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
     if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
   }
 
   const changeLifecycle = async (stageId) => {
+    const oldLabel = currentLifecycle?.name || 'بدون مرحلة'
     await supabase.from('contacts').update({ lifecycle_stage_id: stageId || null }).eq('id', contact.id)
     setContact(prev => prev ? { ...prev, lifecycle_stage_id: stageId || null } : prev)
     setShowLifecycle(false)
+    const newLabel = lifecycles.find(l => l.id === stageId)?.name || 'بدون مرحلة'
+    if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر مرحلة الـ Lifecycle من "${oldLabel}" إلى "${newLabel}"`)
   }
 
   const assignAgent = async (agentId) => {
@@ -396,8 +419,9 @@ export default function ChatScreen() {
       .filter(m => !searchQuery || (m.content || '').toLowerCase().includes(searchQuery.toLowerCase()))
       .map(m => ({ ...m, _kind: 'message' }))
     const logItems = searchQuery ? [] : assignLogs.map(l => ({ ...l, _kind: 'assignment' }))
-    return [...msgItems, ...logItems].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
-  }, [messages, assignLogs, searchQuery])
+    const activityItems = searchQuery ? [] : activityLogs.map(l => ({ ...l, _kind: 'activity' }))
+    return [...msgItems, ...logItems, ...activityItems].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+  }, [messages, assignLogs, activityLogs, searchQuery])
 
   const groupedMessages = timeline.reduce((groups, item) => {
     const date = formatDate(item.created_at)
@@ -528,6 +552,8 @@ export default function ChatScreen() {
             <div className="space-y-1">
               {items.map((item, i) => item._kind === 'assignment' ? (
                 <AssignmentEvent key={item.id} log={item} />
+              ) : item._kind === 'activity' ? (
+                <ActivityEvent key={item.id} log={item} agentsMap={agentsMap} />
               ) : (
                 <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} onMediaClick={setLightbox} agentsMap={agentsMap} />
               ))}
@@ -641,6 +667,18 @@ function AssignmentEvent({ log }) {
         {byName
           ? <>تم تعيين المحادثة لـ <b className="text-fg">{toName}</b> بواسطة <b className="text-fg">{byName}</b></>
           : <>تم توزيع المحادثة تلقائياً لـ <b className="text-fg">{toName}</b></>}
+        <span className="text-fg-subtle">· {formatTime(log.created_at)}</span>
+      </span>
+    </div>
+  )
+}
+
+function ActivityEvent({ log, agentsMap }) {
+  const agentName = agentsMap?.[log.agent_id] || 'موظف'
+  return (
+    <div className="flex justify-center my-2">
+      <span className="flex items-center gap-1.5 text-xs text-fg-muted bg-surface-2 px-3 py-1.5 rounded-full text-center">
+        <b className="text-fg">{agentName}</b> {log.description}
         <span className="text-fg-subtle">· {formatTime(log.created_at)}</span>
       </span>
     </div>
