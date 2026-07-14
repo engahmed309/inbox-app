@@ -337,9 +337,11 @@ function ChannelsTab() {
 }
 
 function ConnectedChannelsList() {
+  const toast = useToast()
   const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [deletingId, setDeletingId] = useState(null)
 
   useEffect(() => { load() }, [])
   const load = async () => {
@@ -354,6 +356,22 @@ function ConnectedChannelsList() {
       setError(err.message)
     } finally {
       setLoading(false)
+    }
+  }
+
+  const disconnectChannel = async (ch) => {
+    if (!confirm(`فصل ${PLATFORM_META[ch.platform].label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
+    setDeletingId(ch.id)
+    try {
+      const res = await fetch(`${API_URL}/channels/${ch.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الفصل')
+      toast.success('اتفصلت القناة')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setDeletingId(null)
     }
   }
 
@@ -404,6 +422,17 @@ function ConnectedChannelsList() {
                 <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">
                   مش مربوطة
                 </span>
+              )}
+              {ch?.id && (
+                <button onClick={() => disconnectChannel(ch)} disabled={deletingId === ch.id}
+                  title="فصل القناة"
+                  className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
+                  {deletingId === ch.id ? (
+                    <div className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 size={14} />
+                  )}
+                </button>
               )}
             </div>
             {ch?.status_reason && (
