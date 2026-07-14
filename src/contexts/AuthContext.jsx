@@ -111,13 +111,20 @@ export function AuthProvider({ children }) {
     if (error) throw error
   }
 
+  // مؤقتاً: دخول بإيميل وباسورد كمان، لحد ما مراجعة ميتا للتطبيق تخلص وقتها هنقفله ونسيب جوجل بس
+  const signInWithPassword = async (email, password) => {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+    if (error) throw error
+    await handleSession(data.session)
+  }
+
   const signOut = async () => {
     if (agent) await setStatus(agent.id, 'offline')
     await supabase.auth.signOut()
   }
 
   return (
-    <AuthContext.Provider value={{ user, agent, loading, authError, signInWithGoogle, signOut, setStatus }}>
+    <AuthContext.Provider value={{ user, agent, loading, authError, signInWithGoogle, signInWithPassword, signOut, setStatus }}>
       {children}
     </AuthContext.Provider>
   )

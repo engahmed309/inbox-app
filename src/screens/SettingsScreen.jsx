@@ -6,7 +6,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
-  MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle
+  MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound
 } from 'lucide-react'
 
 const TABS = [
@@ -224,6 +224,24 @@ function MaxConversationsField({ value, onChange }) {
 function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
+  const toast = useToast()
+
+  // مؤقتاً: بديل لجوجل — عشان مراجع ميتا يقدر يدخل بإيميل وباسورد عادي
+  const resetPassword = async () => {
+    const password = prompt(`باسورد جديد لـ ${agent.name} (٦ حروف على الأقل):`)
+    if (!password) return
+    try {
+      const res = await fetch(`${API_URL}/admin/reset-password`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agent.id, password })
+      })
+      if (!res.ok) throw new Error(await res.text())
+      toast.success('اتغير الباسورد بنجاح')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    }
+  }
 
   return (
     <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
@@ -265,6 +283,9 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
               <p className="text-xs text-fg-subtle">الحد: {agent.max_conversations == null ? 'غير محدود' : `${agent.max_conversations} محادثة`}</p>
             </div>
             <div className="flex gap-1.5">
+              <button onClick={resetPassword} title="تحديد باسورد للدخول المؤقت" className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+                <KeyRound size={14} />
+              </button>
               <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <Edit2 size={14} />
               </button>
