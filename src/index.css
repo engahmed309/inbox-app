@@ -36,9 +36,15 @@
 }
 
 * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
-html, body, #root { height: 100%; overflow: hidden; }
+html { height: 100%; overflow: hidden; }
 /* position: fixed على الـ body بتمنع المتصفح إنه "يسكرول الصفحة كلها" عشان يورّي مربع الكتابة
-   لما الكيبورد الافتراضي يفتح على الموبايل — ده اللي كان بيطيّر الهيدر بره الشاشة */
+   لما الكيبورد الافتراضي يفتح على الموبايل — ده اللي كان بيطيّر الهيدر بره الشاشة.
+   و--app-height بتتحدّث لحظياً من visualViewport في App.jsx بدل 100%/100vh الثابتة، عشان
+   بعض متصفحات الأندرويد مبتغيّرش حجم الـ layout viewport لما الكيبورد يفتح فـ100% لوحدها مش كفاية */
+body, #root {
+  height: var(--app-height, 100%);
+  overflow: hidden;
+}
 body {
   position: fixed;
   inset: 0;
