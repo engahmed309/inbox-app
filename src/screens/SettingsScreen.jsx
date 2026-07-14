@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -416,21 +416,115 @@ function ConnectedChannelsList() {
   )
 }
 
+// بنحمّل الـ SDK بتاع فيسبوك مرة واحدة بس، أول ما حد يحتاجه فعلاً
+let fbSdkPromise = null
+function loadFacebookSDK() {
+  if (fbSdkPromise) return fbSdkPromise
+  fbSdkPromise = new Promise((resolve, reject) => {
+    if (window.FB) { resolve(window.FB); return }
+    window.fbAsyncInit = function () {
+      window.FB.init({ appId: FB_APP_ID, xfbml: false, version: 'v21.0' })
+      resolve(window.FB)
+    }
+    const script = document.createElement('script')
+    script.src = 'https://connect.facebook.net/en_US/sdk.js'
+    script.async = true
+    script.defer = true
+    script.onerror = () => reject(new Error('فشل تحميل SDK بتاع فيسبوك'))
+    document.body.appendChild(script)
+  })
+  return fbSdkPromise
+}
+
 function ConnectNewChannel() {
+  const toast = useToast()
+  const { agent } = useAuth()
+  const [connecting, setConnecting] = useState(null)
+
+  const connectWhatsApp = async () => {
+    if (!WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID) {
+      toast.error('محتاجين نضيف WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID في إعدادات السيرفر الأول')
+      return
+    }
+    setConnecting('whatsapp')
+
+    let sessionInfo = null
+    const handleMessage = (event) => {
+      if (!event.origin?.includes('facebook.com')) return
+      try {
+        const data = JSON.parse(event.data)
+        if (data.type === 'WA_EMBEDDED_SIGNUP' && data.event === 'FINISH') {
+          sessionInfo = data.data
+        }
+      } catch { /* رسايل تانية مش بتاعتنا */ }
+    }
+    window.addEventListener('message', handleMessage)
+
+    try {
+      const FB = await loadFacebookSDK()
+      FB.login((response) => {
+        window.removeEventListener('message', handleMessage)
+        if (response.authResponse?.code && sessionInfo?.phone_number_id && sessionInfo?.waba_id) {
+          finishWhatsAppConnect(response.authResponse.code, sessionInfo)
+        } else {
+          toast.error('اتلغى الربط أو حصل خطأ من فيسبوك')
+          setConnecting(null)
+        }
+      }, {
+        config_id: WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true,
+        extras: { setup: {}, featureType: '', sessionInfoVersion: '3' }
+      })
+    } catch (err) {
+      window.removeEventListener('message', handleMessage)
+      toast.error(err.message)
+      setConnecting(null)
+    }
+  }
+
+  const finishWhatsAppConnect = async (code, sessionInfo) => {
+    try {
+      const res = await fetch(`${API_URL}/channels/whatsapp/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          code, waba_id: sessionInfo.waba_id, phone_number_id: sessionInfo.phone_number_id,
+          agent_id: agent?.id
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل ربط الرقم')
+      toast.success('اترابط رقم الواتساب بنجاح')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setConnecting(null)
+    }
+  }
+
   return (
     <div className="space-y-3 pt-1">
       <p className="text-xs text-fg-subtle -mt-1">اختار القناة اللي عايز تربطها. هتتحول لصفحة ميتا تختار منها الصفحة أو الحساب وتوافق على الصلاحيات.</p>
       {['facebook', 'instagram', 'whatsapp'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
+        const isWhatsApp = platform === 'whatsapp'
+        const isConnecting = connecting === platform
         return (
-          <button key={platform} disabled
-            className="w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 opacity-60 cursor-not-allowed">
+          <button key={platform}
+            disabled={!isWhatsApp || isConnecting}
+            onClick={isWhatsApp ? connectWhatsApp : undefined}
+            className={`w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 transition-colors ${!isWhatsApp ? 'opacity-60 cursor-not-allowed' : 'hover:bg-surface-3'}`}>
             <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
               <Icon size={16} className={meta.color} />
             </div>
             <span className="flex-1 text-right text-sm text-fg font-medium">ربط {meta.label}</span>
-            <span className="text-[11px] text-fg-subtle flex-shrink-0">قريباً</span>
+            {isWhatsApp ? (
+              isConnecting && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
+            ) : (
+              <span className="text-[11px] text-fg-subtle flex-shrink-0">قريباً</span>
+            )}
           </button>
         )
       })}

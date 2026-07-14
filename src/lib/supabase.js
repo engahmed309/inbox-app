@@ -6,3 +6,7 @@ export const supabase = createClient(
 )
 
 export const API_URL = 'https://inbox-api.sehawafeya.com'
+
+// معرفات عامة بتاعة تطبيق ميتا (مش سرية) — لازمة لتشغيل SDK بتاع فيسبوك وربط القنوات من جوه التطبيق
+export const FB_APP_ID = '1617615039978745'
+export const WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = '1009143671730527'
