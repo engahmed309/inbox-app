@@ -7,6 +7,7 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [agent, setAgent] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [authError, setAuthError] = useState('')
 
   async function loadAgent(authUser) {
     if (!authUser) return null
@@ -34,25 +35,41 @@ export function AuthProvider({ children }) {
     }
   }
 
+  // بيتحسب مرة واحدة وبيتنادى من getSession الأول ومن onAuthStateChange بعد كده، عشان منكررش
+  // نفس منطق "هل الموظف ده مدعو فعلاً؟" في مكانين
+  async function handleSession(session) {
+    if (!session?.user) {
+      setUser(null)
+      setAgent(null)
+      return
+    }
+    const ag = await loadAgent(session.user)
+    if (!ag) {
+      // اتسجل دخول بجوجل بس مفيش دعوة ليه في النظام — نرفضه فوراً
+      await supabase.auth.signOut()
+      setUser(null)
+      setAgent(null)
+      setAuthError('الحساب ده مش مدعو لاستخدام النظام. تواصل مع الأدمن عشان يضيفك.')
+      return
+    }
+    setAuthError('')
+    setUser(session.user)
+    setAgent(ag)
+    setStatus(ag.id, 'online')
+  }
+
   useEffect(() => {
     supabase.auth.getSession().then(async ({ data: { session } }) => {
-      setUser(session?.user ?? null)
-      if (session?.user) {
-        const ag = await loadAgent(session.user)
-        setAgent(ag)
-        if (ag) setStatus(ag.id, 'online')
-      }
+      await handleSession(session)
       setLoading(false)
     })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      setUser(session?.user ?? null)
       if (session?.user) {
-        const ag = await loadAgent(session.user)
-        setAgent(ag)
-        if (ag) setStatus(ag.id, 'online')
+        await handleSession(session)
       } else {
         if (agentRef.current) setStatus(agentRef.current.id, 'offline')
+        setUser(null)
         setAgent(null)
       }
     })
@@ -71,10 +88,12 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
-  const signIn = async (email, password) => {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password })
+  const signInWithGoogle = async () => {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin }
+    })
     if (error) throw error
-    return data
   }
 
   const signOut = async () => {
@@ -83,7 +102,7 @@ export function AuthProvider({ children }) {
   }
 
   return (
-    <AuthContext.Provider value={{ user, agent, loading, signIn, signOut, setStatus }}>
+    <AuthContext.Provider value={{ user, agent, loading, authError, signInWithGoogle, signOut, setStatus }}>
       {children}
     </AuthContext.Provider>
   )

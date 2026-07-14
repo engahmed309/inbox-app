@@ -1,27 +1,31 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
-import { Mail, Lock, Eye, EyeOff, MessageSquare } from 'lucide-react'
+import { MessageSquare } from 'lucide-react'
+
+function GoogleIcon(props) {
+  return (
+    <svg viewBox="0 0 24 24" width="18" height="18" {...props}>
+      <path fill="#4285F4" d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47a5.54 5.54 0 0 1-2.4 3.63v3h3.88c2.27-2.09 3.57-5.17 3.57-8.82z" />
+      <path fill="#34A853" d="M12 24c3.24 0 5.96-1.07 7.95-2.91l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.27v3.1A12 12 0 0 0 12 24z" />
+      <path fill="#FBBC05" d="M5.27 14.28A7.2 7.2 0 0 1 4.89 12c0-.79.14-1.56.38-2.28v-3.1H1.27A12 12 0 0 0 0 12c0 1.94.46 3.77 1.27 5.38l4-3.1z" />
+      <path fill="#EA4335" d="M12 4.75c1.76 0 3.34.61 4.58 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.31 0 3.26 2.69 1.27 6.62l4 3.1C6.22 6.86 8.87 4.75 12 4.75z" />
+    </svg>
+  )
+}
 
 export default function LoginScreen() {
-  const [email, setEmail] = useState('')
-  const [password, setPassword] = useState('')
-  const [showPass, setShowPass] = useState(false)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
-  const { signIn } = useAuth()
-  const navigate = useNavigate()
+  const { signInWithGoogle, authError } = useAuth()
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
+  const handleGoogleLogin = async () => {
     setError('')
     setLoading(true)
     try {
-      await signIn(email, password)
-      navigate('/')
+      await signInWithGoogle()
+      // المتصفح هيتحول لصفحة جوجل، فمش محتاجين نعمل حاجة تانية هنا
     } catch (err) {
-      setError('البريد الإلكتروني أو كلمة المرور غير صحيحة')
-    } finally {
+      setError('حصل خطأ أثناء تسجيل الدخول، حاول تاني')
       setLoading(false)
     }
   }
@@ -38,60 +42,29 @@ export default function LoginScreen() {
           <p className="text-fg-muted text-sm mt-1">منصة خدمة العملاء</p>
         </div>
 
-        {/* Form */}
-        <form onSubmit={handleSubmit} className="bg-surface-2 rounded-2xl p-6 space-y-4">
-          <div>
-            <label className="block text-sm text-fg-muted mb-1.5">البريد الإلكتروني</label>
-            <div className="relative">
-              <Mail size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input
-                type="email"
-                value={email}
-                onChange={e => setEmail(e.target.value)}
-                placeholder="example@email.com"
-                required
-                dir="ltr"
-                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 text-fg placeholder-fg-subtle text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-sm text-fg-muted mb-1.5">كلمة المرور</label>
-            <div className="relative">
-              <Lock size={16} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input
-                type={showPass ? 'text' : 'password'}
-                value={password}
-                onChange={e => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                dir="ltr"
-                className="w-full bg-surface-3 rounded-xl px-4 py-3 pr-10 pl-10 text-fg placeholder-fg-subtle text-sm focus:outline-none focus:ring-2 focus:ring-brand"
-              />
-              <button type="button" onClick={() => setShowPass(!showPass)}
-                className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted">
-                {showPass ? <EyeOff size={16} /> : <Eye size={16} />}
-              </button>
-            </div>
-          </div>
-
-          {error && (
+        <div className="bg-surface-2 rounded-2xl p-6 space-y-4">
+          {(error || authError) && (
             <div className="bg-danger/10 border border-danger/30 rounded-xl px-4 py-2.5 text-danger text-sm">
-              {error}
+              {error || authError}
             </div>
           )}
 
           <button
-            type="submit"
+            onClick={handleGoogleLogin}
             disabled={loading}
-            className="w-full bg-brand hover:bg-brand-dark text-white font-semibold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
+            className="w-full bg-white hover:bg-gray-50 text-gray-700 font-semibold py-3 rounded-xl transition-colors disabled:opacity-60 flex items-center justify-center gap-3 border border-surface-3"
           >
             {loading ? (
-              <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : 'تسجيل الدخول'}
+              <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
+            ) : (
+              <><GoogleIcon /> تسجيل الدخول بجوجل</>
+            )}
           </button>
-        </form>
+
+          <p className="text-xs text-fg-subtle text-center leading-relaxed">
+            الدخول متاح بس للموظفين المدعوين من الأدمن. لو محتاج حساب، تواصل مع إدارة العيادة.
+          </p>
+        </div>
       </div>
     </div>
   )

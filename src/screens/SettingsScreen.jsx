@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
-  MessageSquareText, Search, Paperclip, Facebook, Instagram, KeyRound, AlertTriangle
+  MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle
 } from 'lucide-react'
 
 const TABS = [
@@ -75,7 +75,7 @@ function AgentsTab() {
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
   const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+  const [form, setForm] = useState({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
 
@@ -103,17 +103,17 @@ function AgentsTab() {
   const addAgent = async () => {
     setLoading(true)
     try {
-      // Create Supabase Auth user (requires service role - do via backend)
-      const res = await fetch('https://inbox-api.sehawafeya.com/admin/create-agent', {
+      // بيبعت دعوة عن طريق الباك اند (Supabase بيبعت إيميل الدعوة تلقائي)
+      const res = await fetch(`${API_URL}/admin/create-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
       })
       if (!res.ok) throw new Error(await res.text())
       setShowAdd(false)
-      setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+      setForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
-      toast.success('تم إضافة الموظف بنجاح')
+      toast.success('اتبعتت دعوة للموظف على إيميله')
     } catch (err) {
       toast.error('خطأ: ' + err.message)
     } finally {
@@ -131,23 +131,6 @@ function AgentsTab() {
     if (!confirm('حذف الموظف؟')) return
     await supabase.from('agents').delete().eq('id', id)
     loadAgents()
-  }
-
-  const resetPassword = async (id) => {
-    const pass = prompt('اكتب كلمة المرور الجديدة (٦ حروف على الأقل):')
-    if (!pass) return
-    if (pass.length < 6) { toast.error('لازم ٦ حروف على الأقل'); return }
-    try {
-      const res = await fetch('https://inbox-api.sehawafeya.com/admin/reset-password', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: id, new_password: pass })
-      })
-      if (!res.ok) throw new Error(await res.text())
-      toast.success('تم تغيير كلمة المرور بنجاح')
-    } catch (err) {
-      toast.error('خطأ: ' + err.message)
-    }
   }
 
   return (
@@ -169,10 +152,10 @@ function AgentsTab() {
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg">موظف جديد</h3>
+          <h3 className="text-sm font-semibold text-fg">دعوة موظف جديد</h3>
+          <p className="text-xs text-fg-subtle -mt-2">هيوصله إيميل دعوة، وهيسجل دخول بحساب جوجل بتاعه بنفس الإيميل ده.</p>
           <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <InputField label="البريد الإلكتروني" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" />
-          <InputField label="كلمة المرور" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" />
           <div>
             <label className="block text-xs text-fg-muted mb-1">الدور</label>
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
@@ -190,7 +173,7 @@ function AgentsTab() {
           <div className="flex gap-2 pt-1">
             <button onClick={addAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
-              {loading ? 'جاري الإضافة...' : 'إضافة'}
+              {loading ? 'جاري إرسال الدعوة...' : 'إرسال الدعوة'}
             </button>
             <button onClick={() => setShowAdd(false)}
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
@@ -204,7 +187,6 @@ function AgentsTab() {
         <AgentCard key={ag.id} agent={ag} counts={counts[ag.id]}
           onEdit={() => setEditId(ag.id)} onDelete={() => deleteAgent(ag.id)}
           onUpdate={updates => updateAgent(ag.id, updates)}
-          onResetPassword={() => resetPassword(ag.id)}
           editing={editId === ag.id} />
       ))}
     </div>
@@ -239,7 +221,7 @@ function MaxConversationsField({ value, onChange }) {
   )
 }
 
-function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onResetPassword, editing }) {
+function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
 
@@ -273,15 +255,16 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onResetPassword,
               <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${agent.status === 'busy' ? 'bg-follow' : agent.is_online ? 'bg-success' : 'bg-fg-subtle'}`} />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-sm text-fg">{agent.name}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-fg">{agent.name}</p>
+                {!agent.last_seen_at && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">لسه ما دخلش</span>
+                )}
+              </div>
               <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? 'مدير' : 'موظف'}</p>
               <p className="text-xs text-fg-subtle">الحد: {agent.max_conversations == null ? 'غير محدود' : `${agent.max_conversations} محادثة`}</p>
             </div>
             <div className="flex gap-1.5">
-              <button onClick={onResetPassword} title="تغيير كلمة المرور"
-                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-brand rounded-lg hover:bg-surface-3">
-                <KeyRound size={14} />
-              </button>
               <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <Edit2 size={14} />
               </button>
