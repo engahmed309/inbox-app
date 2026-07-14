@@ -67,6 +67,9 @@ export default function ConversationsScreen() {
   const [tags, setTags] = useState([])
   const [selectedTag, setSelectedTag] = useState(null)
   const [contactTagsMap, setContactTagsMap] = useState({}) // { contact_id: [tag,...] }
+  const [lifecycles, setLifecycles] = useState([])
+  const [lifecycleCounts, setLifecycleCounts] = useState({}) // { stage_id: عدد المحادثات المفتوحة }
+  const [selectedLifecycle, setSelectedLifecycle] = useState(null)
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
@@ -86,15 +89,24 @@ export default function ConversationsScreen() {
     const { data: tagsList } = await supabase.from('tags').select('*').order('name')
     setTags(tagsList || [])
 
-    // لو فيه فلتر تاج، جيب الـ contacts اللي عندهم التاج ده
-    let tagContactIds = null
+    // Lifecycle stages
+    const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
+    setLifecycles(lcStages || [])
+
+    // لو فيه فلتر تاج و/أو مرحلة lifecycle، جيب الـ contacts اللي مطابقة (تقاطع لو الاتنين مفعّلين)
+    let scopeContactIds = null
     if (selectedTag) {
       const { data: ctRows } = await supabase.from('contact_tags').select('contact_id').eq('tag_id', selectedTag)
-      tagContactIds = (ctRows || []).map(r => r.contact_id)
+      scopeContactIds = new Set((ctRows || []).map(r => r.contact_id))
+    }
+    if (selectedLifecycle) {
+      const { data: lcRows } = await supabase.from('contacts').select('id').eq('lifecycle_stage_id', selectedLifecycle)
+      const lcIds = new Set((lcRows || []).map(r => r.id))
+      scopeContactIds = scopeContactIds ? new Set([...scopeContactIds].filter(cid => lcIds.has(cid))) : lcIds
     }
 
-    // فلاتر مشتركة (القناة/الموظف/التاج) بنطبقها على أي كويري
-    const applyScope = (q) => {
+    // فلاتر القناة/الموظف بس (من غير تاج/lifecycle) — مستخدمة في عدادات الـ lifecycle نفسها
+    const applyBaseScope = (q) => {
       if (channel !== 'all') q = q.eq('platform', channel)
       if (!canSeeAll) {
         q = q.eq('assigned_agent_id', agent?.id)
@@ -103,9 +115,27 @@ export default function ConversationsScreen() {
       } else if (viewMode === 'mine') {
         q = q.eq('assigned_agent_id', agent?.id)
       }
-      if (tagContactIds) q = q.in('contact_id', tagContactIds.length ? tagContactIds : ['00000000-0000-0000-0000-000000000000'])
       return q
     }
+
+    // فلاتر مشتركة (القناة/الموظف/التاج/اللايف سايكل) بنطبقها على أي كويري
+    const applyScope = (q) => {
+      q = applyBaseScope(q)
+      if (scopeContactIds) q = q.in('contact_id', scopeContactIds.size ? [...scopeContactIds] : ['00000000-0000-0000-0000-000000000000'])
+      return q
+    }
+
+    // عدد المحادثات المفتوحة لكل مرحلة lifecycle (بنفس نطاق القناة/الموظف بس، من غير فلتر التاج/المرحلة نفسها)
+    const { data: lcCountData } = await applyBaseScope(
+      supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)').eq('status', 'open')
+    )
+    const lcCounts = {}
+    lcCountData?.forEach(c => {
+      const sid = c.contacts?.lifecycle_stage_id
+      if (!sid) return
+      lcCounts[sid] = (lcCounts[sid] || 0) + 1
+    })
+    setLifecycleCounts(lcCounts)
 
     // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
     const countsQuery = applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at'))
@@ -181,7 +211,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap)
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly])
+  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle])
 
   useEffect(() => {
     if (!agent) return
@@ -361,7 +391,7 @@ export default function ConversationsScreen() {
         )}
 
         {/* Status Tabs — عمودي */}
-        <div className="flex-1 overflow-y-auto py-2">
+        <div className={sidebarOpen ? 'flex-shrink-0 py-2' : 'flex-1 overflow-y-auto py-2'}>
           {STATUS_TABS.map(t => {
             const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
             return (
@@ -378,6 +408,29 @@ export default function ConversationsScreen() {
             )
           })}
         </div>
+
+        {/* Lifecycle — عدد المحادثات المفتوحة في كل مرحلة، والضغط عليها بيفلتر القائمة (بالحالة المختارة حالياً) */}
+        {sidebarOpen && lifecycles.length > 0 && (
+          <div className="flex-1 overflow-y-auto border-t border-surface-3 py-2">
+            <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">اللايف سايكل</p>
+            <button onClick={() => setSelectedLifecycle(null)}
+              className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${!selectedLifecycle ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+              <span className="flex-1 text-right">كل المراحل</span>
+            </button>
+            {lifecycles.map(l => (
+              <button key={l.id} onClick={() => setSelectedLifecycle(prev => prev === l.id ? null : l.id)}
+                className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                <span className="flex-1 text-right truncate">{l.name}</span>
+                {lifecycleCounts[l.id] > 0 && (
+                  <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
+                    {lifecycleCounts[l.id]}
+                  </span>
+                )}
+              </button>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* ─── العمود الرئيسي ─────────────────────────────────── */}
@@ -505,6 +558,25 @@ export default function ConversationsScreen() {
                 style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
                 <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
                 {t.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Lifecycle Filter (موبايل بس — الديسكتوب عندة القايمة في السايدبار) */}
+        {lifecycles.length > 0 && (
+          <div className="lg:hidden flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+            <button onClick={() => setSelectedLifecycle(null)}
+              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedLifecycle ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+              كل المراحل
+            </button>
+            {lifecycles.map(l => (
+              <button key={l.id} onClick={() => setSelectedLifecycle(l.id === selectedLifecycle ? null : l.id)}
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedLifecycle === l.id ? 'text-white' : 'text-fg-muted'}`}
+                style={{ background: selectedLifecycle === l.id ? l.color : `${l.color}33` }}>
+                <span className="w-1.5 h-1.5 rounded-full" style={{ background: l.color }} />
+                {l.name}
+                {lifecycleCounts[l.id] > 0 && <span className="opacity-75">{lifecycleCounts[l.id]}</span>}
               </button>
             ))}
           </div>
