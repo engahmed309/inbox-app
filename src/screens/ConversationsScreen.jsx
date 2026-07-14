@@ -690,6 +690,7 @@ function ConvCard({ conv, agentName, lastMsg, tags, onClick }) {
   const lastMsgText = lastMsg
     ? lastMsg.content_type !== 'text'
       ? lastMsg.content_type === 'image' ? '📷 صورة'
+        : lastMsg.content_type === 'sticker' ? '👍 ملصق'
         : lastMsg.content_type === 'video' ? '🎥 فيديو'
         : lastMsg.content_type === 'audio' ? '🎵 صوت'
         : '📎 ملف'

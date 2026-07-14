@@ -847,6 +847,9 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap }) {
         {msg.content_type === 'image' && msg.media_url ? (
           <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
             className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
+        ) : msg.content_type === 'sticker' && msg.media_url ? (
+          <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+            className="max-w-[100px] max-h-[100px] object-contain cursor-pointer" />
         ) : msg.content_type === 'video' && msg.media_url ? (
           <video src={msg.media_url} controls onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
             className="rounded-lg max-w-full max-h-48 cursor-pointer" />
