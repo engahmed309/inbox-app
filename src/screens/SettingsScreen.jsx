@@ -1,12 +1,17 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, BarChart3, Facebook, Instagram, Phone, KeyRound
 } from 'lucide-react'
+import {
+  ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
+  PieChart, Pie, Cell
+} from 'recharts'
 
 const TABS = [
   { key: 'agents', label: 'الموظفون', icon: Users },
@@ -630,10 +635,12 @@ function QuickRepliesTab({ agent }) {
 }
 
 // ─── Reports Tab ──────────────────────────────────────────
+// ألوان الأقنية موحّدة مع باقي الشاشات (نفس الألوان اللي بتتلون بيها الأيقونات في المحادثات).
+// واتساب في الوضع الداكن بلون أغمق شوية عن الفاتح عشان يفضل واضح على خلفية غامقة (تباين كافي).
 const PLATFORMS = [
-  { key: 'facebook', label: 'فيسبوك', icon: Facebook, color: '#3B82F6' },
-  { key: 'instagram', label: 'إنستجرام', icon: Instagram, color: '#EC4899' },
-  { key: 'whatsapp', label: 'واتساب', icon: Phone, color: '#22C55E' },
+  { key: 'facebook', label: 'فيسبوك', icon: Facebook, color: { light: '#3B82F6', dark: '#3B82F6' } },
+  { key: 'instagram', label: 'إنستجرام', icon: Instagram, color: { light: '#EC4899', dark: '#EC4899' } },
+  { key: 'whatsapp', label: 'واتساب', icon: Phone, color: { light: '#22C55E', dark: '#16A34A' } },
 ]
 
 const RANGE_OPTS = [
@@ -644,21 +651,43 @@ const RANGE_OPTS = [
   { key: 'custom', label: 'فترة مخصصة' },
 ]
 
+const CHANNEL_OPTS = [
+  { key: 'all', label: 'كل القنوات' },
+  ...PLATFORMS.map(p => ({ key: p.key, label: p.label })),
+]
+
+function dayKey(d) {
+  const x = new Date(d)
+  return `${x.getFullYear()}-${String(x.getMonth() + 1).padStart(2, '0')}-${String(x.getDate()).padStart(2, '0')}`
+}
+function mondayOf(d) {
+  const x = new Date(d)
+  const day = x.getDay() // 0=أحد
+  const diff = (day === 0 ? -6 : 1) - day
+  x.setDate(x.getDate() + diff)
+  x.setHours(0, 0, 0, 0)
+  return x
+}
+function formatShort(dateObj) {
+  return dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })
+}
+
 function ReportsTab() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const [range, setRange] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [counts, setCounts] = useState({})
-  const [total, setTotal] = useState(0)
+  const [channel, setChannel] = useState('all')
+  const [rows, setRows] = useState([]) // بيانات العملاء الخام بعد الفلترة، عشان نجمّعها محلياً
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
     if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return } // استنى لحد ما يختار التاريخين
     load()
-  }, [range, customFrom, customTo])
+  }, [range, customFrom, customTo, channel])
 
   const getDateBounds = () => {
-    const now = new Date()
     if (range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
     if (range === 'week') { const d = new Date(); d.setDate(d.getDate() - 7); return { from: d.toISOString(), to: null } }
     if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
@@ -673,17 +702,101 @@ function ReportsTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = getDateBounds()
-    const results = {}
-    for (const p of PLATFORMS) {
-      let q = supabase.from('contacts').select('id', { count: 'exact', head: true }).eq('platform', p.key)
-      if (from) q = q.gte('created_at', from)
-      if (to) q = q.lte('created_at', to)
-      const { count } = await q
-      results[p.key] = count || 0
-    }
-    setCounts(results)
-    setTotal(Object.values(results).reduce((a, b) => a + b, 0))
+    let q = supabase.from('contacts').select('id, platform, created_at, lifecycle_stage_id, lifecycle_stages(name, color)')
+    if (channel !== 'all') q = q.eq('platform', channel)
+    if (from) q = q.gte('created_at', from)
+    if (to) q = q.lte('created_at', to)
+    const { data } = await q
+    setRows(data || [])
     setLoading(false)
+  }
+
+  // تجميع البيانات الخام: توزيع يومي/أسبوعي لكل قناة + توزيع الـ lifecycle — بيتحسب مرة واحدة لحد ما rows تتغير
+  const { chartData, activePlatforms, lifecycleData, total } = useMemo(() => {
+    const { from, to } = getDateBounds()
+    const activePlatforms = channel === 'all' ? PLATFORMS : PLATFORMS.filter(p => p.key === channel)
+
+    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم تاريخ موجود في البيانات
+    const createdTimes = rows.map(r => new Date(r.created_at).getTime())
+    const startDate = from ? new Date(from) : new Date(createdTimes.length ? Math.min(...createdTimes) : Date.now())
+    const endDate = to ? new Date(to) : new Date()
+    const spanDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
+    const granularity = spanDays > 45 ? 'week' : 'day'
+
+    // ابني قايمة الفترات (buckets) فاضية الأول، عشان الأيام اللي مفيهاش عملاء تظهر بصفر بدل ما تختفي من المحور
+    const buckets = []
+    const bucketMap = {}
+    if (granularity === 'day') {
+      const cur = new Date(startDate); cur.setHours(0, 0, 0, 0)
+      const last = new Date(endDate); last.setHours(0, 0, 0, 0)
+      while (cur <= last) {
+        const key = dayKey(cur)
+        const entry = { key, label: formatShort(cur), facebook: 0, instagram: 0, whatsapp: 0 }
+        buckets.push(entry); bucketMap[key] = entry
+        cur.setDate(cur.getDate() + 1)
+      }
+    } else {
+      const cur = mondayOf(startDate)
+      const last = mondayOf(endDate)
+      while (cur <= last) {
+        const key = dayKey(cur)
+        const entry = { key, label: `أسبوع ${formatShort(cur)}`, facebook: 0, instagram: 0, whatsapp: 0 }
+        buckets.push(entry); bucketMap[key] = entry
+        cur.setDate(cur.getDate() + 7)
+      }
+    }
+
+    const lifecycleMap = {} // { stageId|'none': { name, color, count } }
+    rows.forEach(r => {
+      const key = granularity === 'day' ? dayKey(r.created_at) : dayKey(mondayOf(r.created_at))
+      const bucket = bucketMap[key]
+      if (bucket && r.platform in bucket) bucket[r.platform]++
+
+      const stage = r.lifecycle_stages
+      const stageKey = r.lifecycle_stage_id || 'none'
+      if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: stage?.name || 'بدون مرحلة', color: stage?.color || '#78716C', count: 0 }
+      lifecycleMap[stageKey].count++
+    })
+
+    return {
+      chartData: buckets,
+      activePlatforms,
+      lifecycleData: Object.values(lifecycleMap).sort((a, b) => b.count - a.count),
+      total: rows.length,
+    }
+  }, [rows, channel, range, customFrom, customTo])
+
+  const chartTheme = isDark
+    ? { grid: '#2c2c2a', axis: '#71717a', tooltipBg: '#212127', tooltipBorder: '#36363e', text: '#f8f8fa' }
+    : { grid: '#e4e4e7', axis: '#71717a', tooltipBg: '#ffffff', tooltipBorder: '#e4e4e7', text: '#18181b' }
+
+  const BarTooltip = ({ active, payload, label }) => {
+    if (!active || !payload?.length) return null
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs shadow-xl" style={{ background: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, color: chartTheme.text }}>
+        <p className="font-semibold mb-1">{label}</p>
+        {payload.map(p => (
+          <div key={p.dataKey} className="flex items-center gap-1.5">
+            <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
+            <span className="text-fg-muted">{PLATFORMS.find(pl => pl.key === p.dataKey)?.label}:</span>
+            <b>{p.value}</b>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  const PieTooltip = ({ active, payload }) => {
+    if (!active || !payload?.length) return null
+    const d = payload[0]
+    return (
+      <div className="rounded-lg px-3 py-2 text-xs shadow-xl" style={{ background: chartTheme.tooltipBg, border: `1px solid ${chartTheme.tooltipBorder}`, color: chartTheme.text }}>
+        <div className="flex items-center gap-1.5">
+          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: d.payload.color }} />
+          <span>{d.name}:</span> <b>{d.value}</b>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -695,6 +808,16 @@ function ReportsTab() {
           <button key={r.key} onClick={() => setRange(r.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${range === r.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-white'}`}>
             {r.label}
+          </button>
+        ))}
+      </div>
+
+      {/* فلتر القناة — بيتطبق على كل الشارتات تحت */}
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        {CHANNEL_OPTS.map(c => (
+          <button key={c.key} onClick={() => setChannel(c.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${channel === c.key ? 'bg-fg text-surface border-fg' : 'bg-transparent text-fg-muted border-surface-3 hover:text-fg'}`}>
+            {c.label}
           </button>
         ))}
       </div>
@@ -727,23 +850,61 @@ function ReportsTab() {
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
 
-          <div className="space-y-2">
-            {PLATFORMS.map(p => {
-              const count = counts[p.key] || 0
-              const pct = total > 0 ? Math.round((count / total) * 100) : 0
-              return (
-                <div key={p.key} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-                  <div className="flex items-center gap-2 mb-2">
-                    <p.icon size={16} style={{ color: p.color }} />
-                    <span className="text-sm text-fg font-medium flex-1">{p.label}</span>
-                    <span className="text-lg font-bold text-fg">{count}</span>
-                  </div>
-                  <div className="h-2 bg-surface-3 rounded-full overflow-hidden">
-                    <div className="h-full rounded-full transition-all" style={{ width: `${pct}%`, background: p.color }} />
-                  </div>
+          {/* Column Chart — عدد العملاء الجدد لكل يوم (أو أسبوع لو الفترة طويلة) */}
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+            <p className="text-sm font-medium text-fg mb-3">العملاء الجدد — تفصيل يومي</p>
+            {total === 0 ? (
+              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+            ) : (
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData} barCategoryGap="20%" barGap={2}>
+                    <CartesianGrid vertical={false} stroke={chartTheme.grid} strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fill: chartTheme.axis, fontSize: 11 }} axisLine={{ stroke: chartTheme.grid }} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip content={<BarTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                    {activePlatforms.length > 1 && <Legend formatter={(v) => PLATFORMS.find(p => p.key === v)?.label || v} wrapperStyle={{ fontSize: 12, color: chartTheme.text }} />}
+                    {activePlatforms.map(p => (
+                      <Bar key={p.key} dataKey={p.key} name={p.key} fill={p.color[isDark ? 'dark' : 'light']} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                    ))}
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+
+          {/* Pie Chart — توزيع مراحل الـ Lifecycle */}
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+            <p className="text-sm font-medium text-fg mb-3">توزيع مراحل الـ Lifecycle</p>
+            {lifecycleData.length === 0 ? (
+              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+            ) : (
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <div style={{ width: '100%', maxWidth: 220, height: 220 }} className="flex-shrink-0">
+                  <ResponsiveContainer>
+                    <PieChart>
+                      <Pie data={lifecycleData} dataKey="count" nameKey="name" cx="50%" cy="50%" innerRadius={50} outerRadius={90} paddingAngle={2} stroke={chartTheme.tooltipBg} strokeWidth={2}>
+                        {lifecycleData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                      </Pie>
+                      <Tooltip content={<PieTooltip />} />
+                    </PieChart>
+                  </ResponsiveContainer>
                 </div>
-              )
-            })}
+                <div className="flex-1 w-full space-y-1.5">
+                  {lifecycleData.map((d, i) => {
+                    const pct = total > 0 ? Math.round((d.count / total) * 100) : 0
+                    return (
+                      <div key={i} className="flex items-center gap-2 text-sm">
+                        <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
+                        <span className="text-fg flex-1 truncate">{d.name}</span>
+                        <span className="text-fg-muted text-xs">{pct}%</span>
+                        <span className="font-semibold text-fg w-8 text-left">{d.count}</span>
+                      </div>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
           </div>
         </>
       )}
