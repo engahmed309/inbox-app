@@ -84,6 +84,7 @@ export default function ChatScreen() {
   const [conv, setConv] = useState(null)
   const [contact, setContact] = useState(null)
   const [channelActive, setChannelActive] = useState(true)
+  const [channelLabel, setChannelLabel] = useState(null)
   const [messages, setMessages] = useState([])
   const [assignLogs, setAssignLogs] = useState([])
   const [activityLogs, setActivityLogs] = useState([])
@@ -326,6 +327,8 @@ export default function ChatScreen() {
           ? platformChannels.find(c => c.id === conv.channel_id)
           : platformChannels[0]
         setChannelActive(ch?.status === 'active')
+        // بنوري اسم القناة بس لو فيه أكتر من رقم واتساب متربط، عشان الموظف يعرف بيرد من أنهي رقم
+        setChannelLabel(platformChannels.length > 1 ? (ch?.custom_name || ch?.display_name || null) : null)
       } catch {
         // لو فشل الفحص نفسه (مشكلة شبكة مثلاً)، منقفلش المربع بناءً على معلومة مش أكيدة
       }
@@ -656,6 +659,11 @@ export default function ChatScreen() {
             </div>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
+              {channelLabel && (
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">
+                  {channelLabel}
+                </span>
+              )}
               {conv?.agentName && (
                 <AgentAvatar agent={{ name: conv.agentName, avatar_url: conv.agentAvatarUrl }} size={14} />
               )}

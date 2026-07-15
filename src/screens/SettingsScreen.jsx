@@ -464,12 +464,19 @@ function ConnectedChannelsList() {
                   </p>
                 )}
                 <p className="text-xs text-fg-muted truncate">{ch?.display_name || 'مش مربوطة'}</p>
+                {ch?.waba_id && (
+                  <p className="text-[11px] text-fg-subtle truncate mt-0.5">WABA ID: {ch.waba_id}</p>
+                )}
               </div>
               {editingId !== ch?.id && (
                 <>
                   {ch?.status === 'active' ? (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-success/15 text-success flex items-center gap-1 flex-shrink-0">
                       <span className="w-1.5 h-1.5 rounded-full bg-success" /> نشطة
+                    </span>
+                  ) : ch?.status === 'disconnected' ? (
+                    <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-surface-3 text-fg-subtle flex items-center gap-1 flex-shrink-0">
+                      <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle" /> مفصولة
                     </span>
                   ) : ch ? (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-danger/15 text-danger flex items-center gap-1 flex-shrink-0">

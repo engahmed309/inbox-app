@@ -851,6 +851,7 @@ export default function ConversationsScreen() {
                   selected={selectedIds.has(conv.id)}
                   onToggleSelect={() => toggleSelect(conv.id)}
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
+                  channelLabel={waChannels.length > 1 ? (waChannels.find(c => c.id === conv.channel_id)?.custom_name || waChannels.find(c => c.id === conv.channel_id)?.display_name) : null}
                 />
               ))}
               {conversations.length >= visibleLimit && (
@@ -948,7 +949,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick }) {
+function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, channelLabel }) {
   const contact = conv.contacts
 
   const lastMsgText = lastMsg
@@ -990,6 +991,11 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         <div className="flex items-baseline justify-between gap-2">
           <span className="flex items-center gap-1.5 min-w-0">
             <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
+            {channelLabel && (
+              <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success truncate max-w-[90px]">
+                {channelLabel}
+              </span>
+            )}
             {contact?.lifecycle_stages && (
               <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: contact.lifecycle_stages.color }}>
