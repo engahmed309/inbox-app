@@ -592,30 +592,28 @@ function ConnectNewChannel() {
     setConnecting('facebook')
     try {
       const FB = await loadFacebookSDK()
+      // بنسيب response_type الافتراضي (توكن مباشر) بدل ما نطلب code — تبديل الـ code بتوكن
+      // سيرفر-سايد كان بيفشل باستمرار بسبب الـ redirect_uri الداخلي بتاع حوار فيسبوك JS SDK
       FB.login((response) => {
-        if (response.authResponse?.code) {
-          finishFacebookConnect(response.authResponse.code)
+        if (response.authResponse?.accessToken) {
+          finishFacebookConnect(response.authResponse.accessToken)
         } else {
           toast.error('اتلغى الربط أو حصل خطأ من فيسبوك')
           setConnecting(null)
         }
-      }, {
-        config_id: FACEBOOK_LOGIN_CONFIG_ID,
-        response_type: 'code',
-        override_default_response_type: true
-      })
+      }, { config_id: FACEBOOK_LOGIN_CONFIG_ID })
     } catch (err) {
       toast.error(err.message)
       setConnecting(null)
     }
   }
 
-  const finishFacebookConnect = async (code) => {
+  const finishFacebookConnect = async (userAccessToken) => {
     try {
       const res = await fetch(`${API_URL}/channels/facebook/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code, agent_id: agent?.id })
+        body: JSON.stringify({ user_access_token: userAccessToken, agent_id: agent?.id })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'فشل ربط الصفحة')
