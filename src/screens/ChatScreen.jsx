@@ -7,7 +7,7 @@ import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -117,6 +117,11 @@ export default function ChatScreen() {
   const [showNoteBox, setShowNoteBox] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [sendingNote, setSendingNote] = useState(false)
+
+  const [showFollowUpModal, setShowFollowUpModal] = useState(false)
+  const [followUpDateTime, setFollowUpDateTime] = useState('')
+  const [followUpNote, setFollowUpNote] = useState('')
+  const [savingFollowUp, setSavingFollowUp] = useState(false)
 
   const [lifecycles, setLifecycles] = useState([])
   const [showLifecycle, setShowLifecycle] = useState(false)
@@ -475,11 +480,18 @@ export default function ChatScreen() {
   }
 
   const changeStatus = async (s) => {
+    // "متابعة" محتاجة معاد ترجع فيه — بنفتح مودال بدل ما نغيّر الحالة على طول
+    if (s === 'follow_up') {
+      setShowStatus(false)
+      openFollowUpModal()
+      return
+    }
     const oldLabel = currentStatus.label
     const oldStatus = conv?.status
-    setConv(prev => ({ ...prev, status: s }))
+    setConv(prev => ({ ...prev, status: s, follow_up_at: null }))
     setShowStatus(false)
-    const { error } = await supabase.from('conversations').update({ status: s }).eq('id', id)
+    // لو خرجنا من "متابعة" لحالة تانية يدوي، لازم نلغي أي معاد كان متحدد قبل كده
+    const { error } = await supabase.from('conversations').update({ status: s, follow_up_at: null }).eq('id', id)
     if (error) {
       setConv(prev => ({ ...prev, status: oldStatus }))
       toast.error('فشل تغيير حالة المحادثة، حاول تاني')
@@ -489,6 +501,59 @@ export default function ChatScreen() {
     if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "${newLabel}"`)
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
     if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+  }
+
+  // بيحسب افتراضي معقول (بعد ساعة من دلوقتي) عشان يبقى فيه قيمة جاهزة في المودال بدل مربع فاضي
+  const defaultFollowUpDateTime = () => {
+    const d = new Date(Date.now() + 60 * 60 * 1000)
+    d.setSeconds(0, 0)
+    d.setMinutes(d.getMinutes() - d.getTimezoneOffset())
+    return d.toISOString().slice(0, 16)
+  }
+
+  const openFollowUpModal = () => {
+    setFollowUpDateTime(defaultFollowUpDateTime())
+    setFollowUpNote('')
+    setShowFollowUpModal(true)
+  }
+
+  const confirmFollowUp = async () => {
+    if (!followUpDateTime) { toast.error('حدد معاد الرجوع الأول'); return }
+    const followUpAt = new Date(followUpDateTime)
+    if (followUpAt.getTime() <= Date.now()) { toast.error('المعاد لازم يكون في المستقبل'); return }
+
+    setSavingFollowUp(true)
+    const oldLabel = currentStatus.label
+    const { error } = await supabase.from('conversations')
+      .update({ status: 'follow_up', follow_up_at: followUpAt.toISOString() })
+      .eq('id', id)
+    if (error) {
+      setSavingFollowUp(false)
+      toast.error('فشل حفظ المتابعة، حاول تاني')
+      return
+    }
+    setConv(prev => ({ ...prev, status: 'follow_up', follow_up_at: followUpAt.toISOString() }))
+
+    const readableTime = followUpAt.toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+    if (oldLabel !== 'متابعة') logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "متابعة" — هترجع الساعة ${readableTime}`)
+
+    if (followUpNote.trim()) {
+      try {
+        const res = await fetch(`${API_URL}/notes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ conversation_id: id, content: `🔔 متابعة (${readableTime}): ${followUpNote.trim()}`, agent_id: agent?.id })
+        })
+        if (!res.ok) throw new Error()
+        await fetchMessages(false)
+      } catch {
+        toast.error('اتحفظت المتابعة بس فشل حفظ الملاحظة')
+      }
+    }
+
+    setSavingFollowUp(false)
+    setShowFollowUpModal(false)
+    toast.success(`هترجع المحادثة تاني الساعة ${readableTime}`)
   }
 
   const changeLifecycle = async (stageId) => {
@@ -696,11 +761,6 @@ export default function ChatScreen() {
             </div>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
-              {channelLabel && (
-                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">
-                  {channelLabel}
-                </span>
-              )}
               {conv?.agentName && (
                 <AgentAvatar agent={{ name: conv.agentName, avatar_url: conv.agentAvatarUrl }} size={14} />
               )}
@@ -713,11 +773,6 @@ export default function ChatScreen() {
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => setShowNoteBox(v => !v)} title="ملاحظة داخلية"
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showNoteBox ? 'bg-follow text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            <StickyNote size={14} />
-          </button>
-
           <button onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showSearch ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <Search size={14} />
@@ -746,8 +801,13 @@ export default function ChatScreen() {
 
           <div className="relative">
             <button onClick={() => { setShowStatus(!showStatus); setShowAssign(false) }}
+              title={conv?.status === 'follow_up' && conv?.follow_up_at ? `هترجع الساعة ${new Date(conv.follow_up_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}` : undefined}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white ${currentStatus.color}`}>
-              {currentStatus.label} <ChevronDown size={11} />
+              {currentStatus.label}
+              {conv?.status === 'follow_up' && conv?.follow_up_at && (
+                <span className="opacity-90">⏰ {new Date(conv.follow_up_at).toLocaleString('ar-EG', { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric' })}</span>
+              )}
+              <ChevronDown size={11} />
             </button>
             {showStatus && (
               <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
@@ -812,6 +872,16 @@ export default function ChatScreen() {
 
       {/* Input */}
       <div className="flex-shrink-0 px-3 py-3 bg-surface-2 border-t border-surface-3 relative">
+        <div className="flex items-center gap-1.5 mb-2">
+          <button onClick={() => setShowNoteBox(v => !v)}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${showNoteBox ? 'bg-follow text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <StickyNote size={13} /> ملاحظة داخلية
+          </button>
+          <button onClick={() => { setShowQuickReplies(v => !v); setQuickReplyFilter('') }}
+            className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${showQuickReplies ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <MessageSquareText size={13} /> ردود سريعة
+          </button>
+        </div>
         {showNoteBox && (
           <div className="mb-2 bg-follow/10 border border-follow/30 rounded-xl p-2.5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-follow mb-1.5">
@@ -837,15 +907,28 @@ export default function ChatScreen() {
             </div>
           </div>
         )}
-        {showQuickReplies && filteredQuickReplies.length > 0 && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto">
-            {filteredQuickReplies.map(qr => (
-              <button key={qr.id} onClick={() => pickQuickReply(qr)}
-                className="flex flex-col items-start w-full px-3 py-2.5 hover:bg-surface-3 text-right border-b border-surface-3 last:border-0">
-                <span className="text-sm text-fg font-medium">/{qr.name}</span>
-                {qr.text && <span className="text-xs text-fg-muted truncate w-full">{qr.text}</span>}
-              </button>
-            ))}
+        {showQuickReplies && (
+          <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden flex flex-col">
+            <div className="p-2 border-b border-surface-3 flex-shrink-0">
+              <div className="relative">
+                <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <input autoFocus value={quickReplyFilter} onChange={e => setQuickReplyFilter(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Escape') setShowQuickReplies(false) }}
+                  placeholder="دور على رد سريع..."
+                  className="w-full bg-surface-3 rounded-lg py-1.5 px-3 pr-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              </div>
+            </div>
+            <div className="overflow-y-auto">
+              {filteredQuickReplies.length > 0 ? filteredQuickReplies.map(qr => (
+                <button key={qr.id} onClick={() => pickQuickReply(qr)}
+                  className="flex flex-col items-start w-full px-3 py-2.5 hover:bg-surface-3 text-right border-b border-surface-3 last:border-0">
+                  <span className="text-sm text-fg font-medium">/{qr.name}</span>
+                  {qr.text && <span className="text-xs text-fg-muted truncate w-full">{qr.text}</span>}
+                </button>
+              )) : (
+                <p className="text-xs text-fg-subtle text-center py-4">مفيش ردود سريعة مطابقة</p>
+              )}
+            </div>
           </div>
         )}
 
@@ -939,12 +1022,49 @@ export default function ChatScreen() {
       </div>
 
       {showSidebar && (
-        <ContactSidebar contact={contact} conv={conv}
+        <ContactSidebar contact={contact} conv={conv} channelLabel={channelLabel}
           onClose={() => setShowSidebar(false)} onUpdate={setContact}
           onDeleted={() => navigate('/')} />
       )}
 
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+
+      {showFollowUpModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !savingFollowUp && setShowFollowUpModal(false)}>
+          <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-3.5 border-b border-surface-3">
+              <Clock size={16} className="text-follow" />
+              <span className="font-semibold text-fg text-sm">تحديد معاد المتابعة</span>
+            </div>
+            <div className="p-4 space-y-3.5">
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">هترجع المحادثة تفتح تاني في</label>
+                <input type="datetime-local" value={followUpDateTime} onChange={e => setFollowUpDateTime(e.target.value)}
+                  min={defaultFollowUpDateTime()}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              </div>
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">ملاحظة (اختياري) — تفكرك ليه حطيت المتابعة</label>
+                <textarea value={followUpNote} onChange={e => setFollowUpNote(e.target.value)}
+                  placeholder="مثال: العميل هيدفع بكرة بليل، تابع معاه..."
+                  rows={3}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-surface-3">
+              <button onClick={() => setShowFollowUpModal(false)} disabled={savingFollowUp}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                إلغاء
+              </button>
+              <button onClick={confirmFollowUp} disabled={savingFollowUp}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-follow text-white hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {savingFollowUp ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'تأكيد المتابعة'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

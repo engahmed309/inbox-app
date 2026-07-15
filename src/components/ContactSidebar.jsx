@@ -9,7 +9,7 @@ const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'ال
 
 const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6', '#06B6D4']
 
-export default function ContactSidebar({ contact, conv, onClose, onUpdate, onDeleted }) {
+export default function ContactSidebar({ contact, conv, channelLabel, onClose, onUpdate, onDeleted }) {
   const { agent } = useAuth()
   const toast = useToast()
   const [blocking, setBlocking] = useState(false)
@@ -202,6 +202,11 @@ export default function ContactSidebar({ contact, conv, onClose, onUpdate, onDel
               </div>
             )}
             <span className="mt-2 text-xs text-fg-muted">{contact?.platform_id}</span>
+            {channelLabel && (
+              <span className="mt-1.5 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">
+                {channelLabel}
+              </span>
+            )}
           </div>
 
           {/* Basic Fields */}

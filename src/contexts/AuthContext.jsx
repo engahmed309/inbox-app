@@ -70,7 +70,9 @@ export function AuthProvider({ children }) {
     setAuthError('')
     setUser(session.user)
     setAgent(finalAgent)
-    setStatus(finalAgent.id, 'online')
+    // حالة الموظف (متاح/مشغول/غير متاح) بتتغير بس لما هو يدوس زرار تغيير الحالة يدوياً — مش
+    // بتتفعّل أونلاين تلقائي مع كل ريفريش أو تسجيل دخول جديد. أول مرة بس (status لسه null) بنحطها أونلاين افتراضياً
+    if (!finalAgent.status) setStatus(finalAgent.id, 'online')
   }
 
   useEffect(() => {
@@ -89,17 +91,8 @@ export function AuthProvider({ children }) {
       }
     })
 
-    const handleVisibility = () => {
-      const ag = agentRef.current
-      if (!ag || ag.status === 'busy') return
-      setStatus(ag.id, document.hidden ? 'offline' : 'online')
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('beforeunload', () => agentRef.current && setStatus(agentRef.current.id, 'offline'))
-
     return () => {
       subscription.unsubscribe()
-      document.removeEventListener('visibilitychange', handleVisibility)
     }
   }, [])
 
