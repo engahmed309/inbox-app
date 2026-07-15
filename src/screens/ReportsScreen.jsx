@@ -1,9 +1,10 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase } from '../lib/supabase'
+import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone } from 'lucide-react'
+import { useToast } from '../contexts/ToastContext'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -12,6 +13,7 @@ import {
 const SECTIONS = [
   { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
   { key: 'attendance', label: 'حضور الموظفين', icon: Users2 },
+  { key: 'tags', label: 'التاجات', icon: Tag },
 ]
 
 export default function ReportsScreen() {
@@ -49,6 +51,7 @@ export default function ReportsScreen() {
       <div className="flex-1 overflow-y-auto">
         {section === 'overview' && <OverviewTab />}
         {section === 'attendance' && <AttendanceTab />}
+        {section === 'tags' && <TagsReportTab />}
       </div>
     </div>
   )
@@ -509,6 +512,145 @@ function AttendanceTab() {
               </div>
             </>
           )}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── تقرير التاجات ──────────────────────────────────────────
+// لكل تاج: عدد العملاء الكلي، وعدد اللي شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة (دول بس اللي ينفع
+// نبعتلهم رسالة جماعية دلوقتي، احترامًا لقيود المنصات على الرسايل خارج نافذة الـ٢٤ ساعة)
+function TagsReportTab() {
+  const { agent } = useAuth()
+  const toast = useToast()
+  const [tags, setTags] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [expandedTagId, setExpandedTagId] = useState(null)
+  const [bulkTagId, setBulkTagId] = useState(null)
+  const [bulkText, setBulkText] = useState('')
+  const [sendingBulk, setSendingBulk] = useState(false)
+
+  useEffect(() => { loadReport() }, [])
+  const loadReport = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/tags/report`)
+      const data = await res.json()
+      setTags(data.tags || [])
+    } catch {
+      toast.error('فشل تحميل تقرير التاجات')
+    }
+    setLoading(false)
+  }
+
+  const bulkTag = tags.find(t => t.id === bulkTagId)
+
+  const sendBulk = async () => {
+    if (!bulkText.trim() || !bulkTagId) return
+    setSendingBulk(true)
+    try {
+      const res = await fetch(`${API_URL}/tags/${bulkTagId}/bulk-message`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: bulkText.trim(), agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الإرسال')
+      toast.success(`اتبعتت لـ ${data.sent} عميل${data.failed ? ` — فشلت ${data.failed}` : ''}`)
+      setBulkTagId(null)
+      setBulkText('')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    }
+    setSendingBulk(false)
+  }
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-40">
+        <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      <p className="text-xs text-fg-subtle">
+        عدد العملاء لكل تاج، وإمكانية بعت رسالة جماعية للي شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة (قيود المنصات بتمنع الرد بعد كده).
+      </p>
+
+      {tags.length === 0 && (
+        <p className="text-center text-fg-subtle text-sm py-8">مفيش تاجات لسه — ضيفها من الإعدادات → التاجات</p>
+      )}
+
+      {tags.map(tag => (
+        <div key={tag.id} className="bg-surface-2 rounded-2xl border border-surface-3 overflow-hidden">
+          <button onClick={() => setExpandedTagId(expandedTagId === tag.id ? null : tag.id)}
+            className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/40 transition-colors">
+            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tag.color }} />
+            <span className="flex-1 text-sm font-medium text-fg">{tag.name}</span>
+            <span className="text-xs text-fg-subtle">{tag.count} عميل</span>
+            {tag.eligibleCount > 0 && (
+              <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/15 text-success">
+                {tag.eligibleCount} متاح للرسالة الجماعية
+              </span>
+            )}
+            <ChevronDown size={14} className={`text-fg-subtle transition-transform ${expandedTagId === tag.id ? 'rotate-180' : ''}`} />
+          </button>
+
+          {expandedTagId === tag.id && (
+            <div className="border-t border-surface-3 p-3 space-y-2">
+              {tag.contacts.length === 0 ? (
+                <p className="text-center text-fg-subtle text-xs py-3">مفيش عملاء على التاج ده</p>
+              ) : (
+                <div className="space-y-1.5 max-h-56 overflow-y-auto">
+                  {tag.contacts.map(c => (
+                    <div key={c.id} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-surface-3/40">
+                      <span className="flex-1 text-fg truncate">{c.name || c.platform_id || 'بدون اسم'}</span>
+                      {c.canBulkMessage ? (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">شات مفتوح</span>
+                      ) : (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">مش متاح</span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+              <button onClick={() => { setBulkTagId(tag.id); setBulkText('') }} disabled={tag.eligibleCount === 0}
+                className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
+                <Send size={14} /> رسالة جماعية ({tag.eligibleCount})
+              </button>
+            </div>
+          )}
+        </div>
+      ))}
+
+      {bulkTagId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !sendingBulk && setBulkTagId(null)}>
+          <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-3">
+              <span className="font-semibold text-fg text-sm">رسالة جماعية — {bulkTag?.name}</span>
+              <button onClick={() => setBulkTagId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+            </div>
+            <div className="p-4 space-y-2">
+              <p className="text-xs text-fg-subtle">هتتبعت لـ {bulkTag?.eligibleCount} عميل شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة.</p>
+              <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={4} autoFocus
+                placeholder="اكتب الرسالة اللي هتتبعت..."
+                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-surface-3">
+              <button onClick={() => setBulkTagId(null)} disabled={sendingBulk}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                إلغاء
+              </button>
+              <button onClick={sendBulk} disabled={sendingBulk || !bulkText.trim()}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {sendingBulk ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'إرسال'}
+              </button>
+            </div>
+          </div>
         </div>
       )}
     </div>

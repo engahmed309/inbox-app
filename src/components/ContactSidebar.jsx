@@ -3,11 +3,9 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
-import { X, Save, User, Globe, Package, Tag, Plus, Ban, ShieldCheck, Trash2 } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2 } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
-
-const TAG_COLORS = ['#6366F1', '#EF4444', '#F59E0B', '#10B981', '#EC4899', '#8B5CF6', '#06B6D4']
 
 export default function ContactSidebar({ contact, conv, channelLabel, onClose, onUpdate, onDeleted }) {
   const { agent } = useAuth()
@@ -29,8 +27,6 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const [saved, setSaved] = useState(false)
   const [allTags, setAllTags] = useState([])
   const [contactTags, setContactTags] = useState([])
-  const [showAddTag, setShowAddTag] = useState(false)
-  const [newTagName, setNewTagName] = useState('')
 
   useEffect(() => {
     loadData()
@@ -73,18 +69,6 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
       setContactTags(prev => [...prev, tag])
       logActivity(conv?.id, agent?.id, `أضاف تاج "${tag.name}" للعميل`)
     }
-  }
-
-  const createTag = async () => {
-    if (!newTagName.trim()) return
-    const color = TAG_COLORS[allTags.length % TAG_COLORS.length]
-    const { data: tag, error } = await supabase.from('tags').insert({ name: newTagName.trim(), color }).select().single()
-    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
-    setAllTags(prev => [...prev, tag])
-    await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
-    setContactTags(prev => [...prev, tag])
-    setNewTagName('')
-    setShowAddTag(false)
   }
 
   const save = async () => {
@@ -214,37 +198,34 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           <Field label="الهاتف" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
           <Field label="الدولة" value={form.country} onChange={v => setForm({ ...form, country: v })} />
 
-          {/* Tags */}
+          {/* Tags — التاجات بتتحط من الأدمن بس في الإعدادات، هنا بس اختيار من الموجود */}
           <div>
             <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1.5">
               <Tag size={12} /> التاجات
             </label>
-            <div className="flex flex-wrap gap-1.5">
-              {allTags.map(tag => {
-                const active = contactTags.some(t => t.id === tag.id)
-                return (
+            {contactTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {contactTags.map(tag => (
                   <button key={tag.id} onClick={() => toggleTag(tag)}
-                    className="text-xs px-2.5 py-1 rounded-full font-medium transition-colors"
-                    style={active ? { background: tag.color, color: '#fff' } : { background: `${tag.color}33`, color: tag.color }}>
-                    {tag.name}
+                    className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full font-medium"
+                    style={{ background: tag.color, color: '#fff' }}>
+                    {tag.name} <X size={10} />
                   </button>
-                )
-              })}
-              {showAddTag ? (
-                <div className="flex items-center gap-1">
-                  <input autoFocus value={newTagName} onChange={e => setNewTagName(e.target.value)}
-                    onKeyDown={e => e.key === 'Enter' && createTag()}
-                    placeholder="اسم التاج..."
-                    className="w-24 bg-surface-3 rounded-full px-2.5 py-1 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-                  <button onClick={createTag} className="text-brand text-xs font-semibold">إضافة</button>
-                </div>
-              ) : (
-                <button onClick={() => setShowAddTag(true)}
-                  className="flex items-center gap-1 text-xs px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg">
-                  <Plus size={11} /> تاج جديد
-                </button>
-              )}
-            </div>
+                ))}
+              </div>
+            )}
+            {allTags.filter(t => !contactTags.some(ct => ct.id === t.id)).length > 0 && (
+              <select value="" onChange={e => {
+                const tag = allTags.find(t => t.id === e.target.value)
+                if (tag) toggleTag(tag)
+              }}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+                <option value="">— إضافة تاج —</option>
+                {allTags.filter(t => !contactTags.some(ct => ct.id === t.id)).map(tag => (
+                  <option key={tag.id} value={tag.id}>{tag.name}</option>
+                ))}
+              </select>
+            )}
           </div>
 
           {/* Lifecycle */}

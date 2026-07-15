@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
 
 const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
@@ -155,10 +155,10 @@ const CONVERSATIONS_PAGE_SIZE = 50
 
 const screenCache = {
   status: 'open', channel: 'all', search: '', searchType: 'contact', viewMode: 'all', agentFilter: '',
-  selectedTag: null, selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
+  selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
-  lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
+  lifecycleCounts: {}, lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
   agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
 }
 
@@ -179,8 +179,6 @@ export default function ConversationsScreen() {
   const [statusCounts, setStatusCounts] = useState(screenCache.statusCounts)
   const [sidebarOpen, setSidebarOpen] = useState(screenCache.sidebarOpen)
   const [unrepliedOnly, setUnrepliedOnly] = useState(screenCache.unrepliedOnly)
-  const [tags, setTags] = useState(screenCache.tags)
-  const [selectedTag, setSelectedTag] = useState(screenCache.selectedTag)
   const [contactTagsMap, setContactTagsMap] = useState(screenCache.contactTagsMap) // { contact_id: [tag,...] }
   const [lifecycles, setLifecycles] = useState(screenCache.lifecycles)
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
@@ -234,9 +232,6 @@ export default function ConversationsScreen() {
     setAgentsMap(aMap); screenCache.agentsMap = aMap
     setAgentsList(agentsData || []); screenCache.agentsList = agentsData || []
 
-    const { data: tagsList } = await supabase.from('tags').select('*').order('name')
-    setTags(tagsList || []); screenCache.tags = tagsList || []
-
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
     setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
 
@@ -251,16 +246,11 @@ export default function ConversationsScreen() {
   }, [])
 
   const fetchConversations = useCallback(async () => {
-    // لو فيه فلتر تاج و/أو مرحلة lifecycle، جيب الـ contacts اللي مطابقة (تقاطع لو الاتنين مفعّلين)
+    // لو فيه فلتر مرحلة lifecycle، جيب الـ contacts اللي مطابقة
     let scopeContactIds = null
-    if (selectedTag) {
-      const { data: ctRows } = await supabase.from('contact_tags').select('contact_id').eq('tag_id', selectedTag)
-      scopeContactIds = new Set((ctRows || []).map(r => r.contact_id))
-    }
     if (selectedLifecycle) {
       const { data: lcRows } = await supabase.from('contacts').select('id').eq('lifecycle_stage_id', selectedLifecycle)
-      const lcIds = new Set((lcRows || []).map(r => r.id))
-      scopeContactIds = scopeContactIds ? new Set([...scopeContactIds].filter(cid => lcIds.has(cid))) : lcIds
+      scopeContactIds = new Set((lcRows || []).map(r => r.id))
     }
 
     // فلاتر القناة/الموظف بس (من غير تاج/lifecycle) — مستخدمة في عدادات الـ lifecycle نفسها
@@ -282,7 +272,7 @@ export default function ConversationsScreen() {
       return q
     }
 
-    // فلاتر مشتركة (القناة/الموظف/التاج/اللايف سايكل) بنطبقها على أي كويري
+    // فلاتر مشتركة (القناة/الموظف/اللايف سايكل) بنطبقها على أي كويري
     const applyScope = (q) => {
       q = applyBaseScope(q)
       if (scopeContactIds) q = q.in('contact_id', scopeContactIds.size ? [...scopeContactIds] : ['00000000-0000-0000-0000-000000000000'])
@@ -398,7 +388,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit])
+  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit])
 
   // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
   // فلاتر القناة/الموظف/الحالة الحالية. searchType بيحدد نبحث فين: اسم العميل، محتوى رسالة حقيقية،
@@ -495,7 +485,7 @@ export default function ConversationsScreen() {
   useEffect(() => {
     if (!filtersMountedRef.current) { filtersMountedRef.current = true; return }
     setVisibleLimit(CONVERSATIONS_PAGE_SIZE)
-  }, [status, channel, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly])
+  }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly])
 
   // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
   useEffect(() => {
@@ -505,12 +495,11 @@ export default function ConversationsScreen() {
     screenCache.searchType = searchType
     screenCache.viewMode = viewMode
     screenCache.agentFilter = agentFilter
-    screenCache.selectedTag = selectedTag
     screenCache.selectedLifecycle = selectedLifecycle
     screenCache.unrepliedOnly = unrepliedOnly
     screenCache.sidebarOpen = sidebarOpen
     screenCache.visibleLimit = visibleLimit
-  }, [status, channel, search, viewMode, agentFilter, selectedTag, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit])
+  }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit])
 
   // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل دقيقتين بس
   useEffect(() => {
@@ -855,26 +844,6 @@ export default function ConversationsScreen() {
             })}
           </div>
 
-          {/* التاجات — موبايل بس، الديسكتوب عارضها فوق القائمة */}
-          {expanded && tags.length > 0 && (
-            <div className="lg:hidden border-t border-surface-3 py-2">
-              <div className="flex gap-2 px-3 overflow-x-auto scrollbar-hide">
-                <button onClick={() => setSelectedTag(null)}
-                  className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-                  <Tag size={11} /> كل التاجات
-                </button>
-                {tags.map(t => (
-                  <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
-                    className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
-                    style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
-                    <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                    {t.name}
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-
           {/* Lifecycle — عدد المحادثات المفتوحة في كل مرحلة، والضغط عليها بيفلتر القائمة (بالحالة المختارة حالياً) */}
           {expanded && lifecycles.length > 0 && (
             <div className="border-t border-surface-3 py-2">
@@ -925,24 +894,6 @@ export default function ConversationsScreen() {
           </div>
           <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
         </div>
-
-        {/* Tags Filter (ديسكتوب بس) */}
-        {tags.length > 0 && (
-          <div className="hidden lg:flex gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
-            <button onClick={() => setSelectedTag(null)}
-              className={`flex items-center gap-1 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${!selectedTag ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-              <Tag size={11} /> كل التاجات
-            </button>
-            {tags.map(t => (
-              <button key={t.id} onClick={() => setSelectedTag(t.id === selectedTag ? null : t.id)}
-                className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectedTag === t.id ? 'text-white' : 'text-fg-muted'}`}
-                style={{ background: selectedTag === t.id ? t.color : `${t.color}33` }}>
-                <span className="w-1.5 h-1.5 rounded-full" style={{ background: t.color }} />
-                {t.name}
-              </button>
-            ))}
-          </div>
-        )}
 
         {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض */}
         <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">

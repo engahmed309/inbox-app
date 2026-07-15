@@ -14,6 +14,7 @@ const TABS = [
   { key: 'agents', label: 'الموظفون', icon: Users },
   { key: 'channels', label: 'القنوات', icon: Radio },
   { key: 'lifecycle', label: 'Lifecycle', icon: Tag },
+  { key: 'tags', label: 'التاجات', icon: Tag },
   { key: 'fields', label: 'الحقول', icon: List },
   { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
   { key: 'roundrobin', label: 'التوزيع', icon: Settings2 },
@@ -60,6 +61,7 @@ export default function SettingsScreen() {
         {tab === 'agents' && <AgentsTab />}
         {tab === 'channels' && <ChannelsTab />}
         {tab === 'lifecycle' && <LifecycleTab />}
+        {tab === 'tags' && <TagsTab />}
         {tab === 'fields' && <FieldsTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
         {tab === 'roundrobin' && <RoundRobinTab />}
@@ -753,6 +755,81 @@ function LifecycleTab() {
           </button>
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Tags Tab ────────────────────────────────────────────
+// التاجات بتتحط من هنا بس (الأدمن)، وبتظهر بعد كده كقايمة اختيار جوا ملف العميل — الموظفين
+// يقدروا يحطوا أي تاج موجود بس، مش يعملوا تاجات جديدة
+function TagsTab() {
+  const [tags, setTags] = useState([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [form, setForm] = useState({ name: '', color: '#6366F1' })
+  const toast = useToast()
+
+  useEffect(() => { loadTags() }, [])
+  const loadTags = async () => {
+    const { data } = await supabase.from('tags').select('*').order('name')
+    setTags(data || [])
+  }
+
+  const add = async () => {
+    if (!form.name.trim()) return
+    const { error } = await supabase.from('tags').insert({ name: form.name.trim(), color: form.color })
+    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    setForm({ name: '', color: '#6366F1' })
+    setShowAdd(false)
+    loadTags()
+  }
+
+  const remove = async (id) => {
+    if (!confirm('حذف التاج ده؟ هيتشال من كل العملاء اللي حاططينه.')) return
+    await supabase.from('contact_tags').delete().eq('tag_id', id)
+    await supabase.from('tags').delete().eq('id', id)
+    loadTags()
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-fg">التاجات</h2>
+        <button onClick={() => setShowAdd(!showAdd)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
+          <Plus size={14} /> إضافة
+        </button>
+      </div>
+
+      {showAdd && (
+        <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+          <InputField label="اسم التاج" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <div>
+            <label className="block text-xs text-fg-muted mb-1">اللون</label>
+            <div className="flex items-center gap-2">
+              <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
+                className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 cursor-pointer" />
+              <span className="text-sm text-fg-muted">{form.color}</span>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">إضافة</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+          </div>
+        </div>
+      )}
+
+      {tags.map(t => (
+        <div key={t.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
+          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color }} />
+          <span className="flex-1 text-sm text-fg">{t.name}</span>
+          <button onClick={() => remove(t.id)} className="text-fg-muted hover:text-danger">
+            <Trash2 size={14} />
+          </button>
+        </div>
+      ))}
+      {tags.length === 0 && !showAdd && (
+        <p className="text-center text-fg-subtle text-sm py-6">مفيش تاجات لسه، دوس "إضافة" عشان تعمل واحد</p>
+      )}
     </div>
   )
 }
