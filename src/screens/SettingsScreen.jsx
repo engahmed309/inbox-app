@@ -635,7 +635,9 @@ function ConnectNewChannel() {
     // ده فلو full-page redirect (مش نافذة منبثقة زي الواتساب)، فبنسجّل علامة في sessionStorage
     // عشان لما نرجع من انستجرام نعرف نستنى ونعالج الـ code، ونحول المتصفح كامل
     sessionStorage.setItem('ig_connect_pending', '1')
-    const redirectUri = window.location.origin
+    // لازم يطابق حرفيًا اللي مسجل في "Redirect URL" عند ميتا — وميتا بتحط "/" في الآخر أوتوماتيك
+    // مهما كتبت، فبنضيفها إحنا كمان هنا عشان تفضل مطابقة لنفس القيمة اللي السيرفر هيبعتها
+    const redirectUri = window.location.origin + '/'
     const scope = 'instagram_business_basic,instagram_business_manage_messages'
     window.location.href = `https://www.instagram.com/oauth/authorize?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`
   }
