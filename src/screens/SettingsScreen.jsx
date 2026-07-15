@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID } from '../lib/supabase'
+import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -584,6 +584,19 @@ function ConnectNewChannel() {
     }
   }
 
+  const connectInstagram = () => {
+    if (!INSTAGRAM_APP_ID) {
+      toast.error('محتاجين نضيف INSTAGRAM_APP_ID في إعدادات السيرفر الأول')
+      return
+    }
+    // ده فلو full-page redirect (مش نافذة منبثقة زي الواتساب)، فبنسجّل علامة في sessionStorage
+    // عشان لما نرجع من انستجرام نعرف نستنى ونعالج الـ code، ونحول المتصفح كامل
+    sessionStorage.setItem('ig_connect_pending', '1')
+    const redirectUri = window.location.origin
+    const scope = 'instagram_business_basic,instagram_business_manage_messages'
+    window.location.href = `https://www.instagram.com/oauth/authorize?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`
+  }
+
   const finishWhatsAppConnect = async (code, sessionInfo) => {
     try {
       const res = await fetch(`${API_URL}/channels/whatsapp/connect`, {
@@ -610,18 +623,19 @@ function ConnectNewChannel() {
       {['facebook', 'instagram', 'whatsapp'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        const isWhatsApp = platform === 'whatsapp'
+        const isReady = platform === 'whatsapp' || platform === 'instagram'
         const isConnecting = connecting === platform
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram }
         return (
           <button key={platform}
-            disabled={!isWhatsApp || isConnecting}
-            onClick={isWhatsApp ? connectWhatsApp : undefined}
-            className={`w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 transition-colors ${!isWhatsApp ? 'opacity-60 cursor-not-allowed' : 'hover:bg-surface-3'}`}>
+            disabled={!isReady || isConnecting}
+            onClick={isReady ? handlers[platform] : undefined}
+            className={`w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 transition-colors ${!isReady ? 'opacity-60 cursor-not-allowed' : 'hover:bg-surface-3'}`}>
             <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
               <Icon size={16} className={meta.color} />
             </div>
             <span className="flex-1 text-right text-sm text-fg font-medium">ربط {meta.label}</span>
-            {isWhatsApp ? (
+            {isReady ? (
               isConnecting && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
             ) : (
               <span className="text-[11px] text-fg-subtle flex-shrink-0">قريباً</span>
