@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID } from '../lib/supabase'
+import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -584,6 +584,49 @@ function ConnectNewChannel() {
     }
   }
 
+  const connectFacebook = async () => {
+    if (!FACEBOOK_LOGIN_CONFIG_ID) {
+      toast.error('محتاجين نضيف FACEBOOK_LOGIN_CONFIG_ID الأول')
+      return
+    }
+    setConnecting('facebook')
+    try {
+      const FB = await loadFacebookSDK()
+      FB.login((response) => {
+        if (response.authResponse?.code) {
+          finishFacebookConnect(response.authResponse.code)
+        } else {
+          toast.error('اتلغى الربط أو حصل خطأ من فيسبوك')
+          setConnecting(null)
+        }
+      }, {
+        config_id: FACEBOOK_LOGIN_CONFIG_ID,
+        response_type: 'code',
+        override_default_response_type: true
+      })
+    } catch (err) {
+      toast.error(err.message)
+      setConnecting(null)
+    }
+  }
+
+  const finishFacebookConnect = async (code) => {
+    try {
+      const res = await fetch(`${API_URL}/channels/facebook/connect`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ code, agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل ربط الصفحة')
+      toast.success(`اترابطت ${data.channels?.length || 1} صفحة فيسبوك بنجاح`)
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setConnecting(null)
+    }
+  }
+
   const connectInstagram = () => {
     if (!INSTAGRAM_APP_ID) {
       toast.error('محتاجين نضيف INSTAGRAM_APP_ID في إعدادات السيرفر الأول')
@@ -623,9 +666,9 @@ function ConnectNewChannel() {
       {['facebook', 'instagram', 'whatsapp'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        const isReady = platform === 'whatsapp' || platform === 'instagram'
+        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook'
         const isConnecting = connecting === platform
-        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram }
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook }
         return (
           <button key={platform}
             disabled={!isReady || isConnecting}
