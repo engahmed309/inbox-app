@@ -27,6 +27,7 @@ const WINDOW_EXPIRED_TEXT = {
   instagram: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — انستجرام بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
   facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
 }
+const PLATFORM_LABEL = { facebook: 'فيسبوك', instagram: 'إنستجرام', whatsapp: 'واتساب' }
 
 function AgentAvatar({ agent, size = 20 }) {
   const [broken, setBroken] = useState(false)
@@ -82,6 +83,7 @@ export default function ChatScreen() {
 
   const [conv, setConv] = useState(null)
   const [contact, setContact] = useState(null)
+  const [channelActive, setChannelActive] = useState(true)
   const [messages, setMessages] = useState([])
   const [assignLogs, setAssignLogs] = useState([])
   const [activityLogs, setActivityLogs] = useState([])
@@ -306,6 +308,28 @@ export default function ChatScreen() {
       clearInterval(pollInterval)
     }
   }, [id])
+
+  // ─── التأكد إن قناة المحادثة دي (فيسبوك/انستجرام/واتساب) لسه متربطة ────
+  // لو حد فصل القناة من الإعدادات (أو التوكن بقى منتهي) وإحنا واقفين في شات بتاعها،
+  // نقفل مربع الكتابة ونوضح السبب بدل ما نسيب الموظف يبعت رسالة هتفشل من غير تفسير
+  useEffect(() => {
+    if (!conv?.platform) return
+    let cancelled = false
+    const checkChannel = async () => {
+      try {
+        const res = await fetch(`${API_URL}/channels`)
+        const data = await res.json()
+        if (cancelled) return
+        const ch = data.channels?.find(c => c.platform === conv.platform)
+        setChannelActive(ch?.status === 'active')
+      } catch {
+        // لو فشل الفحص نفسه (مشكلة شبكة مثلاً)، منقفلش المربع بناءً على معلومة مش أكيدة
+      }
+    }
+    checkChannel()
+    const interval = setInterval(checkChannel, 60000)
+    return () => { cancelled = true; clearInterval(interval) }
+  }, [conv?.platform])
 
   // ─── تحميل رسايل أقدم (pagination) ─────────────────────────
   const loadOlderMessages = async () => {
@@ -760,6 +784,11 @@ export default function ChatScreen() {
               className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-brand hover:bg-brand-dark text-white rounded-xl transition-colors">
               <Send size={16} />
             </button>
+          </div>
+        ) : !channelActive ? (
+          <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
+            <Ban size={18} className="flex-shrink-0" />
+            <span>قناة {PLATFORM_LABEL[conv?.platform] || conv?.platform} اتفصلت من التطبيق — لازم تتربط تاني من الإعدادات → القنوات عشان تقدر ترد.</span>
           </div>
         ) : contact?.is_blocked ? (
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
