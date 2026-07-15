@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Tag, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
 
 const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
@@ -54,6 +54,25 @@ function getChannelLabel(ch) {
     return `${ch.display_name || 'واتساب'} #${last2}`
   }
   return ch.display_name || null
+}
+
+const SEARCH_TYPES = [
+  { key: 'contact', label: 'عميل', icon: <User size={11} /> },
+  { key: 'message', label: 'رسالة', icon: <MessageSquare size={11} /> },
+  { key: 'comment', label: 'تعليق', icon: <StickyNote size={11} /> },
+]
+
+function SearchTypeChips({ searchType, setSearchType }) {
+  return (
+    <div className="flex items-center gap-1.5 mt-1.5">
+      {SEARCH_TYPES.map(t => (
+        <button key={t.key} onClick={() => setSearchType(t.key)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${searchType === t.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+          {t.icon} {t.label}
+        </button>
+      ))}
+    </div>
+  )
 }
 
 function AgentAvatar({ agent, size = 22 }) {
@@ -135,7 +154,7 @@ function useInstallPrompt() {
 const CONVERSATIONS_PAGE_SIZE = 50
 
 const screenCache = {
-  status: 'open', channel: 'all', search: '', viewMode: 'all', agentFilter: '',
+  status: 'open', channel: 'all', search: '', searchType: 'contact', viewMode: 'all', agentFilter: '',
   selectedTag: null, selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
@@ -150,6 +169,7 @@ export default function ConversationsScreen() {
   const [status, setStatus] = useState(screenCache.status)
   const [channel, setChannel] = useState(screenCache.channel)
   const [search, setSearch] = useState(screenCache.search)
+  const [searchType, setSearchType] = useState(screenCache.searchType || 'contact') // 'contact' | 'message' | 'comment'
   const [loading, setLoading] = useState(screenCache.conversations === null)
   const [showAgentStatus, setShowAgentStatus] = useState(false)
   const [viewMode, setViewMode] = useState(screenCache.viewMode) // 'all' | 'mine'
@@ -356,6 +376,7 @@ export default function ConversationsScreen() {
         .from('messages')
         .select('conversation_id, content, content_type, direction, created_at')
         .in('conversation_id', ids)
+        .neq('content_type', 'note') // الملاحظات الداخلية متتحسبش كـ"آخر رسالة" في معاينة القائمة
         .order('created_at', { ascending: false })
 
       // خد آخر رسالة لكل محادثة
@@ -379,6 +400,96 @@ export default function ConversationsScreen() {
     }
   }, [status, channel, agent, viewMode, agentFilter, selectedTag, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit])
 
+  // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
+  // فلاتر القناة/الموظف/الحالة الحالية. searchType بيحدد نبحث فين: اسم العميل، محتوى رسالة حقيقية،
+  // أو محتوى ملاحظة داخلية — كل نوع منفصل عن التاني عشان النتايج تبقى واضحة ومحددة
+  const searchConversations = useCallback(async () => {
+    const q = search.trim()
+    if (!q) return
+    setLoading(true)
+    try {
+      let query;
+      if (searchType === 'contact') {
+        query = supabase.from('conversations')
+          .select('*, contacts!inner(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
+          .ilike('contacts.name', `%${q}%`)
+      } else {
+        let msgQuery = supabase.from('messages').select('conversation_id').ilike('content', `%${q}%`).limit(300)
+        msgQuery = searchType === 'comment' ? msgQuery.eq('content_type', 'note') : msgQuery.neq('content_type', 'note')
+        const { data: msgs } = await msgQuery
+        const convIds = [...new Set((msgs || []).map(m => m.conversation_id))]
+        query = supabase.from('conversations')
+          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
+          .in('id', convIds.length ? convIds : ['00000000-0000-0000-0000-000000000000'])
+      }
+
+      query = query.order('last_message_at', { ascending: false }).limit(200)
+      if (status !== 'all') query = query.eq('status', status)
+      const cf = parseChannelFilter(channel)
+      if (cf) {
+        query = query.eq('platform', cf.platform)
+        if (cf.channelId) query = query.eq('channel_id', cf.channelId)
+      }
+      if (!canSeeAll) query = query.eq('assigned_agent_id', agent?.id)
+      else if (agentFilter === 'unassigned') query = query.is('assigned_agent_id', null)
+      else if (agentFilter) query = query.eq('assigned_agent_id', agentFilter)
+      else if (viewMode === 'mine') query = query.eq('assigned_agent_id', agent?.id)
+
+      const { data, error } = await query
+      if (error) { console.error(error); toast.error('فشل البحث، حاول تاني'); setLoading(false); return }
+
+      const convs = (data || []).map(c => ({ ...c, myUnread: false }))
+      setConversations(convs); screenCache.conversations = convs
+      setLoading(false)
+
+      if (convs.length > 0) {
+        const ids = convs.map(c => c.id)
+        const { data: msgs } = await supabase
+          .from('messages')
+          .select('conversation_id, content, content_type, direction, created_at')
+          .in('conversation_id', ids)
+          .neq('content_type', 'note')
+          .order('created_at', { ascending: false })
+        const lastMap = {}
+        msgs?.forEach(m => { if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m })
+        setLastMessages(lastMap); screenCache.lastMessages = lastMap
+
+        const contactIds = convs.map(c => c.contact_id).filter(Boolean)
+        if (contactIds.length) {
+          const { data: ctRows } = await supabase
+            .from('contact_tags').select('contact_id, tags(id, name, color)').in('contact_id', contactIds)
+          const ctMap = {}
+          ctRows?.forEach(r => {
+            if (!ctMap[r.contact_id]) ctMap[r.contact_id] = []
+            if (r.tags) ctMap[r.contact_id].push(r.tags)
+          })
+          setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
+        }
+      } else {
+        setLastMessages({}); setContactTagsMap({})
+      }
+    } catch (err) {
+      console.error(err)
+      toast.error('فشل البحث، حاول تاني')
+      setLoading(false)
+    }
+  }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll])
+
+  // بحث بتأخير بسيط (debounce) عشان منضربش الداتابيز بكويري مع كل حرف بيتكتب — ولو البحث اتمسح
+  // نرجع للقائمة العادية (المفلترة/المقسمة صفحات) تاني
+  const searchMountedRef = useRef(false)
+  useEffect(() => {
+    if (!agent) return
+    if (!search.trim()) {
+      if (searchMountedRef.current) fetchConversations()
+      searchMountedRef.current = true
+      return
+    }
+    searchMountedRef.current = true
+    const t = setTimeout(() => searchConversations(), 350)
+    return () => clearTimeout(t)
+  }, [search, searchType])
+
   // لما الفلاتر تتغيّر (مش أول تحميل للشاشة) نرجّع حد الصفحة لأصله، عشان مانجيبش عدد كبير غير لازم في فلتر تاني
   const filtersMountedRef = useRef(false)
   useEffect(() => {
@@ -391,6 +502,7 @@ export default function ConversationsScreen() {
     screenCache.status = status
     screenCache.channel = channel
     screenCache.search = search
+    screenCache.searchType = searchType
     screenCache.viewMode = viewMode
     screenCache.agentFilter = agentFilter
     screenCache.selectedTag = selectedTag
@@ -408,31 +520,37 @@ export default function ConversationsScreen() {
     return () => clearInterval(staticInterval)
   }, [fetchStaticLists, agent])
 
+  // بنستخدم ref (مش state) عشان نعرف لحظيًا لو فيه بحث شغال دلوقتي، من غير ما نضطر نضيف search
+  // كـ dependency هنا ونسبّب إعادة اشتراك الـ realtime وقايمة الـ intervals مع كل حرف بيتكتب
+  const searchActiveRef = useRef(false)
+  useEffect(() => { searchActiveRef.current = Boolean(search.trim()) }, [search])
+
   useEffect(() => {
     if (!agent) return
     // لو عندنا كاش من قبل (يعني ده مش أول فتح للشاشة)، منعملش سبينر ولا نمسح القائمة —
     // بنوريها زي ما هي فوراً وبنعمل تحديث هادئ في الخلفية بس
     if (screenCache.conversations === null) setLoading(true)
-    fetchConversations()
+    if (!searchActiveRef.current) fetchConversations()
 
-    // Realtime على conversations
+    // Realtime على conversations — لو فيه بحث شغال دلوقتي منعملش تحديث تلقائي، عشان منقاطعش
+    // نتايج البحث الحالية؛ البحث نفسه هيتحدّث لوحده لما نص البحث يتغيّر
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
     realtimeRef.current = supabase
       .channel(`convs-list-${Date.now()}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        fetchConversations()
+        if (!searchActiveRef.current) fetchConversations()
       })
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        fetchConversations() // تحديث آخر رسالة
+        if (!searchActiveRef.current) fetchConversations() // تحديث آخر رسالة
       })
       .subscribe()
 
     // Realtime هو المصدر الأساسي دلوقتي — الـ polling ده بقى بس شبكة أمان بطيئة (كل ٧٥ ثانية)
     // لو حصل انقطاع في الـ Realtime لأي سبب، بدل ما كان بيجري كل ٥ ثواني ويستهلك بيانات زيادة عن اللزوم
-    const handleVisibility = () => { fetchConversations() }
+    const handleVisibility = () => { if (!searchActiveRef.current) fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
-    const pollInterval = setInterval(() => { fetchConversations() }, 75000)
+    const pollInterval = setInterval(() => { if (!searchActiveRef.current) fetchConversations() }, 75000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
@@ -533,13 +651,8 @@ export default function ConversationsScreen() {
     fetchConversations()
   }
 
-  const filtered = conversations.filter(c => {
-    if (!search) return true
-    const q = search.toLowerCase()
-    const nameMatch = c.contacts?.name?.toLowerCase().includes(q)
-    const msgMatch = lastMessages[c.id]?.content?.toLowerCase().includes(q)
-    return nameMatch || msgMatch
-  })
+  // البحث بقى بيتم من الداتا بيز مباشرة (searchConversations)، فـ conversations بالفعل النتيجة النهائية
+  const filtered = conversations
 
   const agentStatusBtn = agent?.status || 'online'
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
@@ -667,10 +780,14 @@ export default function ConversationsScreen() {
         {/* بحث (ديسكتوب بس — على الموبايل البحث ظاهر فوق قائمة المحادثات مباشرة) + الكل/بتاعتي */}
         {expanded ? (
           <div className="px-3 py-2.5 border-b border-surface-3">
-            <div className="hidden lg:block relative">
-              <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
-                className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+            <div className="hidden lg:block">
+              <div className="relative">
+                <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <input value={search} onChange={e => setSearch(e.target.value)}
+                  placeholder={searchType === 'contact' ? 'بحث بالاسم...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
+                  className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              </div>
+              <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
             </div>
             {canSeeAll && (
               <div className="flex bg-surface-3 rounded-xl p-0.5 lg:mt-2">
@@ -802,9 +919,11 @@ export default function ConversationsScreen() {
         <div className="lg:hidden px-4 py-2.5 bg-surface-2 border-b border-surface-3">
           <div className="relative">
             <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث بالاسم أو محتوى رسالة..."
+            <input value={search} onChange={e => setSearch(e.target.value)}
+              placeholder={searchType === 'contact' ? 'بحث بالاسم...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
               className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
+          <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
         </div>
 
         {/* Tags Filter (ديسكتوب بس) */}
