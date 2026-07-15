@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -34,12 +34,26 @@ const PLATFORM_ICONS = {
   whatsapp: <Phone size={12} className="text-green-400" />,
 }
 
-// لو فيه أكتر من رقم واتساب مربوط، مفتاح الفلتر بيبقى "whatsapp:<channel_id>" بدل "whatsapp" بس،
-// عشان نقدر نفلتر بمحادثات رقم بعينه لا كل أرقام الواتساب مع بعض
+// لو فيه أكتر من قناة لنفس المنصة (أرقام واتساب متعددة، أو أكتر من صفحة فيسبوك...) مفتاح الفلتر
+// بيبقى "platform:<channel_id>" بدل اسم المنصة بس، عشان نقدر نفلتر بمحادثات قناة بعينها
 function parseChannelFilter(channel) {
   if (channel === 'all') return null
-  if (channel.startsWith('whatsapp:')) return { platform: 'whatsapp', channelId: channel.slice(9) }
-  return { platform: channel, channelId: null }
+  const sep = channel.indexOf(':')
+  if (sep === -1) return { platform: channel, channelId: null }
+  return { platform: channel.slice(0, sep), channelId: channel.slice(sep + 1) }
+}
+
+// الاسم اللي بيظهر للقناة في أي حتة في التطبيق: الاسم المختصر لو المستخدم حطه، وإلا لكل واتساب
+// بنعرض اسم الـ WABA + آخر رقمين من الـ ID عشان نقدر نفرّق بين أرقام كتير بنفس الاسم، ولباقي
+// المنصات بنرجع لاسم الحساب من ميتا نفسه
+function getChannelLabel(ch) {
+  if (!ch) return null
+  if (ch.custom_name) return ch.custom_name
+  if (ch.platform === 'whatsapp') {
+    const last2 = String(ch.external_id || '').slice(-2)
+    return `${ch.display_name || 'واتساب'} #${last2}`
+  }
+  return ch.display_name || null
 }
 
 function AgentAvatar({ agent, size = 22 }) {
@@ -126,7 +140,7 @@ const screenCache = {
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
   lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
-  agentOpenCounts: {}, unassignedOpenCount: 0, waChannels: [],
+  agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
 }
 
 export default function ConversationsScreen() {
@@ -152,7 +166,7 @@ export default function ConversationsScreen() {
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
   const [agentOpenCounts, setAgentOpenCounts] = useState(screenCache.agentOpenCounts) // { agent_id: عدد المحادثات المفتوحة المعينة له }
   const [unassignedOpenCount, setUnassignedOpenCount] = useState(screenCache.unassignedOpenCount)
-  const [waChannels, setWaChannels] = useState(screenCache.waChannels) // أرقام الواتساب المتربطة كلها (لو أكتر من واحد)
+  const [allChannels, setAllChannels] = useState(screenCache.allChannels) // كل القنوات المتربطة، كل المنصات
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -172,18 +186,24 @@ export default function ConversationsScreen() {
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
 
-  // لو رقم واتساب واحد بس متربط (أو مفيش)، سيب تاب "واتساب" العادي زي ما هو. لو أكتر من رقم،
-  // بدّل التاب الواحد بتاب منفصل لكل رقم عشان محادثات كل رقم تفضل منفصلة عن التاني
-  const channelTabs = waChannels.length > 1
-    ? [
-        ...CHANNELS.filter(c => c.key !== 'whatsapp'),
-        ...waChannels.map(wc => ({
-          key: `whatsapp:${wc.id}`,
-          label: wc.custom_name || wc.display_name || 'واتساب',
-          icon: <Phone size={12} className="text-green-400" />
+  // لو منصة معينة (فيسبوك/انستجرام/واتساب) ليها قناة واحدة بس متربطة (أو مفيش)، سيب التاب العادي
+  // بتاعها زي ما هو. لو أكتر من قناة لنفس المنصة، بدّل التاب الواحد بتاب منفصل لكل قناة عشان
+  // محادثات كل واحدة تفضل منفصلة عن التانية
+  const channelTabs = useMemo(() => {
+    const tabs = []
+    for (const c of CHANNELS) {
+      if (c.key === 'all') { tabs.push(c); continue }
+      const chsForPlatform = allChannels.filter(ch => ch.platform === c.key)
+      if (chsForPlatform.length > 1) {
+        chsForPlatform.forEach(ch => tabs.push({
+          key: `${c.key}:${ch.id}`, label: getChannelLabel(ch), icon: PLATFORM_ICONS[c.key]
         }))
-      ]
-    : CHANNELS
+      } else {
+        tabs.push(c)
+      }
+    }
+    return tabs
+  }, [allChannels])
 
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
@@ -200,13 +220,14 @@ export default function ConversationsScreen() {
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
     setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
 
-    // أرقام الواتساب المتربطة (ممكن يكون أكتر من واحد) — عشان نعرض تاب منفصل لكل رقم بدل ما يترصوا فوق بعض
+    // كل القنوات المتربطة (ممكن يكون أكتر من واحدة لنفس المنصة) — عشان نعرض تاب منفصل لكل واحدة
+    // بدل ما يترصوا فوق بعض، ونوري اسم القناة جوه كل كارت محادثة وجوه الشات نفسه
     try {
       const res = await fetch(`${API_URL}/channels`)
       const data = await res.json()
-      const wa = (data.channels || []).filter(c => c.platform === 'whatsapp' && c.id)
-      setWaChannels(wa); screenCache.waChannels = wa
-    } catch { /* لو فشل، هيفضل تاب "واتساب" العادي شغال زي ما هو */ }
+      const chs = (data.channels || []).filter(c => c.id && c.status === 'active')
+      setAllChannels(chs); screenCache.allChannels = chs
+    } catch { /* لو فشل، هتفضل التابات العادية شغالة زي ما هي */ }
   }, [])
 
   const fetchConversations = useCallback(async () => {
@@ -851,7 +872,7 @@ export default function ConversationsScreen() {
                   selected={selectedIds.has(conv.id)}
                   onToggleSelect={() => toggleSelect(conv.id)}
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
-                  channelLabel={waChannels.length > 1 ? (waChannels.find(c => c.id === conv.channel_id)?.custom_name || waChannels.find(c => c.id === conv.channel_id)?.display_name) : null}
+                  channelLabel={getChannelLabel(allChannels.find(c => c.id === conv.channel_id))}
                 />
               ))}
               {conversations.length >= visibleLimit && (

@@ -7,7 +7,7 @@ import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -28,6 +28,18 @@ const WINDOW_EXPIRED_TEXT = {
   facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
 }
 const PLATFORM_LABEL = { facebook: 'فيسبوك', instagram: 'إنستجرام', whatsapp: 'واتساب' }
+
+// الاسم اللي بيظهر للقناة: الاسم المختصر لو المستخدم حطه، وإلا لكل واتساب بنعرض اسم الـ WABA +
+// آخر رقمين من الـ ID عشان نفرّق بين أرقام كتير بنفس الاسم، ولباقي المنصات بنرجع لاسم الحساب من ميتا
+function getChannelLabel(ch) {
+  if (!ch) return null
+  if (ch.custom_name) return ch.custom_name
+  if (ch.platform === 'whatsapp') {
+    const last2 = String(ch.external_id || '').slice(-2)
+    return `${ch.display_name || 'واتساب'} #${last2}`
+  }
+  return ch.display_name || null
+}
 
 function AgentAvatar({ agent, size = 20 }) {
   const [broken, setBroken] = useState(false)
@@ -101,6 +113,10 @@ export default function ChatScreen() {
 
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+
+  const [showNoteBox, setShowNoteBox] = useState(false)
+  const [noteText, setNoteText] = useState('')
+  const [sendingNote, setSendingNote] = useState(false)
 
   const [lifecycles, setLifecycles] = useState([])
   const [showLifecycle, setShowLifecycle] = useState(false)
@@ -327,8 +343,7 @@ export default function ChatScreen() {
           ? platformChannels.find(c => c.id === conv.channel_id)
           : platformChannels[0]
         setChannelActive(ch?.status === 'active')
-        // بنوري اسم القناة بس لو فيه أكتر من رقم واتساب متربط، عشان الموظف يعرف بيرد من أنهي رقم
-        setChannelLabel(platformChannels.length > 1 ? (ch?.custom_name || ch?.display_name || null) : null)
+        setChannelLabel(getChannelLabel(ch))
       } catch {
         // لو فشل الفحص نفسه (مشكلة شبكة مثلاً)، منقفلش المربع بناءً على معلومة مش أكيدة
       }
@@ -434,6 +449,28 @@ export default function ChatScreen() {
       }
     } finally {
       setSending(false)
+    }
+  }
+
+  const sendNote = async () => {
+    const noteContent = noteText.trim()
+    if (!noteContent || sendingNote) return
+    setSendingNote(true)
+    try {
+      const res = await fetch(`${API_URL}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: id, content: noteContent, agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل إضافة الملاحظة')
+      setNoteText('')
+      setShowNoteBox(false)
+      await fetchMessages(false)
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSendingNote(false)
     }
   }
 
@@ -676,6 +713,11 @@ export default function ChatScreen() {
         </div>
 
         <div className="flex items-center gap-1.5 flex-shrink-0">
+          <button onClick={() => setShowNoteBox(v => !v)} title="ملاحظة داخلية"
+            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showNoteBox ? 'bg-follow text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <StickyNote size={14} />
+          </button>
+
           <button onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
             className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showSearch ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <Search size={14} />
@@ -770,6 +812,31 @@ export default function ChatScreen() {
 
       {/* Input */}
       <div className="flex-shrink-0 px-3 py-3 bg-surface-2 border-t border-surface-3 relative">
+        {showNoteBox && (
+          <div className="mb-2 bg-follow/10 border border-follow/30 rounded-xl p-2.5">
+            <div className="flex items-center gap-1.5 text-xs font-medium text-follow mb-1.5">
+              <StickyNote size={12} /> ملاحظة داخلية — مش هتتبعت للعميل، الموظفين بس هيشوفوها
+            </div>
+            <div className="flex items-end gap-2">
+              <textarea
+                value={noteText}
+                onChange={e => setNoteText(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote() } }}
+                placeholder="اكتب ملاحظتك للموظفين هنا..."
+                rows={2}
+                autoFocus
+                className="flex-1 bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-follow resize-none"
+              />
+              <button onClick={sendNote} disabled={!noteText.trim() || sendingNote}
+                className="w-9 h-9 flex-shrink-0 flex items-center justify-center bg-follow hover:brightness-110 text-white rounded-lg transition-colors disabled:opacity-40">
+                {sendingNote
+                  ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  : <Send size={14} />
+                }
+              </button>
+            </div>
+          </div>
+        )}
         {showQuickReplies && filteredQuickReplies.length > 0 && (
           <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-52 overflow-y-auto">
             {filteredQuickReplies.map(qr => (
@@ -911,6 +978,23 @@ function ActivityEvent({ log, agentsMap }) {
 }
 
 function MessageBubble({ msg, prev, onMediaClick, agentsMap }) {
+  // ملاحظة داخلية — بتتحط جوه المحادثة زي أي رسالة بالترتيب الزمني بالظبط، بس بشكل مميز
+  // (لون مختلف، من غير محاذاة يمين/شمال) عشان الموظفين يفرقوها فورًا من رسالة حقيقية للعميل
+  if (msg.content_type === 'note') {
+    const authorName = agentsMap?.[msg.sent_by_agent_id] || 'موظف'
+    return (
+      <div className="flex justify-center mb-2 px-2">
+        <div className="max-w-[90%] w-full bg-follow/15 border border-follow/30 rounded-xl px-3.5 py-2.5">
+          <div className="flex items-center gap-1.5 text-[11px] font-medium text-follow mb-1">
+            <StickyNote size={11} /> {authorName} · ملاحظة داخلية
+            <span className="text-fg-subtle font-normal mr-auto">{formatTime(msg.created_at)}</span>
+          </div>
+          <p className="text-sm text-fg whitespace-pre-wrap break-words">{msg.content}</p>
+        </div>
+      </div>
+    )
+  }
+
   const isOut = msg.direction === 'outbound'
   const isTemp = msg._temp
   const showTime = !prev ||
