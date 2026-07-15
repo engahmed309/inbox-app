@@ -6,6 +6,8 @@ import { API_URL } from './lib/supabase'
 import LoginScreen from './screens/LoginScreen'
 import ConversationsScreen from './screens/ConversationsScreen'
 import ChatScreen from './screens/ChatScreen'
+import SetPasswordScreen from './screens/SetPasswordScreen'
+import NotificationBell from './components/NotificationBell'
 
 // الشاشتين دول (ومعاهم مكتبة الشارتات الخاصة بالتقارير) مش محتاجهم غير الأدمن، فبنأجّل تحميلهم
 // عشان الموظفين العاديين ميحملوش الحجم ده كله كل مرة يفتحوا التطبيق
@@ -69,8 +71,10 @@ export default function App() {
   return (
     <>
       <InstagramOAuthHandler />
+      <NotificationBell />
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
+        <Route path="/set-password" element={<SetPasswordScreen />} />
         <Route path="/" element={<PrivateRoute><ConversationsScreen /></PrivateRoute>} />
         <Route path="/chat/:id" element={<PrivateRoute><ChatScreen /></PrivateRoute>} />
         <Route path="/settings/*" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><SettingsScreen /></Suspense></PrivateRoute>} />

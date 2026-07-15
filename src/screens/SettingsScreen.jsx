@@ -7,7 +7,7 @@ import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone
+  Radio, Phone, UserCog
 } from 'lucide-react'
 
 const TABS = [
@@ -77,10 +77,15 @@ function AgentsTab() {
   const [agents, setAgents] = useState([])
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
   const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
-  const [showAdd, setShowAdd] = useState(false)
+  const [addMode, setAddMode] = useState('closed') // 'closed' | 'choice' | 'manual' | 'invite'
   const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
+  const [deleteTarget, setDeleteTarget] = useState(null) // { agent, convCount }
+  const [reassignMode, setReassignMode] = useState('specific') // 'specific' | 'all' | 'online'
+  const [reassignToId, setReassignToId] = useState('')
+  const [reassigning, setReassigning] = useState(false)
 
   useEffect(() => { loadAgents(); loadCounts() }, [])
 
@@ -112,10 +117,30 @@ function AgentsTab() {
         body: JSON.stringify(form)
       })
       if (!res.ok) throw new Error(await res.text())
-      setShowAdd(false)
+      setAddMode('closed')
       setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
       toast.success('اتضاف الموظف بنجاح')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const inviteAgent = async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`${API_URL}/admin/invite-agent`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(inviteForm)
+      })
+      if (!res.ok) throw new Error(await res.text())
+      setAddMode('closed')
+      setInviteForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+      loadAgents()
+      toast.success('اتبعتت دعوة على إيميل الموظف')
     } catch (err) {
       toast.error('خطأ: ' + err.message)
     } finally {
@@ -129,17 +154,61 @@ function AgentsTab() {
     setEditId(null)
   }
 
-  const deleteAgent = async (id) => {
-    if (!confirm('حذف الموظف؟')) return
-    await supabase.from('agents').delete().eq('id', id)
-    loadAgents()
+  const confirmDeleteAgent = async (ag) => {
+    const { data: convs } = await supabase
+      .from('conversations').select('id').eq('assigned_agent_id', ag.id).in('status', ['open', 'follow_up'])
+    const convCount = convs?.length || 0
+    if (convCount === 0) {
+      if (!confirm('حذف الموظف؟')) return
+      await supabase.from('agents').delete().eq('id', ag.id)
+      loadAgents()
+      return
+    }
+    setDeleteTarget({ agent: ag, convCount })
+    setReassignMode('specific')
+    setReassignToId('')
+  }
+
+  const finalizeDeleteWithReassign = async () => {
+    if (!deleteTarget) return
+    setReassigning(true)
+    try {
+      const { data: convs } = await supabase
+        .from('conversations').select('id').eq('assigned_agent_id', deleteTarget.agent.id).in('status', ['open', 'follow_up'])
+      const convIds = (convs || []).map(c => c.id)
+
+      let assignments = [] // [{ convId, agentId }]
+      if (reassignMode === 'specific') {
+        if (!reassignToId) { toast.error('اختار الموظف اللي هتحول له المحادثات'); setReassigning(false); return }
+        assignments = convIds.map(id => ({ convId: id, agentId: reassignToId }))
+      } else {
+        const pool = agents.filter(a => a.id !== deleteTarget.agent.id && (reassignMode === 'all' || a.status === 'online'))
+        if (pool.length === 0) { toast.error('مفيش موظفين تانيين متاحين للتوزيع'); setReassigning(false); return }
+        assignments = convIds.map((id, i) => ({ convId: id, agentId: pool[i % pool.length].id }))
+      }
+
+      for (const a of assignments) {
+        await supabase.from('conversations').update({ assigned_agent_id: a.agentId }).eq('id', a.convId)
+        await supabase.from('conversation_assignment_log').insert({ conversation_id: a.convId, assigned_to: a.agentId, assigned_by: null })
+      }
+
+      await supabase.from('agents').delete().eq('id', deleteTarget.agent.id)
+      toast.success(`اتحذف الموظف واتوزعت محادثاته على ${new Set(assignments.map(a => a.agentId)).size} موظف`)
+      setDeleteTarget(null)
+      loadAgents()
+      loadCounts()
+    } catch (err) {
+      toast.error('حصل خطأ أثناء الحذف/التوزيع')
+    } finally {
+      setReassigning(false)
+    }
   }
 
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
         <h2 className="font-semibold text-fg">الموظفون</h2>
-        <button onClick={() => setShowAdd(!showAdd)}
+        <button onClick={() => setAddMode(addMode === 'closed' ? 'choice' : 'closed')}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
           <Plus size={14} /> إضافة موظف
         </button>
@@ -152,10 +221,33 @@ function AgentsTab() {
         <TotalStat label="مغلقة" value={totals.closed} color="text-fg-muted" />
       </div>
 
-      {showAdd && (
+      {addMode === 'choice' && (
+        <div className="bg-surface-2 rounded-2xl p-4 space-y-2 border border-surface-3">
+          <h3 className="text-sm font-semibold text-fg mb-1">إزاي عايز تضيف الموظف؟</h3>
+          <button onClick={() => setAddMode('manual')}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3 hover:bg-surface-3/70 text-right transition-colors">
+            <UserCog size={18} className="text-brand flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-fg">إضافة يدوي</p>
+              <p className="text-xs text-fg-subtle">تحدد الاسم والإيميل والباسورد بنفسك</p>
+            </div>
+          </button>
+          <button onClick={() => setAddMode('invite')}
+            className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3 hover:bg-surface-3/70 text-right transition-colors">
+            <MessageSquareText size={18} className="text-brand flex-shrink-0" />
+            <div className="flex-1">
+              <p className="text-sm font-medium text-fg">دعوة عبر الإيميل</p>
+              <p className="text-xs text-fg-subtle">هيوصله إيميل يحط منه الباسورد بنفسه</p>
+            </div>
+          </button>
+          <button onClick={() => setAddMode('closed')} className="w-full py-2 text-xs text-fg-muted">إلغاء</button>
+        </div>
+      )}
+
+      {addMode === 'manual' && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg">إضافة موظف جديد</h3>
-          <p className="text-xs text-fg-subtle -mt-2">حدد إيميل وباسورد للموظف، وهيقدر يدخل بيهم على طول (أو بجوجل بنفس الإيميل).</p>
+          <h3 className="text-sm font-semibold text-fg">إضافة موظف يدوي</h3>
+          <p className="text-xs text-fg-subtle -mt-2">حدد إيميل وباسورد للموظف، وهيقدر يدخل بيهم على طول.</p>
           <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <InputField label="البريد الإلكتروني" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" />
           <InputField label="الباسورد" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" />
@@ -178,7 +270,40 @@ function AgentsTab() {
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
               {loading ? 'جاري الإضافة...' : 'إضافة الموظف'}
             </button>
-            <button onClick={() => setShowAdd(false)}
+            <button onClick={() => setAddMode('closed')}
+              className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
+      {addMode === 'invite' && (
+        <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+          <h3 className="text-sm font-semibold text-fg">دعوة موظف عبر الإيميل</h3>
+          <p className="text-xs text-fg-subtle -mt-2">هيوصله إيميل فيه رابط، يدخل عليه ويحط باسورد لنفسه.</p>
+          <InputField label="الاسم" value={inviteForm.name} onChange={v => setInviteForm({ ...inviteForm, name: v })} />
+          <InputField label="البريد الإلكتروني" value={inviteForm.email} onChange={v => setInviteForm({ ...inviteForm, email: v })} type="email" />
+          <div>
+            <label className="block text-xs text-fg-muted mb-1">الدور</label>
+            <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+              <option value="agent">موظف</option>
+              <option value="admin">مدير</option>
+            </select>
+          </div>
+          <MaxConversationsField value={inviteForm.max_conversations} onChange={v => setInviteForm({ ...inviteForm, max_conversations: v })} />
+          <Toggle
+            label="يرى جميع المحادثات"
+            value={inviteForm.can_see_all_conversations}
+            onChange={v => setInviteForm({ ...inviteForm, can_see_all_conversations: v })}
+          />
+          <div className="flex gap-2 pt-1">
+            <button onClick={inviteAgent} disabled={loading}
+              className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
+              {loading ? 'جاري الإرسال...' : 'ابعت الدعوة'}
+            </button>
+            <button onClick={() => setAddMode('closed')}
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
               إلغاء
             </button>
@@ -188,10 +313,61 @@ function AgentsTab() {
 
       {agents.map(ag => (
         <AgentCard key={ag.id} agent={ag} counts={counts[ag.id]}
-          onEdit={() => setEditId(ag.id)} onDelete={() => deleteAgent(ag.id)}
+          onEdit={() => setEditId(ag.id)} onDelete={() => confirmDeleteAgent(ag)}
           onUpdate={updates => updateAgent(ag.id, updates)}
           editing={editId === ag.id} />
       ))}
+
+      {deleteTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !reassigning && setDeleteTarget(null)}>
+          <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="px-4 py-3.5 border-b border-surface-3">
+              <span className="font-semibold text-fg text-sm">حذف {deleteTarget.agent.name}</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-fg-muted">
+                الموظف ده معاه <b className="text-fg">{deleteTarget.convCount}</b> محادثة مفتوحة/متابعة. اختار هتروح فين قبل الحذف:
+              </p>
+              <div className="space-y-2">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={reassignMode === 'specific'} onChange={() => setReassignMode('specific')} />
+                  <span className="text-sm text-fg">حولهم كلهم لموظف معين</span>
+                </label>
+                {reassignMode === 'specific' && (
+                  <div className="pr-6">
+                    <select value={reassignToId} onChange={e => setReassignToId(e.target.value)}
+                      className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+                      <option value="">— اختار موظف —</option>
+                      {agents.filter(a => a.id !== deleteTarget.agent.id).map(a => (
+                        <option key={a.id} value={a.id}>{a.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={reassignMode === 'all'} onChange={() => setReassignMode('all')} />
+                  <span className="text-sm text-fg">وزعهم بالتساوي على كل الموظفين (أونلاين أو أوفلاين)</span>
+                </label>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input type="radio" checked={reassignMode === 'online'} onChange={() => setReassignMode('online')} />
+                  <span className="text-sm text-fg">وزعهم على الموظفين الأونلاين بس</span>
+                </label>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-surface-3">
+              <button onClick={() => setDeleteTarget(null)} disabled={reassigning}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                إلغاء
+              </button>
+              <button onClick={finalizeDeleteWithReassign} disabled={reassigning}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {reassigning ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'وزّع واحذف'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -697,6 +873,8 @@ function LifecycleTab() {
   const [stages, setStages] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', color: '#3B82F6' })
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
 
   useEffect(() => { loadStages() }, [])
   const loadStages = async () => {
@@ -714,6 +892,14 @@ function LifecycleTab() {
   const remove = async (id) => {
     if (!confirm('حذف المرحلة؟')) return
     await supabase.from('lifecycle_stages').delete().eq('id', id)
+    loadStages()
+  }
+
+  const startEdit = (s) => { setEditingId(s.id); setEditName(s.name) }
+  const saveEdit = async () => {
+    if (!editName.trim()) return
+    await supabase.from('lifecycle_stages').update({ name: editName.trim() }).eq('id', editingId)
+    setEditingId(null)
     loadStages()
   }
 
@@ -748,11 +934,24 @@ function LifecycleTab() {
       {stages.map((s, i) => (
         <div key={s.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
-          <span className="flex-1 text-sm text-fg">{s.name}</span>
-          <span className="text-xs text-fg-subtle">#{i + 1}</span>
-          <button onClick={() => remove(s.id)} className="text-fg-muted hover:text-danger">
-            <Trash2 size={14} />
-          </button>
+          {editingId === s.id ? (
+            <>
+              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
+              <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-sm text-fg">{s.name}</span>
+              <span className="text-xs text-fg-subtle">#{i + 1}</span>
+              <button onClick={() => startEdit(s)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+              <button onClick={() => remove(s.id)} className="text-fg-muted hover:text-danger">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -766,6 +965,8 @@ function TagsTab() {
   const [tags, setTags] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', color: '#6366F1' })
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
   const toast = useToast()
 
   useEffect(() => { loadTags() }, [])
@@ -787,6 +988,15 @@ function TagsTab() {
     if (!confirm('حذف التاج ده؟ هيتشال من كل العملاء اللي حاططينه.')) return
     await supabase.from('contact_tags').delete().eq('tag_id', id)
     await supabase.from('tags').delete().eq('id', id)
+    loadTags()
+  }
+
+  const startEdit = (t) => { setEditingId(t.id); setEditName(t.name) }
+  const saveEdit = async () => {
+    if (!editName.trim()) return
+    const { error } = await supabase.from('tags').update({ name: editName.trim() }).eq('id', editingId)
+    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    setEditingId(null)
     loadTags()
   }
 
@@ -821,10 +1031,23 @@ function TagsTab() {
       {tags.map(t => (
         <div key={t.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color }} />
-          <span className="flex-1 text-sm text-fg">{t.name}</span>
-          <button onClick={() => remove(t.id)} className="text-fg-muted hover:text-danger">
-            <Trash2 size={14} />
-          </button>
+          {editingId === t.id ? (
+            <>
+              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
+              <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+            </>
+          ) : (
+            <>
+              <span className="flex-1 text-sm text-fg">{t.name}</span>
+              <button onClick={() => startEdit(t)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+              <button onClick={() => remove(t.id)} className="text-fg-muted hover:text-danger">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       ))}
       {tags.length === 0 && !showAdd && (
@@ -839,6 +1062,8 @@ function FieldsTab() {
   const [fields, setFields] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', field_type: 'text', options: '' })
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
 
   useEffect(() => { loadFields() }, [])
   const loadFields = async () => {
@@ -864,6 +1089,14 @@ function FieldsTab() {
   const remove = async (id) => {
     if (!confirm('حذف الحقل؟')) return
     await supabase.from('custom_field_definitions').delete().eq('id', id)
+    loadFields()
+  }
+
+  const startEdit = (f) => { setEditingId(f.id); setEditName(f.name) }
+  const saveEdit = async () => {
+    if (!editName.trim()) return
+    await supabase.from('custom_field_definitions').update({ name: editName.trim() }).eq('id', editingId)
+    setEditingId(null)
     loadFields()
   }
 
@@ -901,14 +1134,27 @@ function FieldsTab() {
 
       {fields.map(f => (
         <div key={f.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
-          <div className="flex-1">
-            <p className="text-sm text-fg font-medium">{f.name}</p>
-            <p className="text-xs text-fg-muted">{TYPES[f.field_type]}</p>
-            {f.options?.choices && <p className="text-xs text-fg-subtle mt-0.5">{f.options.choices.join(' · ')}</p>}
-          </div>
-          <button onClick={() => remove(f.id)} className="text-fg-muted hover:text-danger">
-            <Trash2 size={14} />
-          </button>
+          {editingId === f.id ? (
+            <>
+              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
+              <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+            </>
+          ) : (
+            <>
+              <div className="flex-1">
+                <p className="text-sm text-fg font-medium">{f.name}</p>
+                <p className="text-xs text-fg-muted">{TYPES[f.field_type]}</p>
+                {f.options?.choices && <p className="text-xs text-fg-subtle mt-0.5">{f.options.choices.join(' · ')}</p>}
+              </div>
+              <button onClick={() => startEdit(f)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+              <button onClick={() => remove(f.id)} className="text-fg-muted hover:text-danger">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       ))}
     </div>
@@ -924,6 +1170,8 @@ function QuickRepliesTab({ agent }) {
   const [form, setForm] = useState({ name: '', text: '' })
   const [file, setFile] = useState(null)
   const [saving, setSaving] = useState(false)
+  const [editingId, setEditingId] = useState(null)
+  const [editName, setEditName] = useState('')
 
   useEffect(() => { load() }, [])
   const load = async () => {
@@ -967,6 +1215,15 @@ function QuickRepliesTab({ agent }) {
   const remove = async (id) => {
     if (!confirm('حذف الرد السريع؟')) return
     await supabase.from('quick_replies').delete().eq('id', id)
+    load()
+  }
+
+  const startEdit = (qr) => { setEditingId(qr.id); setEditName(qr.name) }
+  const saveEdit = async () => {
+    if (!editName.trim()) return
+    const { error } = await supabase.from('quick_replies').update({ name: editName.trim() }).eq('id', editingId)
+    if (error) { toast.error('الاسم ده مستخدم بالفعل أو حصل خطأ'); return }
+    setEditingId(null)
     load()
   }
 
@@ -1020,13 +1277,26 @@ function QuickRepliesTab({ agent }) {
           <div className="w-9 h-9 rounded-lg bg-surface-3 flex items-center justify-center flex-shrink-0 text-sm">
             {qr.file_type === 'image' ? '🖼️' : qr.file_type === 'video' ? '🎥' : qr.file_type === 'audio' ? '🎵' : qr.file_url ? '📎' : '💬'}
           </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-fg font-medium">/{qr.name}</p>
-            {qr.text && <p className="text-xs text-fg-muted truncate">{qr.text}</p>}
-          </div>
-          <button onClick={() => remove(qr.id)} className="text-fg-muted hover:text-danger flex-shrink-0">
-            <Trash2 size={14} />
-          </button>
+          {editingId === qr.id ? (
+            <>
+              <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
+                onKeyDown={e => e.key === 'Enter' && saveEdit()}
+                className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              <button onClick={saveEdit} className="text-success hover:brightness-110 flex-shrink-0"><Check size={16} /></button>
+              <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg flex-shrink-0"><X size={16} /></button>
+            </>
+          ) : (
+            <>
+              <div className="flex-1 min-w-0">
+                <p className="text-sm text-fg font-medium">/{qr.name}</p>
+                {qr.text && <p className="text-xs text-fg-muted truncate">{qr.text}</p>}
+              </div>
+              <button onClick={() => startEdit(qr)} className="text-fg-muted hover:text-brand flex-shrink-0"><Edit2 size={14} /></button>
+              <button onClick={() => remove(qr.id)} className="text-fg-muted hover:text-danger flex-shrink-0">
+                <Trash2 size={14} />
+              </button>
+            </>
+          )}
         </div>
       ))}
       {filtered.length === 0 && (

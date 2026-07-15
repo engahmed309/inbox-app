@@ -7,7 +7,7 @@ import ContactSidebar from '../components/ContactSidebar'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -110,6 +110,10 @@ export default function ChatScreen() {
   const [recordSeconds, setRecordSeconds] = useState(0)
   const [pendingFile, setPendingFile] = useState(null) // { file, url, previewUrl, type, name }
   const [lightbox, setLightbox] = useState(null) // { type: 'image'|'video', url }
+  const [showAttachMenu, setShowAttachMenu] = useState(false)
+  const [showLibraryModal, setShowLibraryModal] = useState(false)
+  const [libraryItems, setLibraryItems] = useState([])
+  const [librarySearch, setLibrarySearch] = useState('')
 
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -597,6 +601,29 @@ export default function ChatScreen() {
     setPendingFile(null)
   }
 
+  // ─── مكتبة الملفات (ملفات الردود السريعة بس — صور/فيديو/PDF، من غير الردود النصية) ─────────────
+  const openLibrary = async () => {
+    setShowAttachMenu(false)
+    setShowLibraryModal(true)
+    const { data } = await supabase
+      .from('quick_replies')
+      .select('*')
+      .not('file_url', 'is', null)
+      .in('file_type', ['image', 'video', 'file'])
+      .order('name')
+    setLibraryItems(data || [])
+  }
+
+  const pickFromLibrary = (item) => {
+    setPendingFile({ file: null, url: item.file_url, previewUrl: item.file_url, type: item.file_type, name: item.name })
+    setShowLibraryModal(false)
+  }
+
+  const filteredLibraryItems = useMemo(() => {
+    const q = librarySearch.toLowerCase()
+    return libraryItems.filter(i => !q || i.name.toLowerCase().includes(q))
+  }, [libraryItems, librarySearch])
+
   // ─── تسجيل الرسائل الصوتية ─────────────────────────────
   // بنسجل WebM دايماً (الصيغة الأوثق دعماً من كل المتصفحات)، وتحويلها لصيغة
   // متوافقة مع إنستجرام (m4a) بيتم على السيرفر وقت الإرسال
@@ -982,10 +1009,24 @@ export default function ChatScreen() {
             <div className="flex items-end gap-2">
               <input type="file" ref={fileInputRef} onChange={handleFile} className="hidden"
                 accept="image/*,video/*,audio/*,.pdf,.doc,.docx" />
-              <button onClick={() => fileInputRef.current?.click()}
-                className="w-10 h-10 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
-                <Paperclip size={18} />
-              </button>
+              <div className="relative flex-shrink-0">
+                <button onClick={() => setShowAttachMenu(v => !v)}
+                  className="w-10 h-10 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
+                  <Paperclip size={18} />
+                </button>
+                {showAttachMenu && (
+                  <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden">
+                    <button onClick={openLibrary}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      <FolderOpen size={14} className="text-fg-muted" /> من المكتبة
+                    </button>
+                    <button onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click() }}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      <Paperclip size={14} className="text-fg-muted" /> من الجهاز
+                    </button>
+                  </div>
+                )}
+              </div>
               <textarea
                 ref={textareaRef}
                 value={text}
@@ -1028,6 +1069,49 @@ export default function ChatScreen() {
       )}
 
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+
+      {showLibraryModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => setShowLibraryModal(false)}>
+          <div className="w-full max-w-md h-[70vh] bg-surface-2 rounded-2xl shadow-2xl overflow-hidden flex flex-col" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-3 flex-shrink-0">
+              <div className="flex items-center gap-2">
+                <FolderOpen size={16} className="text-brand" />
+                <span className="font-semibold text-fg text-sm">مكتبة الملفات</span>
+              </div>
+              <button onClick={() => setShowLibraryModal(false)} className="text-fg-muted hover:text-fg"><X size={18} /></button>
+            </div>
+            <div className="p-3 border-b border-surface-3 flex-shrink-0">
+              <div className="relative">
+                <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <input autoFocus value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
+                  placeholder="دور على ملف..."
+                  className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2 content-start">
+              {filteredLibraryItems.map(item => (
+                <button key={item.id} onClick={() => pickFromLibrary(item)}
+                  className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-surface-3 transition-colors">
+                  {item.file_type === 'image' ? (
+                    <img src={item.file_url} className="w-full aspect-square rounded-lg object-cover bg-surface-3" alt="" />
+                  ) : (
+                    <div className="w-full aspect-square rounded-lg bg-surface-3 flex items-center justify-center text-2xl">
+                      {item.file_type === 'video' ? '🎥' : '📎'}
+                    </div>
+                  )}
+                  <span className="text-xs text-fg-muted truncate w-full text-center">{item.name}</span>
+                </button>
+              ))}
+              {filteredLibraryItems.length === 0 && (
+                <p className="col-span-3 text-center text-fg-subtle text-sm py-8">
+                  مفيش ملفات في المكتبة — ضيف ملفات من الإعدادات → الردود السريعة
+                </p>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
 
       {showFollowUpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"

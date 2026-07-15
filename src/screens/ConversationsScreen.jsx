@@ -420,8 +420,9 @@ export default function ConversationsScreen() {
         query = query.eq('platform', cf.platform)
         if (cf.channelId) query = query.eq('channel_id', cf.channelId)
       }
-      if (!canSeeAll) query = query.eq('assigned_agent_id', agent?.id)
-      else if (agentFilter === 'unassigned') query = query.is('assigned_agent_id', null)
+      // البحث مش زي القائمة العادية — بيدور في كل المحادثات حتى المتعينة لموظفين تانيين، عشان لو
+      // موظف دوّر على شات مع زميله يلاقيه في النتايج (بس معلّم باسم الموظف صاحبه)، ويقدر يطلب نقله له
+      if (agentFilter === 'unassigned') query = query.is('assigned_agent_id', null)
       else if (agentFilter) query = query.eq('assigned_agent_id', agentFilter)
       else if (viewMode === 'mine') query = query.eq('assigned_agent_id', agent?.id)
 
@@ -464,6 +465,23 @@ export default function ConversationsScreen() {
       setLoading(false)
     }
   }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll])
+
+  // لو موظف لقى في نتايج البحث محادثة متعينة لزميله، بدل ما يفتحها على طول بيبعت طلب نقل —
+  // بيوصل إشعار لصاحب المحادثة وهو يقبل أو يرفض
+  const requestTransfer = async (conv) => {
+    try {
+      const res = await fetch(`${API_URL}/notifications/transfer-request`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conv.id, from_agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل إرسال الطلب')
+      toast.success('اتبعت طلب النقل، مستنيين رد الموظف')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    }
+  }
 
   // بحث بتأخير بسيط (debounce) عشان منضربش الداتابيز بكويري مع كل حرف بيتكتب — ولو البحث اتمسح
   // نرجع للقائمة العادية (المفلترة/المقسمة صفحات) تاني
@@ -942,6 +960,8 @@ export default function ConversationsScreen() {
                   selected={selectedIds.has(conv.id)}
                   onToggleSelect={() => toggleSelect(conv.id)}
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
+                  isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id}
+                  onRequestTransfer={() => requestTransfer(conv)}
                 />
               ))}
               {conversations.length >= visibleLimit && (
@@ -1039,7 +1059,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick }) {
+function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer }) {
   const contact = conv.contacts
 
   const lastMsgText = lastMsg
@@ -1051,6 +1071,31 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         : '📎 ملف'
       : (lastMsg.direction === 'outbound' ? '↩ ' : '') + (lastMsg.content || '')
     : ''
+
+  // المحادثة دي مش بتاعة الموظف الحالي — ظهرت في نتايج البحث بس، مش هيقدر يفتحها، بس يقدر يطلب نقلها له
+  if (isForeign) {
+    return (
+      <div className="w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3">
+        <div className="relative flex-shrink-0 opacity-60">
+          {contact?.profile_pic ? (
+            <img src={contact.profile_pic} alt="" className="w-12 h-12 rounded-full object-cover bg-surface-3" />
+          ) : (
+            <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center text-fg font-semibold text-lg">
+              {contact?.name?.[0]?.toUpperCase() || '?'}
+            </div>
+          )}
+        </div>
+        <div className="flex-1 min-w-0">
+          <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+          <p className="text-xs text-fg-subtle truncate">مع: {assignedAgent?.name || 'موظف تاني'}</p>
+        </div>
+        <button onClick={onRequestTransfer}
+          className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors">
+          اطلب النقل
+        </button>
+      </div>
+    )
+  }
 
   return (
     <button onClick={onClick}
