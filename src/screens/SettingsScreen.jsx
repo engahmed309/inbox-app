@@ -360,7 +360,7 @@ function ConnectedChannelsList() {
   }
 
   const disconnectChannel = async (ch) => {
-    if (!confirm(`فصل ${PLATFORM_META[ch.platform].label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
+    if (!confirm(`فصل ${ch.custom_name || ch.display_name || PLATFORM_META[ch.platform].label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
     setDeletingId(ch.id)
     try {
       const res = await fetch(`${API_URL}/channels/${ch.id}`, { method: 'DELETE' })
@@ -372,6 +372,23 @@ function ConnectedChannelsList() {
       toast.error('خطأ: ' + err.message)
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const renameChannel = async (ch) => {
+    const name = prompt('اسم مختصر للقناة دي (سيبه فاضي عشان تلغي التسمية):', ch.custom_name || '')
+    if (name === null) return
+    try {
+      const res = await fetch(`${API_URL}/channels/${ch.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_name: name.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل التسمية')
+      toast.success('اتسمّت القناة')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
     }
   }
 
@@ -390,11 +407,13 @@ function ConnectedChannelsList() {
   return (
     <div className="space-y-3 pt-1">
       {['facebook', 'instagram', 'whatsapp'].map(platform => {
-        const ch = channels.find(c => c.platform === platform)
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        return (
-          <div key={platform} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+        // فيسبوك وانستجرام لسه رقم واحد بس، بس الواتساب ممكن يكون فيه أكتر من رقم مربوط
+        const rows = channels.filter(c => c.platform === platform)
+        const list = rows.length > 0 ? rows : [null]
+        return list.map((ch, i) => (
+          <div key={ch?.id || `${platform}-${i}`} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
             <div className="flex items-center gap-3">
               {ch?.avatar_url ? (
                 <img src={ch.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover bg-surface-3"
@@ -406,7 +425,7 @@ function ConnectedChannelsList() {
               )}
               <div className="flex-1 min-w-0">
                 <p className="text-sm text-fg font-semibold flex items-center gap-1.5">
-                  <Icon size={12} className={meta.color} /> {meta.label}
+                  <Icon size={12} className={meta.color} /> {ch?.custom_name || meta.label}
                 </p>
                 <p className="text-xs text-fg-muted truncate">{ch?.display_name || 'مش مربوطة'}</p>
               </div>
@@ -424,22 +443,28 @@ function ConnectedChannelsList() {
                 </span>
               )}
               {ch?.id && (
-                <button onClick={() => disconnectChannel(ch)} disabled={deletingId === ch.id}
-                  title="فصل القناة"
-                  className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
-                  {deletingId === ch.id ? (
-                    <div className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <Trash2 size={14} />
-                  )}
-                </button>
+                <>
+                  <button onClick={() => renameChannel(ch)} title="سمّي القناة"
+                    className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-fg rounded-lg hover:bg-surface-3 flex-shrink-0">
+                    <Edit2 size={13} />
+                  </button>
+                  <button onClick={() => disconnectChannel(ch)} disabled={deletingId === ch.id}
+                    title="فصل القناة"
+                    className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
+                    {deletingId === ch.id ? (
+                      <div className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 size={14} />
+                    )}
+                  </button>
+                </>
               )}
             </div>
             {ch?.status_reason && (
               <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
             )}
           </div>
-        )
+        ))
       })}
     </div>
   )

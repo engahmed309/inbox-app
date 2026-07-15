@@ -320,7 +320,11 @@ export default function ChatScreen() {
         const res = await fetch(`${API_URL}/channels`)
         const data = await res.json()
         if (cancelled) return
-        const ch = data.channels?.find(c => c.platform === conv.platform)
+        // لو المحادثة دي مرتبطة برقم/قناة معينة، اتأكد من القناة دي بالظبط (مش أي قناة من نفس المنصة)
+        const platformChannels = data.channels?.filter(c => c.platform === conv.platform) || []
+        const ch = conv.channel_id
+          ? platformChannels.find(c => c.id === conv.channel_id)
+          : platformChannels[0]
         setChannelActive(ch?.status === 'active')
       } catch {
         // لو فشل الفحص نفسه (مشكلة شبكة مثلاً)، منقفلش المربع بناءً على معلومة مش أكيدة

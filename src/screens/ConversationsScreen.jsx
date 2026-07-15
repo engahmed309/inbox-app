@@ -34,6 +34,14 @@ const PLATFORM_ICONS = {
   whatsapp: <Phone size={12} className="text-green-400" />,
 }
 
+// لو فيه أكتر من رقم واتساب مربوط، مفتاح الفلتر بيبقى "whatsapp:<channel_id>" بدل "whatsapp" بس،
+// عشان نقدر نفلتر بمحادثات رقم بعينه لا كل أرقام الواتساب مع بعض
+function parseChannelFilter(channel) {
+  if (channel === 'all') return null
+  if (channel.startsWith('whatsapp:')) return { platform: 'whatsapp', channelId: channel.slice(9) }
+  return { platform: channel, channelId: null }
+}
+
 function AgentAvatar({ agent, size = 22 }) {
   const [broken, setBroken] = useState(false)
   const name = agent?.name || agent?.full_name || ''
@@ -118,7 +126,7 @@ const screenCache = {
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
   lifecycleCounts: {}, tags: [], lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
-  agentOpenCounts: {}, unassignedOpenCount: 0,
+  agentOpenCounts: {}, unassignedOpenCount: 0, waChannels: [],
 }
 
 export default function ConversationsScreen() {
@@ -144,6 +152,7 @@ export default function ConversationsScreen() {
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
   const [agentOpenCounts, setAgentOpenCounts] = useState(screenCache.agentOpenCounts) // { agent_id: عدد المحادثات المفتوحة المعينة له }
   const [unassignedOpenCount, setUnassignedOpenCount] = useState(screenCache.unassignedOpenCount)
+  const [waChannels, setWaChannels] = useState(screenCache.waChannels) // أرقام الواتساب المتربطة كلها (لو أكتر من واحد)
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
@@ -163,6 +172,19 @@ export default function ConversationsScreen() {
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
 
+  // لو رقم واتساب واحد بس متربط (أو مفيش)، سيب تاب "واتساب" العادي زي ما هو. لو أكتر من رقم،
+  // بدّل التاب الواحد بتاب منفصل لكل رقم عشان محادثات كل رقم تفضل منفصلة عن التاني
+  const channelTabs = waChannels.length > 1
+    ? [
+        ...CHANNELS.filter(c => c.key !== 'whatsapp'),
+        ...waChannels.map(wc => ({
+          key: `whatsapp:${wc.id}`,
+          label: wc.custom_name || wc.display_name || 'واتساب',
+          icon: <Phone size={12} className="text-green-400" />
+        }))
+      ]
+    : CHANNELS
+
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
   const fetchStaticLists = useCallback(async () => {
@@ -177,6 +199,14 @@ export default function ConversationsScreen() {
 
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
     setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
+
+    // أرقام الواتساب المتربطة (ممكن يكون أكتر من واحد) — عشان نعرض تاب منفصل لكل رقم بدل ما يترصوا فوق بعض
+    try {
+      const res = await fetch(`${API_URL}/channels`)
+      const data = await res.json()
+      const wa = (data.channels || []).filter(c => c.platform === 'whatsapp' && c.id)
+      setWaChannels(wa); screenCache.waChannels = wa
+    } catch { /* لو فشل، هيفضل تاب "واتساب" العادي شغال زي ما هو */ }
   }, [])
 
   const fetchConversations = useCallback(async () => {
@@ -194,7 +224,11 @@ export default function ConversationsScreen() {
 
     // فلاتر القناة/الموظف بس (من غير تاج/lifecycle) — مستخدمة في عدادات الـ lifecycle نفسها
     const applyBaseScope = (q) => {
-      if (channel !== 'all') q = q.eq('platform', channel)
+      const cf = parseChannelFilter(channel)
+      if (cf) {
+        q = q.eq('platform', cf.platform)
+        if (cf.channelId) q = q.eq('channel_id', cf.channelId)
+      }
       if (!canSeeAll) {
         q = q.eq('assigned_agent_id', agent?.id)
       } else if (agentFilter === 'unassigned') {
@@ -230,7 +264,11 @@ export default function ConversationsScreen() {
     // نفسه، عشان نقدر نقارن كل الموظفين مع بعض في قائمة الفلتر
     if (canSeeAll) {
       let agentCountQuery = supabase.from('conversations').select('assigned_agent_id').eq('status', 'open')
-      if (channel !== 'all') agentCountQuery = agentCountQuery.eq('platform', channel)
+      const cf = parseChannelFilter(channel)
+      if (cf) {
+        agentCountQuery = agentCountQuery.eq('platform', cf.platform)
+        if (cf.channelId) agentCountQuery = agentCountQuery.eq('channel_id', cf.channelId)
+      }
       const { data: agentCountData } = await agentCountQuery
       const aCounts = {}
       let unassigned = 0
@@ -768,7 +806,7 @@ export default function ConversationsScreen() {
 
         {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض */}
         <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
-          {CHANNELS.map(ch => (
+          {channelTabs.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
               {ch.icon}
