@@ -7,7 +7,7 @@ import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog, ChevronUp, ChevronDown
+  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText
 } from 'lucide-react'
 
 const TABS = [
@@ -18,6 +18,7 @@ const TABS = [
   { key: 'fields', label: 'الحقول', icon: List },
   { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
   { key: 'roundrobin', label: 'التوزيع', icon: Settings2 },
+  { key: 'ai', label: 'AI Agent', icon: Bot },
   { key: 'danger', label: 'منطقة خطرة', icon: AlertTriangle },
 ]
 
@@ -65,6 +66,7 @@ export default function SettingsScreen() {
         {tab === 'fields' && <FieldsTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
         {tab === 'roundrobin' && <RoundRobinTab />}
+        {tab === 'ai' && <AiAgentTab />}
         {tab === 'danger' && <DangerZoneTab />}
       </div>
     </div>
@@ -1411,6 +1413,217 @@ function RoundRobinTab() {
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
           {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
         </button>
+      </div>
+    </div>
+  )
+}
+
+// ─── AI Agent Tab ─────────────────────────────────────────
+const AI_MODELS = [
+  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — سريع ورخيص (موصى به)' },
+  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 — أقوى وأغلى' },
+  { value: 'gpt-4o-mini', label: 'GPT-4o mini' },
+]
+
+function AiAgentTab() {
+  const toast = useToast()
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [sources, setSources] = useState([])
+  const [showAddSource, setShowAddSource] = useState(false)
+  const [sourceForm, setSourceForm] = useState({ type: 'text', title: '', content: '', url: '' })
+  const [usage, setUsage] = useState({ tokens: 0, cost: 0 })
+
+  useEffect(() => { load() }, [])
+
+  const load = async () => {
+    setLoading(true)
+    const [{ data: s }, { data: src }, { data: usageRows }] = await Promise.all([
+      supabase.from('ai_settings').select('*').limit(1).single(),
+      supabase.from('ai_knowledge_sources').select('*').order('created_at', { ascending: false }),
+      supabase.from('ai_usage_log').select('input_tokens, output_tokens, cost_usd')
+        .gte('day', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
+    ])
+    setSettings(s)
+    setSources(src || [])
+    const tokens = (usageRows || []).reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0)
+    const cost = (usageRows || []).reduce((sum, r) => sum + Number(r.cost_usd), 0)
+    setUsage({ tokens, cost })
+    setLoading(false)
+  }
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const { id, updated_at, ...updates } = settings
+      const { error } = await supabase.from('ai_settings').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
+      if (error) throw error
+      toast.success('اتحفظت الإعدادات')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const addSource = async () => {
+    if (!sourceForm.title.trim()) { toast.error('لازم عنوان للمصدر'); return }
+    if (sourceForm.type === 'text' && !sourceForm.content.trim()) { toast.error('لازم تكتب المحتوى'); return }
+    if (sourceForm.type === 'link' && !sourceForm.url.trim()) { toast.error('لازم تحط الرابط'); return }
+    const { error } = await supabase.from('ai_knowledge_sources').insert({
+      type: sourceForm.type,
+      title: sourceForm.title.trim(),
+      content: sourceForm.type === 'text' ? sourceForm.content.trim() : null,
+      url: sourceForm.type === 'link' ? sourceForm.url.trim() : null
+    })
+    if (error) { toast.error('خطأ: ' + error.message); return }
+    setSourceForm({ type: 'text', title: '', content: '', url: '' })
+    setShowAddSource(false)
+    load()
+  }
+
+  const removeSource = async (id) => {
+    if (!confirm('حذف المصدر ده؟')) return
+    await supabase.from('ai_knowledge_sources').delete().eq('id', id)
+    load()
+  }
+
+  if (loading || !settings) return (
+    <div className="flex items-center justify-center h-32">
+      <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+    </div>
+  )
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-fg flex items-center gap-2"><Bot size={18} /> AI Agent</h2>
+        <button onClick={save} disabled={saving}
+          className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium disabled:opacity-60">
+          <Save size={14} /> {saving ? 'جاري الحفظ...' : 'حفظ'}
+        </button>
+      </div>
+
+      {/* تفعيل + الموديل */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <Toggle
+          label="تفعيل AI Agent"
+          sublabel="لو مفعّل، هيقدر يرد على العملاء تلقائي حسب الصلاحيات تحت"
+          value={settings.enabled}
+          onChange={v => setSettings({ ...settings, enabled: v })}
+        />
+        <div>
+          <label className="block text-xs text-fg-muted mb-1">الموديل</label>
+          <select value={settings.model} onChange={e => setSettings({ ...settings, model: e.target.value })}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+            {AI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+          </select>
+        </div>
+      </div>
+
+      {/* التعليمات */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-2 border border-surface-3">
+        <label className="block text-xs text-fg-muted">التعليمات (System Prompt)</label>
+        <textarea
+          value={settings.system_prompt || ''}
+          onChange={e => setSettings({ ...settings, system_prompt: e.target.value })}
+          rows={8}
+          placeholder="اكتب هنا إزاي عايز الـ AI يتصرف، معلومات عن العيادة، الأسعار، السياسات، وأهم حاجة: يمنع تماماً إعطاء أي استشارة أو تشخيص طبي ويحوّل أي سؤال طبي لموظف بشري فوراً."
+          className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-y leading-relaxed"
+        />
+      </div>
+
+      {/* الصلاحيات */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <h3 className="text-sm font-semibold text-fg">الصلاحيات المسموحة للـ AI</h3>
+        <Toggle label="تعيين المحادثات لموظف (assign)" value={settings.can_assign} onChange={v => setSettings({ ...settings, can_assign: v })} />
+        <Toggle label="تعديل مرحلة الـ Lifecycle" value={settings.can_update_lifecycle} onChange={v => setSettings({ ...settings, can_update_lifecycle: v })} />
+        <Toggle label="تعديل بيانات العميل (اسم، رقم تليفون، إلخ)" value={settings.can_update_contact} onChange={v => setSettings({ ...settings, can_update_contact: v })} />
+        <Toggle label="إضافة/تعديل تاجات العميل" value={settings.can_update_tags} onChange={v => setSettings({ ...settings, can_update_tags: v })} />
+      </div>
+
+      {/* سقف الاستهلاك */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <MaxConversationsField
+          value={settings.monthly_token_budget}
+          onChange={v => setSettings({ ...settings, monthly_token_budget: v })}
+        />
+        <p className="text-[11px] text-fg-subtle -mt-2">لو حطيت سقف، الـ AI هيتوقف تلقائي لو الاستهلاك الشهري وصله (هتوصلك رسالة تنبيه).</p>
+      </div>
+
+      {/* استهلاك الشهر الحالي */}
+      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+        <h3 className="text-sm font-semibold text-fg mb-2">استهلاك الشهر الحالي</h3>
+        {usage.tokens === 0 ? (
+          <p className="text-xs text-fg-subtle">لسه مفيش استهلاك مسجل — محرك الـ AI لسه في مرحلة الإعداد</p>
+        ) : (
+          <div className="flex gap-4">
+            <div>
+              <p className="text-lg font-bold text-fg">{usage.tokens.toLocaleString()}</p>
+              <p className="text-[11px] text-fg-subtle">توكن</p>
+            </div>
+            <div>
+              <p className="text-lg font-bold text-fg">${usage.cost.toFixed(2)}</p>
+              <p className="text-[11px] text-fg-subtle">تكلفة تقريبية</p>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Knowledge Base */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <div className="flex items-center justify-between">
+          <h3 className="text-sm font-semibold text-fg flex items-center gap-2"><BookOpen size={15} /> مصادر المعرفة</h3>
+          <button onClick={() => setShowAddSource(!showAddSource)}
+            className="flex items-center gap-1.5 px-2.5 py-1.5 bg-brand rounded-lg text-[11px] text-white font-medium">
+            <Plus size={12} /> إضافة
+          </button>
+        </div>
+        <p className="text-[11px] text-fg-subtle -mt-2">نصوص أو روابط (زي landing page) هيتعلم منها الـ AI معلومات عن العيادة</p>
+
+        {showAddSource && (
+          <div className="bg-surface-3 rounded-xl p-3 space-y-2.5">
+            <div className="flex gap-2">
+              <button onClick={() => setSourceForm({ ...sourceForm, type: 'text' })}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium ${sourceForm.type === 'text' ? 'bg-brand text-white' : 'bg-surface text-fg-muted'}`}>
+                <FileText size={13} /> نص
+              </button>
+              <button onClick={() => setSourceForm({ ...sourceForm, type: 'link' })}
+                className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium ${sourceForm.type === 'link' ? 'bg-brand text-white' : 'bg-surface text-fg-muted'}`}>
+                <Link2 size={13} /> رابط
+              </button>
+            </div>
+            <InputField label="العنوان" value={sourceForm.title} onChange={v => setSourceForm({ ...sourceForm, title: v })} placeholder="مثلاً: خدمات العيادة" />
+            {sourceForm.type === 'text' ? (
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">المحتوى</label>
+                <textarea value={sourceForm.content} onChange={e => setSourceForm({ ...sourceForm, content: e.target.value })}
+                  rows={5} className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-y" />
+              </div>
+            ) : (
+              <InputField label="الرابط" value={sourceForm.url} onChange={v => setSourceForm({ ...sourceForm, url: v })} placeholder="https://..." />
+            )}
+            <div className="flex gap-2">
+              <button onClick={addSource} className="flex-1 py-2 bg-brand rounded-lg text-xs text-white font-medium">إضافة</button>
+              <button onClick={() => setShowAddSource(false)} className="px-3 py-2 bg-surface rounded-lg text-xs text-fg-muted">إلغاء</button>
+            </div>
+          </div>
+        )}
+
+        {sources.map(s => (
+          <div key={s.id} className="flex items-center gap-2 bg-surface-3 rounded-lg px-3 py-2.5">
+            {s.type === 'link' ? <Link2 size={13} className="text-fg-muted flex-shrink-0" /> : <FileText size={13} className="text-fg-muted flex-shrink-0" />}
+            <div className="flex-1 min-w-0">
+              <p className="text-sm text-fg truncate">{s.title}</p>
+              {s.url && <p className="text-[11px] text-fg-subtle truncate">{s.url}</p>}
+            </div>
+            <button onClick={() => removeSource(s.id)} className="text-fg-muted hover:text-danger flex-shrink-0"><Trash2 size={13} /></button>
+          </div>
+        ))}
+        {sources.length === 0 && !showAddSource && (
+          <p className="text-center text-fg-subtle text-xs py-3">مفيش مصادر معرفة لسه</p>
+        )}
       </div>
     </div>
   )
