@@ -4,6 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
+import RequestAdminModal from '../components/RequestAdminModal'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
@@ -114,6 +115,7 @@ export default function ChatScreen() {
   const [showLibraryModal, setShowLibraryModal] = useState(false)
   const [libraryItems, setLibraryItems] = useState([])
   const [librarySearch, setLibrarySearch] = useState('')
+  const [showRequestModal, setShowRequestModal] = useState(false)
 
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -956,6 +958,12 @@ export default function ChatScreen() {
                 <p className="text-xs text-fg-subtle text-center py-4">مفيش ردود سريعة مطابقة</p>
               )}
             </div>
+            {agent?.role !== 'admin' && (
+              <button onClick={() => { setShowQuickReplies(false); setShowRequestModal(true) }}
+                className="flex items-center gap-1.5 justify-center w-full px-3 py-2 text-xs text-brand hover:bg-surface-3 border-t border-surface-3 flex-shrink-0">
+                <Send size={11} /> اطلب رد سريع جديد من الأدمن
+              </button>
+            )}
           </div>
         )}
 
@@ -1111,6 +1119,10 @@ export default function ChatScreen() {
             </div>
           </div>
         </div>
+      )}
+
+      {showRequestModal && (
+        <RequestAdminModal type="quick_reply" onClose={() => setShowRequestModal(false)} />
       )}
 
       {showFollowUpModal && (

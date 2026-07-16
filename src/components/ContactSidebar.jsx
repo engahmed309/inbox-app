@@ -4,7 +4,8 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
 import CountrySelect from './CountrySelect'
-import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2 } from 'lucide-react'
+import RequestAdminModal from './RequestAdminModal'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
 
@@ -28,6 +29,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const [saved, setSaved] = useState(false)
   const [allTags, setAllTags] = useState([])
   const [contactTags, setContactTags] = useState([])
+  const [requestModalType, setRequestModalType] = useState(null) // 'tag' | 'lifecycle' | null
 
   useEffect(() => {
     loadData()
@@ -230,6 +232,12 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
                 ))}
               </select>
             )}
+            {agent?.role !== 'admin' && (
+              <button onClick={() => setRequestModalType('tag')}
+                className="flex items-center gap-1.5 text-xs text-brand mt-1.5 hover:underline">
+                <Send size={11} /> اطلب تاج جديد من الأدمن
+              </button>
+            )}
           </div>
 
           {/* Lifecycle */}
@@ -250,6 +258,12 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: currentStage.color }} />
                 <span className="text-xs text-fg-muted">{currentStage.name}</span>
               </div>
+            )}
+            {agent?.role !== 'admin' && (
+              <button onClick={() => setRequestModalType('lifecycle')}
+                className="flex items-center gap-1.5 text-xs text-brand mt-1.5 hover:underline">
+                <Send size={11} /> اطلب مرحلة جديدة من الأدمن
+              </button>
             )}
           </div>
 
@@ -327,6 +341,10 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           </button>
         </div>
       </div>
+
+      {requestModalType && (
+        <RequestAdminModal type={requestModalType} onClose={() => setRequestModalType(null)} />
+      )}
     </div>
   )
 }

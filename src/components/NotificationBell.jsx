@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Bell, Check, X, UserPlus } from 'lucide-react'
+import { Bell, Check, X, UserPlus, Tag } from 'lucide-react'
 
 // جرس الإشعارات — ثابت فوق كل الشاشات بعد تسجيل الدخول. أول استخدام له طلبات نقل المحادثات
 // بين الموظفين، وممكن نضيفله أنواع تانية بعدين بنفس الشكل
@@ -57,7 +57,7 @@ export default function NotificationBell() {
 
   const openNotification = (n) => {
     markRead(n)
-    if (n.type !== 'transfer_request' && n.conversation_id) {
+    if (!['transfer_request', 'admin_request'].includes(n.type) && n.conversation_id) {
       setOpen(false)
       navigate(`/chat/${n.conversation_id}`)
     }
@@ -74,6 +74,25 @@ export default function NotificationBell() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'فشل الرد على الطلب')
       toast.success(accept ? 'اتحولتلّه المحادثة' : 'اترفض الطلب')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setBusyId(null)
+    }
+  }
+
+  const respondAdminRequest = async (n, accept) => {
+    setBusyId(n.id)
+    try {
+      const res = await fetch(`${API_URL}/admin-requests/${n.request_id}/respond`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accept, admin_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الرد على الطلب')
+      toast.success(accept ? 'اتضاف بنجاح' : 'اترفض الطلب')
       load()
     } catch (err) {
       toast.error('خطأ: ' + err.message)
@@ -107,7 +126,7 @@ export default function NotificationBell() {
               className={`px-4 py-3 border-b border-surface-3 last:border-0 cursor-pointer hover:bg-surface-3/40 transition-colors ${!n.is_read ? 'bg-brand/5' : ''}`}>
               <div className="flex items-start gap-2">
                 <div className="w-7 h-7 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  <UserPlus size={13} className="text-brand" />
+                  {n.type === 'admin_request' ? <Tag size={13} className="text-brand" /> : <UserPlus size={13} className="text-brand" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-fg font-medium">{n.title}</p>
@@ -126,10 +145,25 @@ export default function NotificationBell() {
                       </button>
                     </div>
                   )}
-                  {n.type === 'transfer_request' && n.action_status === 'accepted' && (
+                  {n.type === 'admin_request' && n.action_status === 'pending' && (
+                    <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                      <button onClick={() => respondAdminRequest(n, true)} disabled={busyId === n.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-success text-white disabled:opacity-50">
+                        <Check size={12} /> موافقة
+                      </button>
+                      <button onClick={() => respondAdminRequest(n, false)} disabled={busyId === n.id}
+                        className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted disabled:opacity-50">
+                        <X size={12} /> رفض
+                      </button>
+                    </div>
+                  )}
+                  {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'accepted' && (
                     <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">تمت الموافقة</span>
                   )}
-                  {n.type === 'transfer_request' && n.action_status === 'rejected' && (
+                  {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'approved' && (
+                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">تمت الموافقة</span>
+                  )}
+                  {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'rejected' && (
                     <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-danger/15 text-danger">اترفض</span>
                   )}
                 </div>
