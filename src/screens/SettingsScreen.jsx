@@ -1230,7 +1230,10 @@ function QuickRepliesTab({ agent }) {
     try {
       let file_url = null, file_type = null
       if (file) {
-        const path = `quick-replies/${Date.now()}_${file.name}`
+        // أسماء الملفات اللي فيها مسافات أو حروف عربية أو رموز ممكن سوبابيز يرفض يستخدمها كمسار
+        // تخزين صالح، فبنستبدل أي حرف مش إنجليزي/رقم/نقطة بشرطة تحتية عشان الرفع يفضل يشتغل دايمًا
+        const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+        const path = `quick-replies/${Date.now()}_${safeName}`
         const { error } = await supabase.storage.from('inbox-media').upload(path, file)
         if (error) throw error
         const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
@@ -1245,16 +1248,23 @@ function QuickRepliesTab({ agent }) {
       setFile(null)
       setShowAdd(false)
       load()
-    } catch {
-      toast.error('حصل خطأ أثناء الحفظ')
+    } catch (err) {
+      console.error(err)
+      toast.error('حصل خطأ أثناء الحفظ: ' + (err.message || 'غير معروف'))
     } finally {
       setSaving(false)
     }
   }
 
-  const remove = async (id) => {
+  const remove = async (qr) => {
     if (!confirm('حذف الرد السريع؟')) return
-    await supabase.from('quick_replies').delete().eq('id', id)
+    // لازم نمسح الملف من التخزين بنفسنا — مسح صف الرد السريع من الداتابيز مش بيمسح الملف
+    // المرفوع تلقائي، وكان بيفضل ملف يتيم محتل مساحة تخزين للأبد من غير ما حد يلاحظ
+    if (qr.file_url) {
+      const path = qr.file_url.split('/inbox-media/')[1]
+      if (path) await supabase.storage.from('inbox-media').remove([path])
+    }
+    await supabase.from('quick_replies').delete().eq('id', qr.id)
     load()
   }
 
@@ -1332,7 +1342,7 @@ function QuickRepliesTab({ agent }) {
                 {qr.text && <p className="text-xs text-fg-muted truncate">{qr.text}</p>}
               </div>
               <button onClick={() => startEdit(qr)} className="text-fg-muted hover:text-brand flex-shrink-0"><Edit2 size={14} /></button>
-              <button onClick={() => remove(qr.id)} className="text-fg-muted hover:text-danger flex-shrink-0">
+              <button onClick={() => remove(qr)} className="text-fg-muted hover:text-danger flex-shrink-0">
                 <Trash2 size={14} />
               </button>
             </>

@@ -399,7 +399,8 @@ export default function ChatScreen() {
   // ─── إرسال رسالة (نص و/أو ملف) ─────────────────────────────
   const uploadPendingFile = async (pf) => {
     if (pf.url) return pf.url // ملف جاهز من مكتبة الردود السريعة
-    const path = `media/${id}/${Date.now()}_${pf.file.name}`
+    const safeName = pf.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+    const path = `media/${id}/${Date.now()}_${safeName}`
     const { error } = await supabase.storage.from('inbox-media').upload(path, pf.file)
     if (error) throw error
     const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)

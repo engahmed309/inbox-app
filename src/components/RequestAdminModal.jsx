@@ -29,7 +29,8 @@ export default function RequestAdminModal({ type, onClose }) {
       if (type === 'quick_reply') {
         payload.text = text.trim() || null
         if (file) {
-          const path = `quick-replies/${Date.now()}_${file.name}`
+          const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+          const path = `quick-replies/${Date.now()}_${safeName}`
           const { error } = await supabase.storage.from('inbox-media').upload(path, file)
           if (error) throw error
           const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
