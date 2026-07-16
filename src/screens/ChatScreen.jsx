@@ -742,74 +742,81 @@ export default function ChatScreen() {
   return (
     <div className="h-full flex flex-col bg-surface overflow-hidden">
       {/* Header */}
-      <div className="sticky top-0 z-20 flex-shrink-0 flex items-center gap-3 px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
-        <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg flex-shrink-0">
-          <ArrowRight size={20} />
-        </button>
+      <div className="sticky top-0 z-20 flex-shrink-0 flex flex-col gap-2 px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
+        {/* الصف الأول: رجوع + صورة/اسم العميل + بحث + Lifecycle */}
+        <div className="flex items-center gap-3">
+          <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg flex-shrink-0">
+            <ArrowRight size={20} />
+          </button>
 
-        <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-right cursor-pointer">
-          {contact?.profile_pic ? (
-            <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt=""
-              onError={e => e.target.style.display = 'none'} />
-          ) : (
-            <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
-              <User size={16} className="text-fg-muted" />
-            </div>
-          )}
-          <div className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
-              {contact?.is_blocked && (
-                <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger text-white flex-shrink-0">
-                  <Ban size={9} /> محظور
-                </span>
-              )}
-              <div className="relative flex-shrink-0" onClick={e => e.stopPropagation()}>
-                <button onClick={() => setShowLifecycle(v => !v)}
-                  className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
-                  style={{ background: currentLifecycle?.color || '#64748B' }}>
-                  {currentLifecycle?.name || 'بدون مرحلة'} <ChevronDown size={9} />
-                </button>
-                {showLifecycle && (
-                  <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
-                    <button onClick={() => changeLifecycle(null)}
-                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
-                      <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-500" />
-                      بدون مرحلة
-                    </button>
-                    {lifecycles.map(l => (
-                      <button key={l.id} onClick={() => changeLifecycle(l.id)}
-                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
-                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                        {l.name}
-                      </button>
-                    ))}
-                  </div>
+          <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-right cursor-pointer">
+            {contact?.profile_pic ? (
+              <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt=""
+                onError={e => e.target.style.display = 'none'} />
+            ) : (
+              <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+                <User size={16} className="text-fg-muted" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+                {contact?.is_blocked && (
+                  <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger text-white flex-shrink-0">
+                    <Ban size={9} /> محظور
+                  </span>
+                )}
+              </div>
+              <div className="flex items-center gap-1">
+                <PlatformIcon size={11} className="text-fg-muted" />
+                {!contact?.name && (
+                  <span className="text-xs text-fg-muted truncate">اضغط لإضافة الاسم</span>
                 )}
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <PlatformIcon size={11} className="text-fg-muted" />
-              {!contact?.name && (
-                <span className="text-xs text-fg-muted truncate">اضغط لإضافة الاسم</span>
+          </div>
+
+          <div className="flex items-center gap-1.5 flex-shrink-0">
+            <button onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
+              className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showSearch ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+              <Search size={14} />
+            </button>
+
+            <div className="relative" onClick={e => e.stopPropagation()}>
+              <button onClick={() => setShowLifecycle(v => !v)}
+                className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-1.5 rounded-full text-white max-w-[90px]"
+                style={{ background: currentLifecycle?.color || '#64748B' }}>
+                <span className="truncate">{currentLifecycle?.name || 'بدون مرحلة'}</span> <ChevronDown size={9} className="flex-shrink-0" />
+              </button>
+              {showLifecycle && (
+                <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
+                  <button onClick={() => changeLifecycle(null)}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                    <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-500" />
+                    بدون مرحلة
+                  </button>
+                  {lifecycles.map(l => (
+                    <button key={l.id} onClick={() => changeLifecycle(l.id)}
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
+                      {l.name}
+                    </button>
+                  ))}
+                </div>
               )}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-1.5 flex-shrink-0">
-          <button onClick={() => { setShowSearch(v => !v); setSearchQuery('') }}
-            className={`w-8 h-8 flex items-center justify-center rounded-lg transition-colors ${showSearch ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            <Search size={14} />
-          </button>
-
+        {/* الصف الثاني: تعيين الموظف + حالة المحادثة */}
+        <div className="flex items-center gap-1.5">
           <div className="relative">
             <button onClick={() => { setShowAssign(!showAssign); setShowStatus(false) }}
-              className="px-2.5 py-1.5 text-xs bg-surface-3 rounded-lg text-fg-muted hover:text-fg max-w-[110px] truncate">
+              className="px-2.5 py-1.5 text-xs bg-surface-3 rounded-lg text-fg-muted hover:text-fg max-w-[140px] truncate">
               {conv?.agentName || 'غير معين'}
             </button>
             {showAssign && (
-              <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
                 {agents.map(ag => (
                   <button key={ag.id} onClick={() => assignAgent(ag.id)}
                     className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right">
@@ -835,7 +842,7 @@ export default function ChatScreen() {
               <ChevronDown size={11} />
             </button>
             {showStatus && (
-              <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
                 {STATUS_OPTS.map(s => (
                   <button key={s.key} onClick={() => changeStatus(s.key)}
                     className="flex items-center gap-2 w-full px-4 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
