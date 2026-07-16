@@ -6,6 +6,7 @@ import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
+import PushNotificationToggle from '../components/PushNotificationToggle'
 
 const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
@@ -784,6 +785,7 @@ export default function ConversationsScreen() {
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
             </button>
+            <PushNotificationToggle />
             {agent?.role === 'admin' && (
               <button onClick={() => navigate('/reports')} title="التقارير"
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
