@@ -1,12 +1,12 @@
 import { useState, useEffect } from 'react'
-import { supabase } from '../lib/supabase'
+import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
 import { COUNTRY_MAP } from '../lib/countries'
-import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
 
@@ -69,6 +69,18 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     notes: contact?.notes || '',
     lifecycle_stage_id: contact?.lifecycle_stage_id || '',
   })
+  const [connectedChannels, setConnectedChannels] = useState([])
+
+  // القنوات المتصلة — لواتساب بس، بيعرض كل رقم بتاعنا كلّم بيه العميل ده وامتى آخر مرة، عشان
+  // يبقى واضح إن المحادثة الواحدة دي بتجمّع كل الأرقام مع بعض بدل ما تتقسم لمحادثات منفصلة
+  useEffect(() => {
+    if (conv?.platform !== 'whatsapp' || !conv?.id) { setConnectedChannels([]); return }
+    fetch(`${API_URL}/conversations/${conv.id}/channels`)
+      .then(r => r.json())
+      .then(data => setConnectedChannels(data.channels || []))
+      .catch(() => setConnectedChannels([]))
+  }, [conv?.id, conv?.platform])
+
   const [lifecycles, setLifecycles] = useState([])
   const [customFields, setCustomFields] = useState([])
   const [customValues, setCustomValues] = useState({})
@@ -243,6 +255,19 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
               </span>
             )}
           </div>
+
+          {/* القنوات المتصلة — لو العميل كلّم من أكتر من رقم واتساب، بتتجمّع كلها هنا */}
+          {connectedChannels.length > 1 && (
+            <div className="bg-surface-3 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-medium text-fg-muted flex items-center gap-1.5"><Radio size={12} /> قنوات متصلة</p>
+              {connectedChannels.map(c => (
+                <div key={c.channel_id} className="flex items-center justify-between text-xs">
+                  <span className="text-fg truncate">{c.channels?.custom_name || c.channels?.display_name || 'رقم واتساب'}</span>
+                  <span className="text-fg-subtle flex-shrink-0">{new Date(c.last_inbound_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</span>
+                </div>
+              ))}
+            </div>
+          )}
 
           {/* Basic Fields */}
           <Field label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />

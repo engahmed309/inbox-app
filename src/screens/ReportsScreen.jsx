@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio } from 'lucide-react'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -13,6 +13,7 @@ import {
 const SECTIONS = [
   { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
   { key: 'customers', label: 'العملاء', icon: Users2 },
+  { key: 'countries', label: 'الدول', icon: Globe },
   { key: 'attendance', label: 'حضور الموظفين', icon: Users2 },
   { key: 'performance', label: 'أداء الموظفين', icon: Zap },
   { key: 'volume', label: 'رسايل القنوات', icon: Radio },
@@ -71,6 +72,7 @@ export default function ReportsScreen() {
       <div className="flex-1 overflow-y-auto">
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}
+        {section === 'countries' && <CountriesTab />}
         {section === 'attendance' && <AttendanceTab />}
         {section === 'performance' && <PerformanceTab />}
         {section === 'volume' && <ChannelVolumeTab />}
@@ -136,8 +138,11 @@ function computeDateBounds(range, customFrom, customTo) {
   if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
   if (range === 'custom') {
     if (!customFrom || !customTo) return { from: null, to: null }
-    const to = new Date(customTo); to.setHours(23, 59, 59, 999)
-    return { from: new Date(customFrom).toISOString(), to: to.toISOString() }
+    // لو المستخدم اختار "من" بعد "إلى" غلط، بنبدلهم بدل ما نرجع فترة معكوسة تجيب صفر نتايج دايمًا
+    let fromStr = customFrom, toStr = customTo
+    if (fromStr > toStr) { const tmp = fromStr; fromStr = toStr; toStr = tmp }
+    const to = new Date(toStr); to.setHours(23, 59, 59, 999)
+    return { from: new Date(fromStr).toISOString(), to: to.toISOString() }
   }
   return { from: null, to: null }
 }
@@ -327,6 +332,101 @@ function CustomersTab() {
   )
 }
 
+// ─── العملاء حسب الدولة ─────────────────────────────────────
+// كام عميل جديد دخل من كل دولة، حسب حقل contacts.country — العملاء اللي الحقل ده فاضي عندهم
+// بيتحسبوا تحت عمود "بدون" بدل ما يختفوا من التقرير
+function CountriesTab() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const [range, setRange] = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [rows, setRows] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+    const buildQ = () => {
+      let q = supabase.from('contacts').select('country, created_at')
+      if (from) q = q.gte('created_at', from)
+      if (to) q = q.lte('created_at', to)
+      return q
+    }
+    const entries = await fetchAllRows(buildQ)
+    const map = {}
+    entries.forEach(r => {
+      const key = r.country?.trim() || 'بدون'
+      map[key] = (map[key] || 0) + 1
+    })
+    setRows(Object.entries(map).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count))
+    setLoading(false)
+  }
+
+  const total = rows.reduce((s, r) => s + r.count, 0)
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">العملاء حسب الدولة</h2>
+      <p className="text-xs text-fg-subtle -mt-2">كام عميل جديد دخل من كل دولة في الفترة المختارة. "بدون" يعني حقل الدولة فاضي عند العميل.</p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
+            <p className="text-xs text-fg-muted mb-1">إجمالي العملاء</p>
+            <p className="text-3xl font-bold text-fg">{total}</p>
+          </div>
+          {rows.length === 0 ? (
+            <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+          ) : (
+            <>
+              <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+                <div style={{ width: '100%', height: 280 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={rows} barCategoryGap="20%">
+                      <CartesianGrid vertical={false} stroke={isDark ? '#2c2c2a' : '#e4e4e7'} strokeDasharray="3 3" />
+                      <XAxis dataKey="country" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: isDark ? '#2c2c2a' : '#e4e4e7' }} tickLine={false} interval={0} angle={-20} textAnchor="end" height={50} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+                      <Tooltip contentStyle={{ background: isDark ? '#212127' : '#fff', border: `1px solid ${isDark ? '#36363e' : '#e4e4e7'}`, borderRadius: 8, fontSize: 12 }} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                        {rows.map((r, i) => <Cell key={r.country} fill={CHANNEL_COLOR_PALETTE[i % CHANNEL_COLOR_PALETTE.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+              <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+                {rows.map(r => (
+                  <div key={r.country} className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex-1 text-sm text-fg truncate">{r.country}</span>
+                    <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
+                      <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  )
+}
+
 function OverviewTab() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -359,8 +459,10 @@ function OverviewTab() {
     if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
     if (range === 'custom') {
       if (!customFrom || !customTo) return { from: null, to: null }
-      const to = new Date(customTo); to.setHours(23, 59, 59, 999)
-      return { from: new Date(customFrom).toISOString(), to: to.toISOString() }
+      let fromStr = customFrom, toStr = customTo
+      if (fromStr > toStr) { const tmp = fromStr; fromStr = toStr; toStr = tmp }
+      const to = new Date(toStr); to.setHours(23, 59, 59, 999)
+      return { from: new Date(fromStr).toISOString(), to: to.toISOString() }
     }
     return { from: null, to: null }
   }

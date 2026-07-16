@@ -128,6 +128,11 @@ export default function ChatScreen() {
   const [noteText, setNoteText] = useState('')
   const [sendingNote, setSendingNote] = useState(false)
 
+  // القنوات المتصلة بمحادثة واتساب واحدة (كل الأرقام اللي العميل كلّم بيها) — لو أكتر من رقم لسه
+  // في نافذة الـ٢٤ ساعة، الموظف يقدر يختار يرد من أنهي رقم بدل ما يبقى مقفول على آخر رقم رد بيه بس
+  const [connectedChannels, setConnectedChannels] = useState([])
+  const [selectedChannelId, setSelectedChannelId] = useState(null)
+
   const [showFollowUpModal, setShowFollowUpModal] = useState(false)
   const [followUpDateTime, setFollowUpDateTime] = useState('')
   const [followUpNote, setFollowUpNote] = useState('')
@@ -249,9 +254,22 @@ export default function ChatScreen() {
       // ملحوظة: مبنعملش "mark as read" عالمي هنا — المحادثة تفضل غير مقروءة للكل لحد ما نرد فعلياً.
       // بس بمجرد ما الموظف ده يفتح الشات، نسجّل قراءته الشخصية (خاصة بيه بس)
       if (agent?.id) {
-        supabase.from('conversation_reads')
+        // await ضروري هنا — كويري سوبابيز lazy، من غير await/.then() الطلب مبيتبعتش خالص للسيرفر
+        await supabase.from('conversation_reads')
           .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
       }
+
+      // القنوات المتصلة بمحادثة الواتساب دي (كل رقم كلّم بيه العميل) — لتحديد رقم افتراضي وعرضها للموظف
+      if (convData?.platform === 'whatsapp') {
+        try {
+          const chRes = await fetch(`${API_URL}/conversations/${id}/channels`)
+          const chData = await chRes.json()
+          setConnectedChannels(chData.channels || [])
+        } catch { setConnectedChannels([]) }
+      } else {
+        setConnectedChannels([])
+      }
+      setSelectedChannelId(convData?.channel_id || null)
 
       // Agents list (لأي agent يقدر يعيّن/يستلم محادثات) — بنستبعد صف الـ AI Agent نفسه، عشان
       // مربع "تعيين" ده لتحويل المحادثة لموظف بشري بس، مش وسيلة لتفعيل رد الـ AI
@@ -412,7 +430,11 @@ export default function ChatScreen() {
     const res = await fetch(`${API_URL}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: id, content, content_type, media_url, agent_id: agent?.id, reply_to_message_id: replyToId || undefined })
+      body: JSON.stringify({
+        conversation_id: id, content, content_type, media_url, agent_id: agent?.id,
+        reply_to_message_id: replyToId || undefined,
+        channel_id: conv?.platform === 'whatsapp' ? (selectedChannelId || undefined) : undefined
+      })
     })
     if (!res.ok) throw new Error()
   }
@@ -1140,6 +1162,20 @@ export default function ChatScreen() {
                 <button onClick={removePendingFile} className="text-fg-muted hover:text-danger flex-shrink-0">
                   <X size={16} />
                 </button>
+              </div>
+            )}
+            {/* العميل ده كلّم من أكتر من رقم واتساب — اختار ترد من أنهي رقم منهم (لسه في نافذة الـ٢٤ ساعة) */}
+            {conv?.platform === 'whatsapp' && connectedChannels.filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000).length > 1 && (
+              <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
+                <span className="text-[11px] text-fg-subtle flex-shrink-0">رد من:</span>
+                {connectedChannels
+                  .filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000)
+                  .map(c => (
+                    <button key={c.channel_id} onClick={() => setSelectedChannelId(c.channel_id)}
+                      className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${selectedChannelId === c.channel_id ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                      {c.channels?.custom_name || c.channels?.display_name || 'رقم'}
+                    </button>
+                  ))}
               </div>
             )}
             <div className="flex items-end gap-2">

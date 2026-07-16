@@ -102,6 +102,53 @@ function AgentAvatar({ agent, size = 22 }) {
   )
 }
 
+// مكوّن مستقل خارج ConversationsScreen عشان مايتعادش تعريفه في كل render — لو فضل جوّه، أي polling
+// بيغيّر الـ state بيخلي React يقفل الـ DOM القديم ويعمل واحد جديد كل شوية، فالسكرول جوه القايمة
+// بيرجع لفوق لوحده لو الموظف بيحاول يسكرول أثناء ده
+function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFilter, aiEnabled, aiOpenCount, agentsList, agentOpenCounts, unassignedOpenCount }) {
+  return (
+    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
+      <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
+        <Users size={14} className="text-fg-muted flex-shrink-0" />
+        <span className="flex-1">كل الموظفين</span>
+      </button>
+      <button onClick={() => { setAgentFilter('ai'); setShowAgentFilter(false) }}
+        title={aiEnabled ? 'الـ AI Agent مفعّل' : 'الـ AI Agent متوقف'}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
+        <span className="relative flex-shrink-0">
+          <span className="w-[22px] h-[22px] rounded-full bg-brand/15 flex items-center justify-center text-brand"><Bot size={13} /></span>
+          <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
+        </span>
+        <span className="flex-1 truncate">AI Agent</span>
+        <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة بيرد عليها الـ AI">{aiOpenCount}</span>
+      </button>
+      {agentsList.map(a => {
+        const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
+        return (
+          <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
+            className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
+            <span className="relative flex-shrink-0">
+              <AgentAvatar agent={a} size={22} />
+              <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
+            </span>
+            <span className="flex-1 truncate">{a.name}</span>
+            <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة معينة له">{agentOpenCounts[a.id] || 0}</span>
+          </button>
+        )
+      })}
+      <button onClick={() => { setAgentFilter('unassigned'); setShowAgentFilter(false) }}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'unassigned' ? 'bg-surface-3' : ''}`}>
+        <span className="w-[22px] h-[22px] rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 text-fg-subtle">
+          <UserX size={12} />
+        </span>
+        <span className="flex-1 truncate text-fg-muted">غير معينة</span>
+        <span className="text-[11px] text-fg-subtle flex-shrink-0">{unassignedOpenCount}</span>
+      </button>
+    </div>
+  )
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -706,47 +753,6 @@ export default function ConversationsScreen() {
   const agentStatusBtn = agent?.status || 'online'
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
   const expanded = sidebarOpen || mobileMenuOpen
-  const AgentFilterList = ({ vertical }) => (
-    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
-      <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
-        <Users size={14} className="text-fg-muted flex-shrink-0" />
-        <span className="flex-1">كل الموظفين</span>
-      </button>
-      <button onClick={() => { setAgentFilter('ai'); setShowAgentFilter(false) }}
-        title={aiEnabled ? 'الـ AI Agent مفعّل' : 'الـ AI Agent متوقف'}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
-        <span className="relative flex-shrink-0">
-          <span className="w-[22px] h-[22px] rounded-full bg-brand/15 flex items-center justify-center text-brand"><Bot size={13} /></span>
-          <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
-        </span>
-        <span className="flex-1 truncate">AI Agent</span>
-        <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة بيرد عليها الـ AI">{aiOpenCount}</span>
-      </button>
-      {agentsList.map(a => {
-        const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
-        return (
-          <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
-            className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
-            <span className="relative flex-shrink-0">
-              <AgentAvatar agent={a} size={22} />
-              <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
-            </span>
-            <span className="flex-1 truncate">{a.name}</span>
-            <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة معينة له">{agentOpenCounts[a.id] || 0}</span>
-          </button>
-        )
-      })}
-      <button onClick={() => { setAgentFilter('unassigned'); setShowAgentFilter(false) }}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'unassigned' ? 'bg-surface-3' : ''}`}>
-        <span className="w-[22px] h-[22px] rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 text-fg-subtle">
-          <UserX size={12} />
-        </span>
-        <span className="flex-1 truncate text-fg-muted">غير معينة</span>
-        <span className="text-[11px] text-fg-subtle flex-shrink-0">{unassignedOpenCount}</span>
-      </button>
-    </div>
-  )
 
   return (
     <div className="h-full flex bg-surface">
@@ -897,7 +903,12 @@ export default function ConversationsScreen() {
               )}
               <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
             </button>
-            {showAgentFilter && <AgentFilterList vertical />}
+            {showAgentFilter && (
+              <AgentFilterList vertical
+                agentFilter={agentFilter} setAgentFilter={setAgentFilter} setShowAgentFilter={setShowAgentFilter}
+                aiEnabled={aiEnabled} aiOpenCount={aiOpenCount} agentsList={agentsList}
+                agentOpenCounts={agentOpenCounts} unassignedOpenCount={unassignedOpenCount} />
+            )}
           </div>
         )}
 

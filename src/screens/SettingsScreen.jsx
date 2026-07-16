@@ -7,7 +7,7 @@ import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText
+  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw
 } from 'lucide-react'
 
 const TABS = [
@@ -1564,20 +1564,48 @@ function AiAgentTab() {
     }
   }
 
+  const [savingSource, setSavingSource] = useState(false)
+  const [refreshingId, setRefreshingId] = useState(null)
+
+  // مصادر النوع "رابط" بتتحمّل وتتحوّل لنص مرة واحدة هنا وقت الإضافة (على السيرفر)، وبعد كده
+  // النص المخزّن ده هو اللي بيتحط في تعليمات الـ AI — مش بيعيد قراءة الصفحة في كل رسالة
   const addSource = async () => {
     if (!sourceForm.title.trim()) { toast.error('لازم عنوان للمصدر'); return }
     if (sourceForm.type === 'text' && !sourceForm.content.trim()) { toast.error('لازم تكتب المحتوى'); return }
     if (sourceForm.type === 'link' && !sourceForm.url.trim()) { toast.error('لازم تحط الرابط'); return }
-    const { error } = await supabase.from('ai_knowledge_sources').insert({
-      type: sourceForm.type,
-      title: sourceForm.title.trim(),
-      content: sourceForm.type === 'text' ? sourceForm.content.trim() : null,
-      url: sourceForm.type === 'link' ? sourceForm.url.trim() : null
-    })
-    if (error) { toast.error('خطأ: ' + error.message); return }
-    setSourceForm({ type: 'text', title: '', content: '', url: '' })
-    setShowAddSource(false)
-    load()
+    setSavingSource(true)
+    try {
+      const res = await fetch(`${API_URL}/ai/knowledge-sources`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(sourceForm)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل إضافة المصدر')
+      setSourceForm({ type: 'text', title: '', content: '', url: '' })
+      setShowAddSource(false)
+      toast.success(sourceForm.type === 'link' ? 'اتحمّلت الصفحة واتحفظ محتواها' : 'اتضاف المصدر')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSavingSource(false)
+    }
+  }
+
+  const refreshSource = async (id) => {
+    setRefreshingId(id)
+    try {
+      const res = await fetch(`${API_URL}/ai/knowledge-sources/${id}/refresh`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل تحديث المصدر')
+      toast.success('اتحدّث محتوى الصفحة')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setRefreshingId(null)
+    }
   }
 
   const removeSource = async (id) => {
@@ -1749,8 +1777,11 @@ function AiAgentTab() {
               <InputField label="الرابط" value={sourceForm.url} onChange={v => setSourceForm({ ...sourceForm, url: v })} placeholder="https://..." />
             )}
             <div className="flex gap-2">
-              <button onClick={addSource} className="flex-1 py-2 bg-brand rounded-lg text-xs text-white font-medium">إضافة</button>
-              <button onClick={() => setShowAddSource(false)} className="px-3 py-2 bg-surface rounded-lg text-xs text-fg-muted">إلغاء</button>
+              <button onClick={addSource} disabled={savingSource}
+                className="flex-1 py-2 bg-brand rounded-lg text-xs text-white font-medium disabled:opacity-60">
+                {savingSource ? (sourceForm.type === 'link' ? 'بيحمّل الصفحة...' : 'جاري الإضافة...') : 'إضافة'}
+              </button>
+              <button onClick={() => setShowAddSource(false)} disabled={savingSource} className="px-3 py-2 bg-surface rounded-lg text-xs text-fg-muted">إلغاء</button>
             </div>
           </div>
         )}
@@ -1762,6 +1793,12 @@ function AiAgentTab() {
               <p className="text-sm text-fg truncate">{s.title}</p>
               {s.url && <p className="text-[11px] text-fg-subtle truncate">{s.url}</p>}
             </div>
+            {s.type === 'link' && (
+              <button onClick={() => refreshSource(s.id)} disabled={refreshingId === s.id}
+                title="أعد تحميل محتوى الصفحة" className="text-fg-muted hover:text-brand flex-shrink-0 disabled:opacity-50">
+                <RefreshCw size={13} className={refreshingId === s.id ? 'animate-spin' : ''} />
+              </button>
+            )}
             <button onClick={() => removeSource(s.id)} className="text-fg-muted hover:text-danger flex-shrink-0"><Trash2 size={13} /></button>
           </div>
         ))}

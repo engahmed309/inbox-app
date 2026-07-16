@@ -27,7 +27,8 @@ export function AuthProvider({ children }) {
     const now = new Date().toISOString()
     await supabase.from('agents').update({ status, last_seen_at: now }).eq('id', agentId)
     // بنسجل كل تغيير حالة في لوج منفصل، عشان نقدر نبني تقرير حضور/غياب لاحقاً (من امتى لحد امتى كان أونلاين كل يوم)
-    supabase.from('agent_status_log').insert({ agent_id: agentId, status, changed_at: now })
+    // لازم await هنا — كويري سوبابيز lazy، لو محدش عمل await/.then() ليها الطلب مبيتبعتش للسيرفر خالص
+    await supabase.from('agent_status_log').insert({ agent_id: agentId, status, changed_at: now })
     setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online', last_seen_at: now } : prev)
     // لما موظف يبقى متاح، حاول توزّع أي محادثات كانت مستنية موظف فاضي
     if (status === 'online') {
@@ -101,9 +102,12 @@ export function AuthProvider({ children }) {
   // تحسب "قعد شغال فعلياً من كام لحد كام" بدقة، حتى لو الموظف نسي يغيّر حالته بنفسه
   useEffect(() => {
     if (!agent?.id) return
-    const sendHeartbeat = () => {
+    // لازم await/.then() هنا كمان لنفس السبب — من غيرها الـ insert مبيتنفذش خالص برغم إن الكود
+    // شكله سليم، وده كان بيخلي جداول الحضور تفضل فاضية تمامًا
+    const sendHeartbeat = async () => {
       if (document.visibilityState !== 'visible') return
-      supabase.from('agent_heartbeats').insert({ agent_id: agent.id })
+      const { error } = await supabase.from('agent_heartbeats').insert({ agent_id: agent.id })
+      if (error) console.error('heartbeat insert failed:', error.message)
     }
     sendHeartbeat()
     const interval = setInterval(sendHeartbeat, 90 * 1000)
