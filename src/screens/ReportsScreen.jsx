@@ -12,11 +12,29 @@ import {
 
 const SECTIONS = [
   { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
+  { key: 'customers', label: 'العملاء', icon: Users2 },
   { key: 'attendance', label: 'حضور الموظفين', icon: Users2 },
   { key: 'performance', label: 'أداء الموظفين', icon: Zap },
   { key: 'volume', label: 'رسايل القنوات', icon: Radio },
   { key: 'tags', label: 'التاجات', icon: Tag },
 ]
+
+// بتجيب كل صفوف كويري معينة من غير ما تقف عند حد الـ 1000 صف الافتراضي بتاع سوبابيز — بتلف
+// بصفحات من 1000 لحد ما ترجع صفحة أصغر من كده (يعني خلصت). بناخد factory function بترجع كويري
+// جديدة كل مرة (مش نفس الكائن) عشان .range() يتطبق نضيف من غير آثار جانبية بين الصفحات
+async function fetchAllRows(buildQuery) {
+  const PAGE = 1000
+  let offset = 0
+  let all = []
+  while (true) {
+    const { data, error } = await buildQuery().range(offset, offset + PAGE - 1)
+    if (error) throw error
+    all = all.concat(data || [])
+    if (!data || data.length < PAGE) break
+    offset += PAGE
+  }
+  return all
+}
 
 export default function ReportsScreen() {
   const [section, setSection] = useState('overview')
@@ -52,6 +70,7 @@ export default function ReportsScreen() {
 
       <div className="flex-1 overflow-y-auto">
         {section === 'overview' && <OverviewTab />}
+        {section === 'customers' && <CustomersTab />}
         {section === 'attendance' && <AttendanceTab />}
         {section === 'performance' && <PerformanceTab />}
         {section === 'volume' && <ChannelVolumeTab />}
@@ -153,6 +172,161 @@ function DateRangeFilter({ range, setRange, customFrom, setCustomFrom, customTo,
   )
 }
 
+// ─── العملاء الجدد / العملاء اللي كلموا ────────────────────────
+// تقريرين قريبين من بعض في تاب واحد بتبديلة: "عملاء جدد" = أول مرة يبقى ليهم contact في الداتابيز
+// خالص (contacts.created_at)، و"كل العملاء اللي كلموا" = أي عميل بعت رسالة في اليوم ده حتى لو
+// مش أول مرة (عدد مختلف كل يوم، من غير تكرار لو كلّم أكتر من مرة في نفس اليوم)
+function CustomersTab() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
+  const [metric, setMetric] = useState('new') // 'new' | 'active'
+  const [range, setRange] = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [chartData, setChartData] = useState([])
+  const [total, setTotal] = useState(0)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [metric, range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+
+    let dayOf // (row) => Date لليوم اللي الصف ده بيتحسب عليه
+    let entries
+    if (metric === 'new') {
+      const buildQ = () => {
+        let q = supabase.from('contacts').select('id, created_at').order('created_at', { ascending: true })
+        if (from) q = q.gte('created_at', from)
+        if (to) q = q.lte('created_at', to)
+        return q
+      }
+      entries = await fetchAllRows(buildQ)
+      dayOf = (r) => new Date(r.created_at)
+    } else {
+      const buildQ = () => {
+        let q = supabase.from('messages')
+          .select('created_at, conversations!inner(contact_id)')
+          .eq('direction', 'inbound').neq('content_type', 'note')
+          .order('created_at', { ascending: true })
+        if (from) q = q.gte('created_at', from)
+        if (to) q = q.lte('created_at', to)
+        return q
+      }
+      entries = await fetchAllRows(buildQ)
+      dayOf = (r) => new Date(r.created_at)
+    }
+
+    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم تاريخ موجود في البيانات
+    const times = entries.map(r => dayOf(r).getTime())
+    const startDate = from ? new Date(from) : new Date(times.length ? Math.min(...times) : Date.now())
+    const endDate = to ? new Date(to) : new Date()
+    const spanDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
+    const granularity = spanDays > 45 ? 'week' : 'day'
+
+    const buckets = []
+    const bucketMap = {}
+    if (granularity === 'day') {
+      const cur = new Date(startDate); cur.setHours(0, 0, 0, 0)
+      const last = new Date(endDate); last.setHours(0, 0, 0, 0)
+      while (cur <= last) {
+        const key = dayKey(cur)
+        const entry = { key, label: formatShort(cur), count: 0, _set: metric === 'active' ? new Set() : null }
+        buckets.push(entry); bucketMap[key] = entry
+        cur.setDate(cur.getDate() + 1)
+      }
+    } else {
+      const cur = mondayOf(startDate)
+      const last = mondayOf(endDate)
+      while (cur <= last) {
+        const key = dayKey(cur)
+        const entry = { key, label: `أسبوع ${formatShort(cur)}`, count: 0, _set: metric === 'active' ? new Set() : null }
+        buckets.push(entry); bucketMap[key] = entry
+        cur.setDate(cur.getDate() + 7)
+      }
+    }
+
+    entries.forEach(r => {
+      const d = dayOf(r)
+      const key = granularity === 'day' ? dayKey(d) : dayKey(mondayOf(d))
+      const bucket = bucketMap[key]
+      if (!bucket) return
+      if (metric === 'active') {
+        const contactId = r.conversations?.contact_id
+        if (contactId && !bucket._set.has(contactId)) { bucket._set.add(contactId); bucket.count++ }
+      } else {
+        bucket.count++
+      }
+    })
+
+    setChartData(buckets.map(({ key, label, count }) => ({ key, label, count })))
+    setTotal(metric === 'active'
+      ? new Set(entries.map(r => r.conversations?.contact_id).filter(Boolean)).size
+      : entries.length)
+    setLoading(false)
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">العملاء</h2>
+
+      <div className="flex bg-surface-3 rounded-xl p-0.5">
+        <button onClick={() => setMetric('new')}
+          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${metric === 'new' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+          عملاء جدد (أول مرة)
+        </button>
+        <button onClick={() => setMetric('active')}
+          className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${metric === 'active' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
+          كل العملاء اللي كلموا
+        </button>
+      </div>
+      <p className="text-xs text-fg-subtle -mt-2">
+        {metric === 'new'
+          ? 'كام عميل جديد اتكلم مع العيادة لأول مرة في كل يوم.'
+          : 'كام عميل (جديد أو قديم) بعت رسالة في كل يوم — العميل بيتعدّ مرة واحدة بس لو بعت أكتر من رسالة في نفس اليوم.'}
+      </p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
+            <p className="text-xs text-fg-muted mb-1">{metric === 'new' ? 'إجمالي العملاء الجدد' : 'إجمالي العملاء المختلفين'}</p>
+            <p className="text-3xl font-bold text-fg">{total}</p>
+          </div>
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+            {total === 0 ? (
+              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+            ) : (
+              <div style={{ width: '100%', height: 280 }}>
+                <ResponsiveContainer>
+                  <BarChart data={chartData} barCategoryGap="20%">
+                    <CartesianGrid vertical={false} stroke={isDark ? '#2c2c2a' : '#e4e4e7'} strokeDasharray="3 3" />
+                    <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: isDark ? '#2c2c2a' : '#e4e4e7' }} tickLine={false} interval="preserveStartEnd" />
+                    <YAxis allowDecimals={false} tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
+                    <Tooltip contentStyle={{ background: isDark ? '#212127' : '#fff', border: `1px solid ${isDark ? '#36363e' : '#e4e4e7'}`, borderRadius: 8, fontSize: 12 }} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                    <Bar dataKey="count" fill="#3B82F6" radius={[4, 4, 0, 0]} maxBarSize={36} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  )
+}
+
 function OverviewTab() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -196,13 +370,16 @@ function OverviewTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = getDateBounds()
-    let q = supabase.from('conversations')
-      .select('id, platform, channel_id, created_at, contact_id, contacts(lifecycle_stage_id, lifecycle_stages(name, color))')
-    if (channel !== 'all') q = q.eq('channel_id', channel)
-    if (from) q = q.gte('created_at', from)
-    if (to) q = q.lte('created_at', to)
-    const { data } = await q
-    setRows(data || [])
+    const buildQ = () => {
+      let q = supabase.from('conversations')
+        .select('id, platform, channel_id, created_at, contact_id, contacts(lifecycle_stage_id, lifecycle_stages(name, color))')
+        .order('id', { ascending: true })
+      if (channel !== 'all') q = q.eq('channel_id', channel)
+      if (from) q = q.gte('created_at', from)
+      if (to) q = q.lte('created_at', to)
+      return q
+    }
+    setRows(await fetchAllRows(buildQ))
     setLoading(false)
   }
 
@@ -419,9 +596,11 @@ function OverviewTab() {
 }
 
 // ─── حضور الموظفين ──────────────────────────────────────────
-// المصدر الوحيد للحقيقة هنا هو agent_status_log: كل تغيير حالة (أونلاين/مشغول/أوفلاين) بيتسجل فيه
-// (AuthContext بيسجله تلقائي عند تسجيل الدخول/الخروج وتبديل التاب وتغيير الحالة يدوياً).
-// من التتابع الزمني للتغييرات دي بنقدر نعيد بناء "كان أونلاين من كذا لحد كذا" لأي يوم.
+// مصدرين مختلفين هنا: agent_status_log بيسجل بس لما الموظف يدوس زرار تغيير الحالة بنفسه يدوياً
+// (متاح/مشغول/غير متاح) — ده بيوضح الحالة اللي هو اختارها، مش بالضرورة كل وقت اشتغاله الفعلي.
+// عشان "إجمالي الساعات" يبقى رقم حقيقي نقدر نعتمد عليه حتى لو الموظف نسي يغيّر حالته، بنستخدم
+// agent_heartbeats — نبضة بتتسجل كل ~٩٠ ثانية طول ما التاب فاتح وظاهر قدامه (AuthContext)،
+// وده بيدينا "كان فاتح التطبيق فعلياً من كذا لحد كذا" بغض النظر عن الحالة اللي هو حاططها
 const ATTENDANCE_STATUS_OPTS = [
   { key: 'online', label: 'متصل', dot: 'bg-success', text: 'text-success' },
   { key: 'busy', label: 'مشغول', dot: 'bg-follow', text: 'text-follow' },
@@ -485,6 +664,30 @@ async function computeDayTimeline(agentId, dateStr) {
   }).filter(s => s.ms > 0)
 }
 
+// الوقت الفعلي اللي الموظف كان فاتح فيه التطبيق في يوم معين، محسوب من كثافة نبضات الحضور —
+// أي فجوة بين نبضتين أكبر من ٣ أضعاف فترة النبضة (٩٠ ثانية) معناها التاب اتقفل أو الجهاز نام،
+// فبنوقف العد هناك بدل ما نفترض إنه فاضل شغال طول الفجوة دي
+const HEARTBEAT_INTERVAL_MS = 90 * 1000
+async function computeDayPresenceMs(agentId, dateStr) {
+  const dayStart = new Date(`${dateStr}T00:00:00`)
+  const dayEnd = new Date(`${dateStr}T23:59:59.999`)
+  const { data } = await supabase
+    .from('agent_heartbeats').select('at')
+    .eq('agent_id', agentId)
+    .gte('at', dayStart.toISOString()).lte('at', dayEnd.toISOString())
+    .order('at', { ascending: true })
+
+  const beats = (data || []).map(r => new Date(r.at).getTime())
+  if (beats.length === 0) return 0
+
+  const gapTolerance = HEARTBEAT_INTERVAL_MS * 3
+  let totalMs = HEARTBEAT_INTERVAL_MS // أول نبضة بتفترض إنه كان فاتح على الأقل لمدة فترة نبضة واحدة
+  for (let i = 1; i < beats.length; i++) {
+    totalMs += Math.min(beats[i] - beats[i - 1], gapTolerance)
+  }
+  return totalMs
+}
+
 function AttendanceTab() {
   const [agents, setAgents] = useState([])
   const [selectedAgentIds, setSelectedAgentIds] = useState(null) // null لحد ما الموظفين يتحملوا، وقتها بنختارهم كلهم افتراضياً
@@ -515,10 +718,13 @@ function AttendanceTab() {
     setLoadingSummaries(true)
     setExpandedAgentId(null)
     const results = await Promise.all(agentIds.map(async id => {
-      const segs = await computeDayTimeline(id, dateStr)
+      const [segs, presenceMs] = await Promise.all([
+        computeDayTimeline(id, dateStr),
+        computeDayPresenceMs(id, dateStr)
+      ])
       const totals = { online: 0, busy: 0, offline: 0 }
       segs.forEach(s => { totals[s.status] = (totals[s.status] || 0) + s.ms })
-      return { agentId: id, segments: segs, totals }
+      return { agentId: id, segments: segs, totals, presenceMs }
     }))
     setSummaries(results)
     setLoadingSummaries(false)
@@ -545,7 +751,8 @@ function AttendanceTab() {
     <div className="p-4 space-y-4">
       <h2 className="font-semibold text-fg">حضور الموظفين</h2>
       <p className="text-xs text-fg-subtle -mt-2">
-        كل ما حالة موظف تتغير (متصل/مشغول/غير متصل) بنسجلها، عشان تقدر تعرف كان شغال من كام لحد كام وإجمالي ساعاته في أي يوم.
+        "فعلياً" = وقت حقيقي متحسوب من إن التطبيق كان فاتح قدام الموظف، مش من حالته اللي هو حاططها بنفسه (ممكن ينسى يغيّرها).
+        اضغط على أي موظف تشوف تفاصيل حالاته (متصل/مشغول/غير متصل) على مدار اليوم.
       </p>
 
       {/* اختيار الموظفين + التاريخ */}
@@ -563,16 +770,20 @@ function AttendanceTab() {
                 <input type="checkbox" readOnly checked={selectedAgentIds?.length === agents.length} />
                 <span className="font-medium text-fg">تحديد الكل</span>
               </button>
-              {agents.map(a => (
-                <button key={a.id} onClick={() => toggleAgent(a.id)}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right">
-                  <input type="checkbox" readOnly checked={selectedAgentIds?.includes(a.id) || false} />
-                  <span className="flex-1 text-fg truncate">{a.name}</span>
-                  <span className="text-[11px] text-fg-subtle flex-shrink-0">
-                    {a.status === 'offline' ? `آخر ظهور: ${relTime(a.last_seen_at)}` : 'متصل الآن'}
-                  </span>
-                </button>
-              ))}
+              {agents.map(a => {
+                const st = ATTENDANCE_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || ATTENDANCE_STATUS_OPTS[2]
+                return (
+                  <button key={a.id} onClick={() => toggleAgent(a.id)}
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right">
+                    <input type="checkbox" readOnly checked={selectedAgentIds?.includes(a.id) || false} />
+                    <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
+                    <span className="flex-1 text-fg truncate">{a.name}</span>
+                    <span className={`text-[11px] flex-shrink-0 ${st.text}`}>
+                      {st.label} · {relTime(a.last_seen_at)}
+                    </span>
+                  </button>
+                )
+              })}
             </div>
           )}
         </div>
@@ -590,14 +801,12 @@ function AttendanceTab() {
           {summaries.map(s => {
             const a = agents.find(ag => ag.id === s.agentId)
             if (!a) return null
-            const worked = (s.totals.online || 0) + (s.totals.busy || 0)
             return (
               <button key={s.agentId} onClick={() => setExpandedAgentId(expandedAgentId === s.agentId ? null : s.agentId)}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/60 transition-colors ${expandedAgentId === s.agentId ? 'bg-surface-3/60' : ''}`}>
                 <span className="flex-1 text-sm font-medium text-fg truncate">{a.name}</span>
-                <span className="text-xs text-success">متصل: {formatDuration(s.totals.online || 0)}</span>
-                <span className="text-xs text-follow">مشغول: {formatDuration(s.totals.busy || 0)}</span>
-                <span className="text-xs text-fg font-semibold w-24 text-left">إجمالي: {formatDuration(worked)}</span>
+                <span className="text-xs text-fg-subtle hidden sm:inline">حالته: {formatDuration((s.totals.online || 0) + (s.totals.busy || 0))}</span>
+                <span className="text-xs text-fg font-semibold w-28 text-left">فعلياً: {formatDuration(s.presenceMs || 0)}</span>
               </button>
             )
           })}
@@ -819,15 +1028,16 @@ function PerformanceTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    let q = supabase.from('messages')
-      .select('conversation_id, direction, sent_by_agent_id, content_type, created_at')
-      .neq('content_type', 'note')
-      .order('created_at', { ascending: true })
-      .limit(20000)
-    if (from) q = q.gte('created_at', from)
-    if (to) q = q.lte('created_at', to)
-    const { data } = await q
-    setRows(data || [])
+    const buildQ = () => {
+      let q = supabase.from('messages')
+        .select('conversation_id, direction, sent_by_agent_id, content_type, created_at')
+        .neq('content_type', 'note')
+        .order('created_at', { ascending: true })
+      if (from) q = q.gte('created_at', from)
+      if (to) q = q.lte('created_at', to)
+      return q
+    }
+    setRows(await fetchAllRows(buildQ))
     setLoading(false)
   }
 
@@ -924,10 +1134,13 @@ function AgentAvatar({ agent, size = 22 }) {
 // ─── تقرير حجم رسايل القنوات ──────────────────────────────────
 // كام رسالة واردة (من العميل) دخلت من كل قناة بعينها في فترة معينة
 function ChannelVolumeTab() {
+  const { theme } = useTheme()
+  const isDark = theme === 'dark'
   const [range, setRange] = useState('week')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [channelsList, setChannelsList] = useState([])
+  const [channelsLoaded, setChannelsLoaded] = useState(false)
   const [counts, setCounts] = useState(null) // { channel_id|'none': count }
   const [loading, setLoading] = useState(true)
 
@@ -938,30 +1151,38 @@ function ChannelVolumeTab() {
         const data = await res.json()
         setChannelsList((data.channels || []).filter(c => c.id))
       } catch { /* هنعرض بالـ id بس لو فشل */ }
+      setChannelsLoaded(true)
     })()
   }, [])
 
   useEffect(() => {
+    if (!channelsLoaded) return
     if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
     load()
-  }, [range, customFrom, customTo])
+  }, [range, customFrom, customTo, channelsLoaded])
 
+  // بنستخدم كويري "عدّ بس" (count: 'exact', head: true) لكل قناة على حدة بدل ما نجيب الصفوف
+  // كلها ونعدّها إحنا — سوبابيز بترجع 1000 صف بالأكتر لأي كويري عادي (حتى لو حطينا limit أعلى)،
+  // فلو الرسايل أكتر من كده كانت النتيجة بتيجي غلط وأقل من الحقيقي. الـ count الحقيقي مش محدود بكده
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    let q = supabase.from('messages')
-      .select('conversation_id, created_at, conversations!inner(channel_id)')
-      .eq('direction', 'inbound')
-      .neq('content_type', 'note')
-      .limit(50000)
-    if (from) q = q.gte('created_at', from)
-    if (to) q = q.lte('created_at', to)
-    const { data } = await q
+    const buildQuery = (channelId) => {
+      let q = supabase.from('messages')
+        .select('id, conversations!inner(channel_id)', { count: 'exact', head: true })
+        .eq('direction', 'inbound')
+        .neq('content_type', 'note')
+      if (from) q = q.gte('created_at', from)
+      if (to) q = q.lte('created_at', to)
+      q = channelId === null ? q.is('conversations.channel_id', null) : q.eq('conversations.channel_id', channelId)
+      return q
+    }
+
+    const channelIds = channelsList.map(c => c.id)
+    const results = await Promise.all([...channelIds.map(id => buildQuery(id)), buildQuery(null)])
     const map = {}
-    ;(data || []).forEach(m => {
-      const key = m.conversations?.channel_id || 'none'
-      map[key] = (map[key] || 0) + 1
-    })
+    channelIds.forEach((id, i) => { map[id] = results[i].count || 0 })
+    map.none = results[results.length - 1].count || 0
     setCounts(map)
     setLoading(false)
   }
@@ -997,17 +1218,34 @@ function ChannelVolumeTab() {
           {rows.length === 0 ? (
             <p className="text-center text-fg-subtle text-sm py-10">مفيش رسايل في الفترة دي</p>
           ) : (
-            <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
-              {rows.map(r => (
-                <div key={r.id} className="flex items-center gap-3 px-4 py-3">
-                  <span className="flex-1 text-sm text-fg truncate">{r.label}</span>
-                  <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
-                    <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
-                  </div>
-                  <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+            <>
+              <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+                <div style={{ width: '100%', height: 260 }}>
+                  <ResponsiveContainer>
+                    <BarChart data={rows} barCategoryGap="25%">
+                      <CartesianGrid vertical={false} stroke={isDark ? '#2c2c2a' : '#e4e4e7'} strokeDasharray="3 3" />
+                      <XAxis dataKey="label" tick={{ fill: '#71717a', fontSize: 11 }} axisLine={{ stroke: isDark ? '#2c2c2a' : '#e4e4e7' }} tickLine={false} interval={0} angle={-20} textAnchor="end" height={50} />
+                      <YAxis allowDecimals={false} tick={{ fill: '#71717a', fontSize: 11 }} axisLine={false} tickLine={false} width={32} />
+                      <Tooltip contentStyle={{ background: isDark ? '#212127' : '#fff', border: `1px solid ${isDark ? '#36363e' : '#e4e4e7'}`, borderRadius: 8, fontSize: 12 }} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
+                      <Bar dataKey="count" radius={[4, 4, 0, 0]} maxBarSize={48}>
+                        {rows.map((r, i) => <Cell key={r.id} fill={CHANNEL_COLOR_PALETTE[i % CHANNEL_COLOR_PALETTE.length]} />)}
+                      </Bar>
+                    </BarChart>
+                  </ResponsiveContainer>
                 </div>
-              ))}
-            </div>
+              </div>
+              <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+                {rows.map(r => (
+                  <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                    <span className="flex-1 text-sm text-fg truncate">{r.label}</span>
+                    <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
+                      <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
+                    </div>
+                    <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+                  </div>
+                ))}
+              </div>
+            </>
           )}
         </>
       )}

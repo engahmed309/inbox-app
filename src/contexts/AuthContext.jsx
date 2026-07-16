@@ -96,6 +96,24 @@ export function AuthProvider({ children }) {
     }
   }, [])
 
+  // نبضة حضور خفيفة (heartbeat) — بتسجل إن الموظف فعلاً فاتح التطبيق والتاب ظاهر قدامه، من غير
+  // ما تلمس status خالص (الحالة يدوية بالكامل زي ما اتفقنا). التقارير بتستخدم النبضات دي عشان
+  // تحسب "قعد شغال فعلياً من كام لحد كام" بدقة، حتى لو الموظف نسي يغيّر حالته بنفسه
+  useEffect(() => {
+    if (!agent?.id) return
+    const sendHeartbeat = () => {
+      if (document.visibilityState !== 'visible') return
+      supabase.from('agent_heartbeats').insert({ agent_id: agent.id })
+    }
+    sendHeartbeat()
+    const interval = setInterval(sendHeartbeat, 90 * 1000)
+    document.addEventListener('visibilitychange', sendHeartbeat)
+    return () => {
+      clearInterval(interval)
+      document.removeEventListener('visibilitychange', sendHeartbeat)
+    }
+  }, [agent?.id])
+
   const signInWithGoogle = async () => {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
