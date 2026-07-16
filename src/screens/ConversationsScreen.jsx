@@ -244,7 +244,7 @@ export default function ConversationsScreen() {
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
   const fetchStaticLists = useCallback(async () => {
-    const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online, avatar_url').order('name')
+    const { data: agentsData } = await supabase.from('agents').select('id, name, status, is_online, avatar_url').neq('role', 'ai').order('name')
     const aMap = {}
     agentsData?.forEach(a => { aMap[a.id] = { name: a.name, avatar_url: a.avatar_url } })
     setAgentsMap(aMap); screenCache.agentsMap = aMap

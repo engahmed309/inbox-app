@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -253,8 +253,9 @@ export default function ChatScreen() {
           .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
       }
 
-      // Agents list (لأي agent يقدر يعيّن/يستلم محادثات)
-      const { data: ags } = await supabase.from('agents').select('id, name, is_online, status, avatar_url').order('name')
+      // Agents list (لأي agent يقدر يعيّن/يستلم محادثات) — بنستبعد صف الـ AI Agent نفسه، عشان
+      // مربع "تعيين" ده لتحويل المحادثة لموظف بشري بس، مش وسيلة لتفعيل رد الـ AI
+      const { data: ags } = await supabase.from('agents').select('id, name, is_online, status, avatar_url').neq('role', 'ai').order('name')
       setAgents(ags || [])
 
       // Quick replies
@@ -611,6 +612,19 @@ export default function ChatScreen() {
     setConv(prev => ({ ...prev, agentName: ag?.name, agentAvatarUrl: ag?.avatar_url, assigned_agent_id: agentId }))
     setShowAssign(false)
     fetchMessages(false)
+  }
+
+  // استلام المحادثة من الـ AI Agent — بيوقف رد الـ AI التلقائي ويفتح مربع الكتابة للموظف البشري
+  const takeOverFromAi = async () => {
+    const { error } = await supabase.from('conversations').update({ ai_active: false }).eq('id', id)
+    if (error) { toast.error('فشل استلام المحادثة، حاول تاني'); return }
+    setConv(prev => ({ ...prev, ai_active: false }))
+    if (!conv?.assigned_agent_id && agent?.id) {
+      await supabase.from('conversations').update({ assigned_agent_id: agent.id }).eq('id', id)
+      await supabase.from('conversation_assignment_log').insert({ conversation_id: id, assigned_to: agent.id, assigned_by: agent?.id })
+      setConv(prev => ({ ...prev, assigned_agent_id: agent.id, agentName: agent.name, agentAvatarUrl: agent.avatar_url }))
+    }
+    toast.success('استلمت المحادثة من الـ AI Agent')
   }
 
   // ─── اختيار ملف من الجهاز (بريفيو قبل الإرسال) ─────────────────
@@ -1045,6 +1059,15 @@ export default function ChatScreen() {
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
             <Ban size={18} className="flex-shrink-0" />
             <span>العميل ده محظور — مينفعش تبعتله رسايل. تقدر تلغي الحظر من بيانات العميل.</span>
+          </div>
+        ) : conv?.ai_active ? (
+          <div className="flex items-center gap-2.5 bg-brand/10 rounded-xl px-4 py-3 text-sm text-fg">
+            <Bot size={18} className="flex-shrink-0 text-brand" />
+            <span className="flex-1">الـ AI Agent بيرد على المحادثة دي دلوقتي.</span>
+            <button onClick={takeOverFromAi}
+              className="flex-shrink-0 px-3 py-1.5 bg-brand rounded-lg text-xs text-white font-medium hover:brightness-110">
+              استلم المحادثة
+            </button>
           </div>
         ) : isWindowExpired ? (
           <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">

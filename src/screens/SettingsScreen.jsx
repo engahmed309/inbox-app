@@ -88,19 +88,24 @@ function AgentsTab() {
   const [reassignMode, setReassignMode] = useState('specific') // 'specific' | 'all' | 'online'
   const [reassignToId, setReassignToId] = useState('')
   const [reassigning, setReassigning] = useState(false)
+  const [aiAgentRow, setAiAgentRow] = useState(null)
+  const [aiCounts, setAiCounts] = useState({ open: 0, follow_up: 0, closed: 0 })
 
   useEffect(() => { loadAgents(); loadCounts() }, [])
 
   const loadAgents = async () => {
     const { data } = await supabase.from('agents').select('*').order('created_at')
-    setAgents(data || [])
+    setAgents((data || []).filter(a => a.role !== 'ai'))
+    setAiAgentRow((data || []).find(a => a.role === 'ai') || null)
   }
 
   const loadCounts = async () => {
-    const { data } = await supabase.from('conversations').select('assigned_agent_id, status')
+    const { data } = await supabase.from('conversations').select('assigned_agent_id, status, ai_active')
     const map = {}
     const t = { open: 0, follow_up: 0, closed: 0 }
+    const ai = { open: 0, follow_up: 0, closed: 0 }
     data?.forEach(c => {
+      if (c.ai_active && ai[c.status] !== undefined) ai[c.status]++
       if (!c.assigned_agent_id) return
       if (!map[c.assigned_agent_id]) map[c.assigned_agent_id] = { open: 0, follow_up: 0, closed: 0 }
       if (map[c.assigned_agent_id][c.status] !== undefined) map[c.assigned_agent_id][c.status]++
@@ -108,6 +113,7 @@ function AgentsTab() {
     })
     setCounts(map)
     setTotals(t)
+    setAiCounts(ai)
   }
 
   const addAgent = async () => {
@@ -324,6 +330,25 @@ function AgentsTab() {
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
               إلغاء
             </button>
+          </div>
+        </div>
+      )}
+
+      {aiAgentRow && (
+        <div className="bg-surface-2 rounded-2xl p-4 border border-brand/30">
+          <div className="flex items-center gap-3">
+            <div className="w-10 h-10 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0">
+              <Bot size={18} className="text-brand" />
+            </div>
+            <div className="flex-1">
+              <p className="font-semibold text-sm text-fg">{aiAgentRow.name}</p>
+              <p className="text-xs text-fg-muted">بيرد تلقائي على المحادثات الجديدة — تحكّم فيه من تاب "AI Agent"</p>
+            </div>
+          </div>
+          <div className="flex gap-3 mt-3 pt-3 border-t border-surface-3">
+            <span className="text-[11px] text-success">مفتوحة: {aiCounts.open}</span>
+            <span className="text-[11px] text-follow">متابعة: {aiCounts.follow_up}</span>
+            <span className="text-[11px] text-fg-subtle">مغلقة: {aiCounts.closed}</span>
           </div>
         </div>
       )}
