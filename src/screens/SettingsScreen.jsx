@@ -154,14 +154,29 @@ function AgentsTab() {
     setEditId(null)
   }
 
+  // بنحذف عن طريق السيرفر مش سوبابيز مباشرة، عشان يمسح حساب الأوث بتاع الموظف كمان (auth_id) —
+  // لو مسحناه من جدول agents بس، إيميله فضل محجوز في نظام الدخول ولو حاولت تضيفه تاني (يدوي أو
+  // بدعوة) هيرفض بـ "already been registered" حتى لو مش ظاهر في قايمة الموظفين خالص
+  const deleteAgentFully = async (id) => {
+    const res = await fetch(`${API_URL}/admin/agent/${id}`, { method: 'DELETE' })
+    if (!res.ok) {
+      const data = await res.json().catch(() => ({}))
+      throw new Error(data.error || 'فشل حذف الموظف')
+    }
+  }
+
   const confirmDeleteAgent = async (ag) => {
     const { data: convs } = await supabase
       .from('conversations').select('id').eq('assigned_agent_id', ag.id).in('status', ['open', 'follow_up'])
     const convCount = convs?.length || 0
     if (convCount === 0) {
       if (!confirm('حذف الموظف؟')) return
-      await supabase.from('agents').delete().eq('id', ag.id)
-      loadAgents()
+      try {
+        await deleteAgentFully(ag.id)
+        loadAgents()
+      } catch (err) {
+        toast.error('خطأ: ' + err.message)
+      }
       return
     }
     setDeleteTarget({ agent: ag, convCount })
@@ -192,13 +207,13 @@ function AgentsTab() {
         await supabase.from('conversation_assignment_log').insert({ conversation_id: a.convId, assigned_to: a.agentId, assigned_by: null })
       }
 
-      await supabase.from('agents').delete().eq('id', deleteTarget.agent.id)
+      await deleteAgentFully(deleteTarget.agent.id)
       toast.success(`اتحذف الموظف واتوزعت محادثاته على ${new Set(assignments.map(a => a.agentId)).size} موظف`)
       setDeleteTarget(null)
       loadAgents()
       loadCounts()
     } catch (err) {
-      toast.error('حصل خطأ أثناء الحذف/التوزيع')
+      toast.error('خطأ: ' + err.message)
     } finally {
       setReassigning(false)
     }

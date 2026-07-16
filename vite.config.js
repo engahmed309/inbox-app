@@ -7,6 +7,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
+      injectRegister: false,
       includeAssets: ['favicon.ico', 'icons/*.png'],
       manifest: {
         name: 'صحة وعافية — إنبوكس',
