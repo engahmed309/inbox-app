@@ -2,7 +2,7 @@ import { useState, useRef, useEffect } from 'react'
 import { COUNTRIES, COUNTRY_MAP } from '../lib/countries'
 import { ChevronDown, Search } from 'lucide-react'
 
-// قايمة اختيار دولة قابلة للبحث — بديل عن مربع نص حر، بتخزن كود ISO2 (زي "EG") مش اسم حر
+// قايمة اختيار دولة قابلة للبحث — بديل عن مربع نص حر،   كود ISO2 (زي "EG") مش اسم حر
 export default function CountrySelect({ value, onChange, placeholder = 'اختار الدولة' }) {
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
