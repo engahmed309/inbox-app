@@ -85,10 +85,10 @@ export default function NotificationBell() {
   if (!agent) return null
 
   return (
-    <div ref={wrapRef} className="fixed z-[60] left-3" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-      <button onClick={() => setOpen(v => !v)}
-        className="relative w-10 h-10 flex items-center justify-center bg-surface-2 border border-surface-3 rounded-full shadow-lg text-fg-muted hover:text-fg transition-colors">
-        <Bell size={17} />
+    <div ref={wrapRef} className="relative">
+      <button onClick={() => setOpen(v => !v)} title="الإشعارات"
+        className="relative w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+        <Bell size={15} />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-danger text-white text-[10px] font-bold rounded-full">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -97,7 +97,7 @@ export default function NotificationBell() {
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl">
+        <div className="absolute top-full left-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
           <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">الإشعارات</div>
           {items.length === 0 && (
             <p className="text-center text-fg-subtle text-sm py-8">مفيش إشعارات</p>

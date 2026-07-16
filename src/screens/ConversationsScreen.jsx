@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
+import NotificationBell from '../components/NotificationBell'
 
 const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
 
@@ -750,6 +751,7 @@ export default function ConversationsScreen() {
             )}
           </div>
           <div className={`flex items-center gap-1 ${expanded ? '' : 'flex-col'}`}>
+            <NotificationBell />
             <button onClick={toggleTheme}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}

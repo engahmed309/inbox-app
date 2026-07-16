@@ -3,6 +3,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
+import CountrySelect from './CountrySelect'
 import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2 } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
@@ -196,7 +197,10 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           {/* Basic Fields */}
           <Field label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <Field label="الهاتف" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
-          <Field label="الدولة" value={form.country} onChange={v => setForm({ ...form, country: v })} />
+          <div>
+            <label className="block text-xs text-fg-muted mb-1">الدولة</label>
+            <CountrySelect value={form.country || null} onChange={v => setForm({ ...form, country: v || '' })} />
+          </div>
 
           {/* Tags — التاجات بتتحط من الأدمن بس في الإعدادات، هنا بس اختيار من الموجود */}
           <div>
