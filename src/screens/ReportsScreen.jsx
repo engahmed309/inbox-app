@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X } from 'lucide-react'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -13,6 +13,8 @@ import {
 const SECTIONS = [
   { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
   { key: 'attendance', label: 'حضور الموظفين', icon: Users2 },
+  { key: 'performance', label: 'أداء الموظفين', icon: Zap },
+  { key: 'volume', label: 'رسايل القنوات', icon: Radio },
   { key: 'tags', label: 'التاجات', icon: Tag },
 ]
 
@@ -51,6 +53,8 @@ export default function ReportsScreen() {
       <div className="flex-1 overflow-y-auto">
         {section === 'overview' && <OverviewTab />}
         {section === 'attendance' && <AttendanceTab />}
+        {section === 'performance' && <PerformanceTab />}
+        {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
       </div>
     </div>
@@ -74,10 +78,21 @@ const RANGE_OPTS = [
   { key: 'custom', label: 'فترة مخصصة' },
 ]
 
-const CHANNEL_OPTS = [
-  { key: 'all', label: 'كل القنوات' },
-  ...PLATFORMS.map(p => ({ key: p.key, label: p.label })),
-]
+// لوحة ألوان تصنيفية بنوزّعها على القنوات بالترتيب — لازمة عشان لو فيه أكتر من قناة لنفس المنصة
+// (مثلاً رقمين واتساب) يبقى كل واحدة ليها لون مميز في الشارت بدل ما يترصّوا فوق بعض بلون واحد
+const CHANNEL_COLOR_PALETTE = ['#3B82F6', '#22C55E', '#EC4899', '#F59E0B', '#8B5CF6', '#06B6D4', '#EF4444', '#84CC16']
+
+// نفس منطق تسمية القنوات المستخدم في شاشة المحادثات والشات: الاسم المختصر لو محطوط، وإلا لواتساب
+// اسم الـ WABA + آخر رقمين من الـ ID، ولباقي المنصات اسم الحساب من ميتا
+function getChannelLabel(ch) {
+  if (!ch) return null
+  if (ch.custom_name) return ch.custom_name
+  if (ch.platform === 'whatsapp') {
+    const last2 = String(ch.external_id || '').slice(-2)
+    return `${ch.display_name || 'واتساب'} #${last2}`
+  }
+  return ch.display_name || PLATFORMS.find(p => p.key === ch.platform)?.label || ch.platform
+}
 
 function dayKey(d) {
   const x = new Date(d)
@@ -95,15 +110,69 @@ function formatShort(dateObj) {
   return dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })
 }
 
+// حدود التاريخ (من/إلى بصيغة ISO) لأي فترة مختارة — نفس المنطق مستخدم في أكتر من تقرير
+function computeDateBounds(range, customFrom, customTo) {
+  if (range === 'today') { const d = new Date(); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
+  if (range === 'week') { const d = new Date(); d.setDate(d.getDate() - 7); return { from: d.toISOString(), to: null } }
+  if (range === 'month') { const d = new Date(); d.setDate(1); d.setHours(0, 0, 0, 0); return { from: d.toISOString(), to: null } }
+  if (range === 'custom') {
+    if (!customFrom || !customTo) return { from: null, to: null }
+    const to = new Date(customTo); to.setHours(23, 59, 59, 999)
+    return { from: new Date(customFrom).toISOString(), to: to.toISOString() }
+  }
+  return { from: null, to: null }
+}
+
+// شريط اختيار الفترة (اليوم/أسبوع/شهر/الكل/فترة مخصصة) — قابل لإعادة الاستخدام في أي تقرير
+function DateRangeFilter({ range, setRange, customFrom, setCustomFrom, customTo, setCustomTo }) {
+  return (
+    <>
+      <div className="flex gap-2 overflow-x-auto scrollbar-hide">
+        {RANGE_OPTS.map(r => (
+          <button key={r.key} onClick={() => setRange(r.key)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${range === r.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-white'}`}>
+            {r.label}
+          </button>
+        ))}
+      </div>
+      {range === 'custom' && (
+        <div className="flex items-center gap-2 bg-surface-2 rounded-xl p-3 border border-surface-3">
+          <div className="flex-1">
+            <label className="block text-xs text-fg-muted mb-1">من</label>
+            <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
+              className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+          <div className="flex-1">
+            <label className="block text-xs text-fg-muted mb-1">إلى</label>
+            <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
+              className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+        </div>
+      )}
+    </>
+  )
+}
+
 function OverviewTab() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [range, setRange] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
-  const [channel, setChannel] = useState('all')
+  const [channel, setChannel] = useState('all') // 'all' أو channel_id بعينه
+  const [channelsList, setChannelsList] = useState([]) // القنوات المتربطة فعلياً، كل واحدة باسمها الحقيقي
   const [rows, setRows] = useState([]) // بيانات العملاء الخام بعد الفلترة، عشان نجمّعها محلياً
   const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/channels`)
+        const data = await res.json()
+        setChannelsList((data.channels || []).filter(c => c.id))
+      } catch { /* لو فشل، هنفضل نعرض التقرير بس من غير أسماء قنوات محددة */ }
+    })()
+  }, [])
 
   useEffect(() => {
     if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return } // استنى لحد ما يختار التاريخين
@@ -122,11 +191,14 @@ function OverviewTab() {
     return { from: null, to: null }
   }
 
+  // بنعتمد على تاريخ أول محادثة للعميل على كل قناة (مش تاريخ إنشاء العميل نفسه) عشان نقدر نوزّع
+  // العدد على القناة المحددة بالظبط — عميل واحد ممكن يبقى ليه أكتر من محادثة على أكتر من قناة
   const load = async () => {
     setLoading(true)
     const { from, to } = getDateBounds()
-    let q = supabase.from('contacts').select('id, platform, created_at, lifecycle_stage_id, lifecycle_stages(name, color)')
-    if (channel !== 'all') q = q.eq('platform', channel)
+    let q = supabase.from('conversations')
+      .select('id, platform, channel_id, created_at, contact_id, contacts(lifecycle_stage_id, lifecycle_stages(name, color))')
+    if (channel !== 'all') q = q.eq('channel_id', channel)
     if (from) q = q.gte('created_at', from)
     if (to) q = q.lte('created_at', to)
     const { data } = await q
@@ -134,10 +206,16 @@ function OverviewTab() {
     setLoading(false)
   }
 
+  // كل قناة بيظهرلها اسمها الحقيقي (مش اسم منصة عام) + لون مميز، عشان لو فيه أكتر من قناة لنفس
+  // المنصة (أرقام واتساب متعددة مثلاً) متتلخبطش مع بعض في الشارت
+  const activeChannels = useMemo(() => {
+    const list = channel === 'all' ? channelsList : channelsList.filter(c => c.id === channel)
+    return list.map((c, i) => ({ key: c.id, label: getChannelLabel(c) || c.platform, color: CHANNEL_COLOR_PALETTE[i % CHANNEL_COLOR_PALETTE.length] }))
+  }, [channelsList, channel])
+
   // تجميع البيانات الخام: توزيع يومي/أسبوعي لكل قناة + توزيع الـ lifecycle — بيتحسب مرة واحدة لحد ما rows تتغير
-  const { chartData, activePlatforms, lifecycleData, total } = useMemo(() => {
+  const { chartData, lifecycleData, total } = useMemo(() => {
     const { from, to } = getDateBounds()
-    const activePlatforms = channel === 'all' ? PLATFORMS : PLATFORMS.filter(p => p.key === channel)
 
     // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم تاريخ موجود في البيانات
     const createdTimes = rows.map(r => new Date(r.created_at).getTime())
@@ -149,12 +227,13 @@ function OverviewTab() {
     // ابني قايمة الفترات (buckets) فاضية الأول، عشان الأيام اللي مفيهاش عملاء تظهر بصفر بدل ما تختفي من المحور
     const buckets = []
     const bucketMap = {}
+    const emptyChannelCounts = () => Object.fromEntries(activeChannels.map(c => [c.key, 0]))
     if (granularity === 'day') {
       const cur = new Date(startDate); cur.setHours(0, 0, 0, 0)
       const last = new Date(endDate); last.setHours(0, 0, 0, 0)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: formatShort(cur), facebook: 0, instagram: 0, whatsapp: 0 }
+        const entry = { key, label: formatShort(cur), ...emptyChannelCounts() }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 1)
       }
@@ -163,7 +242,7 @@ function OverviewTab() {
       const last = mondayOf(endDate)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: `أسبوع ${formatShort(cur)}`, facebook: 0, instagram: 0, whatsapp: 0 }
+        const entry = { key, label: `أسبوع ${formatShort(cur)}`, ...emptyChannelCounts() }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 7)
       }
@@ -173,21 +252,20 @@ function OverviewTab() {
     rows.forEach(r => {
       const key = granularity === 'day' ? dayKey(r.created_at) : dayKey(mondayOf(r.created_at))
       const bucket = bucketMap[key]
-      if (bucket && r.platform in bucket) bucket[r.platform]++
+      if (bucket && r.channel_id in bucket) bucket[r.channel_id]++
 
-      const stage = r.lifecycle_stages
-      const stageKey = r.lifecycle_stage_id || 'none'
+      const stage = r.contacts?.lifecycle_stages
+      const stageKey = r.contacts?.lifecycle_stage_id || 'none'
       if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: stage?.name || 'بدون مرحلة', color: stage?.color || '#78716C', count: 0 }
       lifecycleMap[stageKey].count++
     })
 
     return {
       chartData: buckets,
-      activePlatforms,
       lifecycleData: Object.values(lifecycleMap).sort((a, b) => b.count - a.count),
       total: rows.length,
     }
-  }, [rows, channel, range, customFrom, customTo])
+  }, [rows, activeChannels, range, customFrom, customTo])
 
   const chartTheme = isDark
     ? { grid: '#2c2c2a', axis: '#71717a', tooltipBg: '#212127', tooltipBorder: '#36363e', text: '#f8f8fa' }
@@ -201,7 +279,7 @@ function OverviewTab() {
         {payload.map(p => (
           <div key={p.dataKey} className="flex items-center gap-1.5">
             <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: p.fill }} />
-            <span className="text-fg-muted">{PLATFORMS.find(pl => pl.key === p.dataKey)?.label}:</span>
+            <span className="text-fg-muted">{activeChannels.find(c => c.key === p.dataKey)?.label}:</span>
             <b>{p.value}</b>
           </div>
         ))}
@@ -235,12 +313,17 @@ function OverviewTab() {
         ))}
       </div>
 
-      {/* فلتر القناة — بيتطبق على كل الشارتات تحت */}
+      {/* فلتر القناة — بيتطبق على كل الشارتات تحت. كل قناة باسمها الحقيقي مش اسم المنصة بس،
+          عشان لو فيه أكتر من رقم واتساب مثلاً يبقوا واضحين من بعض */}
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
-        {CHANNEL_OPTS.map(c => (
-          <button key={c.key} onClick={() => setChannel(c.key)}
-            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${channel === c.key ? 'bg-fg text-surface border-fg' : 'bg-transparent text-fg-muted border-surface-3 hover:text-fg'}`}>
-            {c.label}
+        <button onClick={() => setChannel('all')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${channel === 'all' ? 'bg-fg text-surface border-fg' : 'bg-transparent text-fg-muted border-surface-3 hover:text-fg'}`}>
+          كل القنوات
+        </button>
+        {channelsList.map(c => (
+          <button key={c.id} onClick={() => setChannel(c.id)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${channel === c.id ? 'bg-fg text-surface border-fg' : 'bg-transparent text-fg-muted border-surface-3 hover:text-fg'}`}>
+            {getChannelLabel(c)}
           </button>
         ))}
       </div>
@@ -286,9 +369,9 @@ function OverviewTab() {
                     <XAxis dataKey="label" tick={{ fill: chartTheme.axis, fontSize: 11 }} axisLine={{ stroke: chartTheme.grid }} tickLine={false} interval="preserveStartEnd" />
                     <YAxis allowDecimals={false} tick={{ fill: chartTheme.axis, fontSize: 11 }} axisLine={false} tickLine={false} width={28} />
                     <Tooltip content={<BarTooltip />} cursor={{ fill: isDark ? 'rgba(255,255,255,0.04)' : 'rgba(0,0,0,0.03)' }} />
-                    {activePlatforms.length > 1 && <Legend formatter={(v) => PLATFORMS.find(p => p.key === v)?.label || v} wrapperStyle={{ fontSize: 12, color: chartTheme.text }} />}
-                    {activePlatforms.map(p => (
-                      <Bar key={p.key} dataKey={p.key} name={p.key} fill={p.color[isDark ? 'dark' : 'light']} radius={[4, 4, 0, 0]} maxBarSize={36} />
+                    {activeChannels.length > 1 && <Legend formatter={(v) => activeChannels.find(c => c.key === v)?.label || v} wrapperStyle={{ fontSize: 12, color: chartTheme.text }} />}
+                    {activeChannels.map(c => (
+                      <Bar key={c.key} dataKey={c.key} name={c.key} fill={c.color} radius={[4, 4, 0, 0]} maxBarSize={36} />
                     ))}
                   </BarChart>
                 </ResponsiveContainer>
@@ -373,12 +456,43 @@ function formatDuration(ms) {
   return `${h}س ${m}د`
 }
 
+// بيحسب من agent_status_log تايم لاين الحالة (أونلاين/مشغول/أوفلاين) لموظف معين في يوم معين —
+// من آخر حالة معروفة قبل بداية اليوم، لحد آخر تغيير فيه (أو دلوقتي لو النهارده)
+async function computeDayTimeline(agentId, dateStr) {
+  const dayStart = new Date(`${dateStr}T00:00:00`)
+  const dayEnd = new Date(`${dateStr}T23:59:59.999`)
+  const isToday = dateStr === todayStr()
+  const nowClipped = new Date(Math.min(Date.now(), dayEnd.getTime()))
+
+  const { data: before } = await supabase
+    .from('agent_status_log').select('status, changed_at')
+    .eq('agent_id', agentId).lt('changed_at', dayStart.toISOString())
+    .order('changed_at', { ascending: false }).limit(1)
+  const { data: within } = await supabase
+    .from('agent_status_log').select('status, changed_at')
+    .eq('agent_id', agentId)
+    .gte('changed_at', dayStart.toISOString()).lte('changed_at', dayEnd.toISOString())
+    .order('changed_at', { ascending: true })
+
+  const timeline = [
+    { status: before?.[0]?.status || 'offline', at: dayStart },
+    ...(within || []).map(r => ({ status: r.status, at: new Date(r.changed_at) })),
+  ]
+
+  return timeline.map((entry, i) => {
+    const end = timeline[i + 1]?.at || (isToday ? nowClipped : dayEnd)
+    return { status: entry.status, start: entry.at, end, ms: Math.max(0, end - entry.at) }
+  }).filter(s => s.ms > 0)
+}
+
 function AttendanceTab() {
   const [agents, setAgents] = useState([])
-  const [selectedAgentId, setSelectedAgentId] = useState(null)
+  const [selectedAgentIds, setSelectedAgentIds] = useState(null) // null لحد ما الموظفين يتحملوا، وقتها بنختارهم كلهم افتراضياً
+  const [showAgentDropdown, setShowAgentDropdown] = useState(false)
   const [selectedDate, setSelectedDate] = useState(todayStr())
-  const [segments, setSegments] = useState(null) // null = مفيش موظف متختار لسه
-  const [loadingTimeline, setLoadingTimeline] = useState(false)
+  const [summaries, setSummaries] = useState([]) // [{ agent, totals, segments }]
+  const [loadingSummaries, setLoadingSummaries] = useState(false)
+  const [expandedAgentId, setExpandedAgentId] = useState(null)
 
   useEffect(() => {
     loadAgents()
@@ -387,101 +501,123 @@ function AttendanceTab() {
   }, [])
 
   useEffect(() => {
-    if (selectedAgentId) loadTimeline(selectedAgentId, selectedDate)
-  }, [selectedAgentId, selectedDate])
+    if (selectedAgentIds?.length) loadSummaries(selectedAgentIds, selectedDate)
+    else setSummaries([])
+  }, [selectedAgentIds, selectedDate])
 
   const loadAgents = async () => {
     const { data } = await supabase.from('agents').select('id, name, status, is_online, last_seen_at').order('name')
     setAgents(data || [])
+    setSelectedAgentIds(prev => prev || (data || []).map(a => a.id)) // أول تحميل: كل الموظفين مختارين
   }
 
-  const loadTimeline = async (agentId, dateStr) => {
-    setLoadingTimeline(true)
-    const dayStart = new Date(`${dateStr}T00:00:00`)
-    const dayEnd = new Date(`${dateStr}T23:59:59.999`)
-    const isToday = dateStr === todayStr()
-    const nowClipped = new Date(Math.min(Date.now(), dayEnd.getTime()))
-
-    const { data: before } = await supabase
-      .from('agent_status_log').select('status, changed_at')
-      .eq('agent_id', agentId).lt('changed_at', dayStart.toISOString())
-      .order('changed_at', { ascending: false }).limit(1)
-    const { data: within } = await supabase
-      .from('agent_status_log').select('status, changed_at')
-      .eq('agent_id', agentId)
-      .gte('changed_at', dayStart.toISOString()).lte('changed_at', dayEnd.toISOString())
-      .order('changed_at', { ascending: true })
-
-    // لو مفيش حالة معروفة قبل بداية اليوم، بنفترض إنه كان أوفلاين لحد أول تغيير نلاقيه
-    const timeline = [
-      { status: before?.[0]?.status || 'offline', at: dayStart },
-      ...(within || []).map(r => ({ status: r.status, at: new Date(r.changed_at) })),
-    ]
-
-    const segs = timeline.map((entry, i) => {
-      const end = timeline[i + 1]?.at || (isToday ? nowClipped : dayEnd)
-      return { status: entry.status, start: entry.at, end, ms: Math.max(0, end - entry.at) }
-    }).filter(s => s.ms > 0)
-
-    setSegments(segs)
-    setLoadingTimeline(false)
+  const loadSummaries = async (agentIds, dateStr) => {
+    setLoadingSummaries(true)
+    setExpandedAgentId(null)
+    const results = await Promise.all(agentIds.map(async id => {
+      const segs = await computeDayTimeline(id, dateStr)
+      const totals = { online: 0, busy: 0, offline: 0 }
+      segs.forEach(s => { totals[s.status] = (totals[s.status] || 0) + s.ms })
+      return { agentId: id, segments: segs, totals }
+    }))
+    setSummaries(results)
+    setLoadingSummaries(false)
   }
 
-  const totals = useMemo(() => {
-    const t = { online: 0, busy: 0, offline: 0 }
-    segments?.forEach(s => { t[s.status] = (t[s.status] || 0) + s.ms })
-    return t
-  }, [segments])
+  const toggleAgent = (id) => {
+    setSelectedAgentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  }
+  const toggleAll = () => {
+    setSelectedAgentIds(prev => prev.length === agents.length ? [] : agents.map(a => a.id))
+  }
 
-  const selectedAgent = agents.find(a => a.id === selectedAgentId)
   const dayTotalMs = 24 * 60 * 60 * 1000
+  const expandedSummary = summaries.find(s => s.agentId === expandedAgentId)
+  const expandedAgent = agents.find(a => a.id === expandedAgentId)
+
+  const dropdownLabel = !selectedAgentIds || selectedAgentIds.length === agents.length
+    ? 'كل الموظفين'
+    : selectedAgentIds.length === 1
+      ? agents.find(a => a.id === selectedAgentIds[0])?.name || 'موظف واحد'
+      : `${selectedAgentIds.length} موظفين محددين`
 
   return (
     <div className="p-4 space-y-4">
       <h2 className="font-semibold text-fg">حضور الموظفين</h2>
       <p className="text-xs text-fg-subtle -mt-2">
-        الحالة الحالية لكل موظف، وآخر ظهور. اضغط على موظف لعرض تفاصيل يوم معيّن (من كام لحد كام كان متصل).
+        كل ما حالة موظف تتغير (متصل/مشغول/غير متصل) بنسجلها، عشان تقدر تعرف كان شغال من كام لحد كام وإجمالي ساعاته في أي يوم.
       </p>
 
-      {/* قايمة الموظفين — الحالة الحالية */}
-      <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
-        {agents.map(a => {
-          const st = ATTENDANCE_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || ATTENDANCE_STATUS_OPTS[2]
-          return (
-            <button key={a.id} onClick={() => setSelectedAgentId(a.id === selectedAgentId ? null : a.id)}
-              className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/60 transition-colors ${selectedAgentId === a.id ? 'bg-surface-3/60' : ''}`}>
-              <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${st.dot}`} />
-              <span className="flex-1 text-sm font-medium text-fg truncate">{a.name}</span>
-              <span className={`text-xs ${st.text}`}>{st.label}</span>
-              <span className="text-xs text-fg-subtle w-28 text-left">
-                {a.status === 'offline' ? `آخر ظهور: ${relTime(a.last_seen_at)}` : `متصل ${relTime(a.last_seen_at) === 'الآن' ? 'الآن' : `من ${relTime(a.last_seen_at)}`}`}
-              </span>
-            </button>
-          )
-        })}
-        {agents.length === 0 && <p className="text-center text-fg-subtle text-sm py-8">مفيش موظفين</p>}
+      {/* اختيار الموظفين + التاريخ */}
+      <div className="flex items-center gap-2">
+        <div className="relative flex-1">
+          <button onClick={() => setShowAgentDropdown(v => !v)}
+            className="w-full flex items-center justify-between bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg">
+            <span>{dropdownLabel}</span>
+            <ChevronDown size={14} className={`text-fg-subtle transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`} />
+          </button>
+          {showAgentDropdown && (
+            <div className="absolute top-full right-0 left-0 mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-20 max-h-72 overflow-y-auto">
+              <button onClick={toggleAll}
+                className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right border-b border-surface-3">
+                <input type="checkbox" readOnly checked={selectedAgentIds?.length === agents.length} />
+                <span className="font-medium text-fg">تحديد الكل</span>
+              </button>
+              {agents.map(a => (
+                <button key={a.id} onClick={() => toggleAgent(a.id)}
+                  className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right">
+                  <input type="checkbox" readOnly checked={selectedAgentIds?.includes(a.id) || false} />
+                  <span className="flex-1 text-fg truncate">{a.name}</span>
+                  <span className="text-[11px] text-fg-subtle flex-shrink-0">
+                    {a.status === 'offline' ? `آخر ظهور: ${relTime(a.last_seen_at)}` : 'متصل الآن'}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
+        </div>
+        <input type="date" value={selectedDate} max={todayStr()} onChange={e => setSelectedDate(e.target.value)}
+          className="bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
       </div>
 
-      {/* تفاصيل يوم معيّن للموظف المختار */}
-      {selectedAgent && (
-        <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 space-y-3">
-          <div className="flex items-center justify-between gap-2">
-            <p className="text-sm font-medium text-fg">تفاصيل يوم — {selectedAgent.name}</p>
-            <input type="date" value={selectedDate} max={todayStr()} onChange={e => setSelectedDate(e.target.value)}
-              className="bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-          </div>
+      {/* جدول ملخص الساعات لكل موظف مختار في اليوم ده */}
+      {loadingSummaries ? (
+        <div className="flex items-center justify-center h-24">
+          <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : summaries.length > 0 ? (
+        <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+          {summaries.map(s => {
+            const a = agents.find(ag => ag.id === s.agentId)
+            if (!a) return null
+            const worked = (s.totals.online || 0) + (s.totals.busy || 0)
+            return (
+              <button key={s.agentId} onClick={() => setExpandedAgentId(expandedAgentId === s.agentId ? null : s.agentId)}
+                className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/60 transition-colors ${expandedAgentId === s.agentId ? 'bg-surface-3/60' : ''}`}>
+                <span className="flex-1 text-sm font-medium text-fg truncate">{a.name}</span>
+                <span className="text-xs text-success">متصل: {formatDuration(s.totals.online || 0)}</span>
+                <span className="text-xs text-follow">مشغول: {formatDuration(s.totals.busy || 0)}</span>
+                <span className="text-xs text-fg font-semibold w-24 text-left">إجمالي: {formatDuration(worked)}</span>
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار موظف واحد على الأقل</p>
+      )}
 
-          {loadingTimeline ? (
-            <div className="flex items-center justify-center h-24">
-              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : !segments?.length ? (
+      {/* تفاصيل يوم الموظف اللي اتفتح */}
+      {expandedAgent && expandedSummary && (
+        <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 space-y-3">
+          <p className="text-sm font-medium text-fg">تفاصيل يوم — {expandedAgent.name}</p>
+
+          {!expandedSummary.segments?.length ? (
             <p className="text-center text-fg-subtle text-sm py-8">مفيش بيانات ليوم {selectedDate}</p>
           ) : (
             <>
               {/* شريط اليوم الأفقي — 24 ساعة */}
               <div className="flex h-3 rounded-full overflow-hidden bg-surface-3">
-                {segments.map((s, i) => (
+                {expandedSummary.segments.map((s, i) => (
                   <div key={i} style={{ width: `${(s.ms / dayTotalMs) * 100}%` }}
                     className={ATTENDANCE_STATUS_OPTS.find(o => o.key === s.status)?.dot} />
                 ))}
@@ -489,14 +625,14 @@ function AttendanceTab() {
               <div className="flex items-center gap-4 text-xs text-fg-muted">
                 {ATTENDANCE_STATUS_OPTS.map(o => (
                   <span key={o.key} className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${o.dot}`} /> {o.label}: <b className="text-fg">{formatDuration(totals[o.key] || 0)}</b>
+                    <span className={`w-2 h-2 rounded-full ${o.dot}`} /> {o.label}: <b className="text-fg">{formatDuration(expandedSummary.totals[o.key] || 0)}</b>
                   </span>
                 ))}
               </div>
 
               {/* تفاصيل الفترات */}
               <div className="space-y-1.5 pt-1">
-                {segments.filter(s => s.status !== 'offline').map((s, i) => {
+                {expandedSummary.segments.filter(s => s.status !== 'offline').map((s, i) => {
                   const st = ATTENDANCE_STATUS_OPTS.find(o => o.key === s.status)
                   return (
                     <div key={i} className="flex items-center gap-2 text-sm">
@@ -506,7 +642,7 @@ function AttendanceTab() {
                     </div>
                   )
                 })}
-                {segments.every(s => s.status === 'offline') && (
+                {expandedSummary.segments.every(s => s.status === 'offline') && (
                   <p className="text-center text-fg-subtle text-xs py-2">الموظف كان غير متصل طول اليوم ده</p>
                 )}
               </div>
@@ -652,6 +788,228 @@ function TagsReportTab() {
             </div>
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── تقرير أداء الموظفين ─────────────────────────────────────
+// سرعة الرد = الوقت بين أول رسالة عميل جديدة والرد الأول عليها من نفس الموظف (بمتوسط كل الردود
+// في الفترة المختارة)، مستقبلة من عدد رسائل العملاء في المحادثات اللي الموظف رد فيها، ومبعوتة
+// من كل رسايله هو نفسه (من غير الملاحظات الداخلية اللي مش بتتبعت للعميل)
+function PerformanceTab() {
+  const [range, setRange] = useState('week')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [rows, setRows] = useState([])
+  const [agents, setAgents] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => { loadAgents() }, [])
+  const loadAgents = async () => {
+    const { data } = await supabase.from('agents').select('id, name, avatar_url').order('name')
+    setAgents(data || [])
+  }
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+    let q = supabase.from('messages')
+      .select('conversation_id, direction, sent_by_agent_id, content_type, created_at')
+      .neq('content_type', 'note')
+      .order('created_at', { ascending: true })
+      .limit(20000)
+    if (from) q = q.gte('created_at', from)
+    if (to) q = q.lte('created_at', to)
+    const { data } = await q
+    setRows(data || [])
+    setLoading(false)
+  }
+
+  const stats = useMemo(() => {
+    // اجمع الرسايل حسب المحادثة عشان نمشي على كل محادثة لوحدها بترتيبها الزمني
+    const byConv = {}
+    rows.forEach(m => { (byConv[m.conversation_id] ||= []).push(m) })
+
+    const perAgent = {} // { agentId: { sent, received, replyTimes: [ms], customers: Set } }
+    const ensure = (id) => (perAgent[id] ||= { sent: 0, received: 0, replyTimes: [], customers: new Set() })
+
+    Object.entries(byConv).forEach(([convId, msgs]) => {
+      let lastInboundAt = null
+      msgs.forEach(m => {
+        if (m.direction === 'inbound') {
+          lastInboundAt = new Date(m.created_at)
+        } else if (m.direction === 'outbound' && m.sent_by_agent_id) {
+          const st = ensure(m.sent_by_agent_id)
+          st.sent++
+          st.customers.add(convId)
+          if (lastInboundAt) {
+            st.replyTimes.push(new Date(m.created_at) - lastInboundAt)
+            st.received++
+            lastInboundAt = null // الرد ده بيغطي رسالة العميل، من غير ما نعده تاني في رد جاي
+          }
+        }
+      })
+    })
+
+    return agents.map(a => {
+      const st = perAgent[a.id] || { sent: 0, received: 0, replyTimes: [], customers: new Set() }
+      const avgReplyMs = st.replyTimes.length ? st.replyTimes.reduce((s, x) => s + x, 0) / st.replyTimes.length : null
+      return {
+        agent: a, sent: st.sent, received: st.received,
+        customers: st.customers.size, avgReplyMs
+      }
+    }).sort((a, b) => b.sent - a.sent)
+  }, [rows, agents])
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">أداء الموظفين</h2>
+      <p className="text-xs text-fg-subtle -mt-2">
+        سرعة الرد (متوسط الوقت من رسالة العميل لحد رد الموظف)، وعدد الرسايل المستقبلة والمبعوتة، وعدد العملاء المختلفين اللي رد عليهم — في الفترة المختارة.
+      </p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : stats.every(s => s.sent === 0 && s.received === 0) ? (
+        <p className="text-center text-fg-subtle text-sm py-10">مفيش رسايل في الفترة دي</p>
+      ) : (
+        <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+          {stats.map(s => (
+            <div key={s.agent.id} className="px-4 py-3">
+              <div className="flex items-center gap-2 mb-2">
+                <AgentAvatar agent={s.agent} size={22} />
+                <span className="text-sm font-semibold text-fg flex-1 truncate">{s.agent.name}</span>
+                <span className="text-xs text-fg-subtle">
+                  {s.avgReplyMs != null ? `متوسط الرد: ${formatDuration(s.avgReplyMs)}` : 'مفيش ردود متتبعة'}
+                </span>
+              </div>
+              <div className="flex items-center gap-4 text-xs">
+                <span className="text-fg-muted">استقبل: <b className="text-fg">{s.received}</b></span>
+                <span className="text-fg-muted">بعت: <b className="text-fg">{s.sent}</b></span>
+                <span className="text-fg-muted">عملاء اتردّ عليهم: <b className="text-fg">{s.customers}</b></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function AgentAvatar({ agent, size = 22 }) {
+  const [broken, setBroken] = useState(false)
+  if (agent?.avatar_url && !broken) {
+    return <img src={agent.avatar_url} onError={() => setBroken(true)} alt=""
+      style={{ width: size, height: size }} className="rounded-full object-cover flex-shrink-0" />
+  }
+  return (
+    <div style={{ width: size, height: size }} className="rounded-full bg-surface-3 flex items-center justify-center text-fg-muted font-semibold flex-shrink-0" >
+      <span style={{ fontSize: size * 0.45 }}>{agent?.name?.[0]?.toUpperCase() || '?'}</span>
+    </div>
+  )
+}
+
+// ─── تقرير حجم رسايل القنوات ──────────────────────────────────
+// كام رسالة واردة (من العميل) دخلت من كل قناة بعينها في فترة معينة
+function ChannelVolumeTab() {
+  const [range, setRange] = useState('week')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [channelsList, setChannelsList] = useState([])
+  const [counts, setCounts] = useState(null) // { channel_id|'none': count }
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${API_URL}/channels`)
+        const data = await res.json()
+        setChannelsList((data.channels || []).filter(c => c.id))
+      } catch { /* هنعرض بالـ id بس لو فشل */ }
+    })()
+  }, [])
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+    let q = supabase.from('messages')
+      .select('conversation_id, created_at, conversations!inner(channel_id)')
+      .eq('direction', 'inbound')
+      .neq('content_type', 'note')
+      .limit(50000)
+    if (from) q = q.gte('created_at', from)
+    if (to) q = q.lte('created_at', to)
+    const { data } = await q
+    const map = {}
+    ;(data || []).forEach(m => {
+      const key = m.conversations?.channel_id || 'none'
+      map[key] = (map[key] || 0) + 1
+    })
+    setCounts(map)
+    setLoading(false)
+  }
+
+  const rows = useMemo(() => {
+    if (!counts) return []
+    const list = channelsList.map(c => ({ id: c.id, label: getChannelLabel(c), count: counts[c.id] || 0 }))
+    if (counts.none) list.push({ id: 'none', label: 'قنوات قديمة (من غير رقم قناة محدد)', count: counts.none })
+    return list.sort((a, b) => b.count - a.count)
+  }, [counts, channelsList])
+
+  const total = rows.reduce((s, r) => s + r.count, 0)
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">رسايل القنوات</h2>
+      <p className="text-xs text-fg-subtle -mt-2">عدد الرسايل الواردة من العملاء لكل قناة بعينها، في الفترة المختارة.</p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : (
+        <>
+          <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
+            <p className="text-xs text-fg-muted mb-1">إجمالي الرسايل الواردة</p>
+            <p className="text-3xl font-bold text-fg">{total}</p>
+          </div>
+          {rows.length === 0 ? (
+            <p className="text-center text-fg-subtle text-sm py-10">مفيش رسايل في الفترة دي</p>
+          ) : (
+            <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+              {rows.map(r => (
+                <div key={r.id} className="flex items-center gap-3 px-4 py-3">
+                  <span className="flex-1 text-sm text-fg truncate">{r.label}</span>
+                  <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
+                    <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
+                  </div>
+                  <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+                </div>
+              ))}
+            </div>
+          )}
+        </>
       )}
     </div>
   )
