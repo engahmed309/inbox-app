@@ -699,6 +699,7 @@ export default function ConversationsScreen() {
 
   return (
     <div className="h-full flex bg-surface">
+      <NotificationBell />
       {/* خلفية معتمة تقفل قائمة الموبايل لو ضُغط عليها */}
       {mobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 bg-black/50 z-30" onClick={() => setMobileMenuOpen(false)} />
@@ -751,7 +752,6 @@ export default function ConversationsScreen() {
             )}
           </div>
           <div className={`flex items-center gap-1 ${expanded ? '' : 'flex-col'}`}>
-            <NotificationBell />
             <button onClick={toggleTheme}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
