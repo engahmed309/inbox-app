@@ -405,9 +405,17 @@ export default function ConversationsScreen() {
     try {
       let query;
       if (searchType === 'contact') {
+        // بندور على اسم العميل أو رقم هاتفه (للواتساب) في جدول contacts نفسه، بعدين نجيب
+        // المحادثات بتاعت العملاء دول — بنفس الأسلوب المستخدم في بحث الرسايل/التعليقات تحت
+        const { data: contactRows } = await supabase
+          .from('contacts')
+          .select('id')
+          .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+          .limit(300)
+        const contactIds = [...new Set((contactRows || []).map(c => c.id))]
         query = supabase.from('conversations')
-          .select('*, contacts!inner(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
-          .ilike('contacts.name', `%${q}%`)
+          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
+          .in('contact_id', contactIds.length ? contactIds : ['00000000-0000-0000-0000-000000000000'])
       } else {
         let msgQuery = supabase.from('messages').select('conversation_id').ilike('content', `%${q}%`).limit(300)
         msgQuery = searchType === 'comment' ? msgQuery.eq('content_type', 'note') : msgQuery.neq('content_type', 'note')
@@ -714,8 +722,8 @@ export default function ConversationsScreen() {
         {/* Logo + إغلاق (موبايل) / طي (ديسكتوب) */}
         <div className={`flex items-center gap-2 px-3 pt-4 pb-3 border-b border-surface-3 ${expanded ? 'justify-between' : 'flex-col-reverse gap-2'}`}>
           <div className="flex items-center gap-2 min-w-0">
-            <div className="w-8 h-8 bg-brand rounded-lg flex items-center justify-center flex-shrink-0">
-              <MessageSquare size={16} className="text-white" />
+            <div className="w-8 h-8 rounded-lg overflow-hidden flex-shrink-0">
+              <img src="/icons/icon-192.png" alt="Bridge" className="w-full h-full object-cover" />
             </div>
             {expanded && (
               <div className="min-w-0">
@@ -797,7 +805,7 @@ export default function ConversationsScreen() {
               <div className="relative">
                 <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder={searchType === 'contact' ? 'بحث بالاسم...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
+                  placeholder={searchType === 'contact' ? 'بحث بالاسم أو رقم الهاتف...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
                   className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
               <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
@@ -913,7 +921,7 @@ export default function ConversationsScreen() {
           <div className="relative">
             <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={searchType === 'contact' ? 'بحث بالاسم...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
+              placeholder={searchType === 'contact' ? 'بحث بالاسم أو رقم الهاتف...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
               className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
