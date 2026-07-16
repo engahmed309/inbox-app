@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { Bell, BellOff, Volume2, VolumeX } from 'lucide-react'
+import { Bell, BellOff, Volume2, VolumeX, X } from 'lucide-react'
 
 function urlBase64ToUint8Array(base64String) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -110,39 +110,47 @@ export default function PushNotificationToggle() {
   }
 
   return (
-    <div className="relative" ref={wrapRef}>
+    <div ref={wrapRef}>
       <button onClick={() => setOpen(v => !v)} title="إشعارات الموبايل"
         className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
         {subscribed ? <Bell size={15} /> : <BellOff size={15} />}
       </button>
       {open && (
-        <div className="absolute left-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[220px] overflow-hidden p-3 space-y-3">
-          {!supported ? (
-            <p className="text-xs text-fg-subtle">المتصفح ده مش بيدعم إشعارات الموبايل</p>
-          ) : (
-            <>
-              <div className="flex items-center justify-between gap-2">
-                <span className="text-sm text-fg">إشعارات الموبايل</span>
-                <button onClick={subscribed ? disablePush : enablePush} disabled={loading}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-50 ${subscribed ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                  {loading ? '...' : subscribed ? 'مفعّلة' : 'فعّل'}
-                </button>
-              </div>
-              <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface-3">
-                <span className="flex items-center gap-1.5 text-sm text-fg">
-                  {soundEnabled ? <Volume2 size={14} className="text-fg-muted" /> : <VolumeX size={14} className="text-fg-muted" />}
-                  صوت الإشعار
-                </span>
-                <button onClick={toggleSound}
-                  className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${soundEnabled ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                  {soundEnabled ? 'شغال' : 'صامت'}
-                </button>
-              </div>
-              <p className="text-[11px] text-fg-subtle leading-relaxed">
-                الصوت بيجي بس لو التطبيق مقفول أو في الخلفية.
-              </p>
-            </>
-          )}
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setOpen(false)}>
+          <div className="w-full max-w-sm bg-surface border border-surface-3 rounded-2xl shadow-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-fg text-sm">إشعارات الموبايل</span>
+              <button onClick={() => setOpen(false)} className="text-fg-muted hover:text-fg">
+                <X size={16} />
+              </button>
+            </div>
+            {!supported ? (
+              <p className="text-xs text-fg-subtle">المتصفح ده مش بيدعم إشعارات الموبايل</p>
+            ) : (
+              <>
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-sm text-fg">إشعارات الموبايل</span>
+                  <button onClick={subscribed ? disablePush : enablePush} disabled={loading}
+                    className={`text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-50 ${subscribed ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                    {loading ? '...' : subscribed ? 'مفعّلة' : 'فعّل'}
+                  </button>
+                </div>
+                <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface-3">
+                  <span className="flex items-center gap-1.5 text-sm text-fg">
+                    {soundEnabled ? <Volume2 size={14} className="text-fg-muted" /> : <VolumeX size={14} className="text-fg-muted" />}
+                    صوت الإشعار
+                  </span>
+                  <button onClick={toggleSound}
+                    className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${soundEnabled ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                    {soundEnabled ? 'شغال' : 'صامت'}
+                  </button>
+                </div>
+                <p className="text-[11px] text-fg-subtle leading-relaxed">
+                  الصوت بيجي بس لو التطبيق مقفول أو في الخلفية.
+                </p>
+              </>
+            )}
+          </div>
         </div>
       )}
     </div>
