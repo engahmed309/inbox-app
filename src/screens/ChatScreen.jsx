@@ -790,13 +790,9 @@ export default function ChatScreen() {
             </div>
             <div className="flex items-center gap-1">
               <PlatformIcon size={11} className="text-fg-muted" />
-              {conv?.agentName && (
-                <AgentAvatar agent={{ name: conv.agentName, avatar_url: conv.agentAvatarUrl }} size={14} />
+              {!contact?.name && (
+                <span className="text-xs text-fg-muted truncate">اضغط لإضافة الاسم</span>
               )}
-              <span className="text-xs text-fg-muted truncate">
-                {conv?.agentName || 'غير معين'}
-                {!contact?.name && ' · اضغط لإضافة الاسم'}
-              </span>
             </div>
           </div>
         </div>
@@ -809,8 +805,8 @@ export default function ChatScreen() {
 
           <div className="relative">
             <button onClick={() => { setShowAssign(!showAssign); setShowStatus(false) }}
-              className="px-2.5 py-1.5 text-xs bg-surface-3 rounded-lg text-fg-muted hover:text-fg">
-              تعيين
+              className="px-2.5 py-1.5 text-xs bg-surface-3 rounded-lg text-fg-muted hover:text-fg max-w-[110px] truncate">
+              {conv?.agentName || 'غير معين'}
             </button>
             {showAssign && (
               <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
