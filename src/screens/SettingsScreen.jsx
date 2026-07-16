@@ -7,7 +7,7 @@ import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog
+  Radio, Phone, UserCog, ChevronUp, ChevronDown
 } from 'lucide-react'
 
 const TABS = [
@@ -918,6 +918,21 @@ function LifecycleTab() {
     loadStages()
   }
 
+  // بيبدّل ترتيب مرحلتين جنب بعض — ده اللي بيحدد الترتيب اللي الموظفين بيشوفوا بيه المراحل في كل مكان
+  const move = async (index, direction) => {
+    const otherIndex = index + direction
+    if (otherIndex < 0 || otherIndex >= stages.length) return
+    const a = stages[index], b = stages[otherIndex]
+    const reordered = [...stages]
+    reordered[index] = b; reordered[otherIndex] = a
+    setStages(reordered)
+    await Promise.all([
+      supabase.from('lifecycle_stages').update({ stage_order: otherIndex }).eq('id', a.id),
+      supabase.from('lifecycle_stages').update({ stage_order: index }).eq('id', b.id),
+    ])
+    loadStages()
+  }
+
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -948,6 +963,12 @@ function LifecycleTab() {
 
       {stages.map((s, i) => (
         <div key={s.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
+          <div className="flex flex-col flex-shrink-0 -my-1">
+            <button onClick={() => move(i, -1)} disabled={i === 0}
+              className="text-fg-muted hover:text-brand disabled:opacity-25 disabled:hover:text-fg-muted"><ChevronUp size={14} /></button>
+            <button onClick={() => move(i, 1)} disabled={i === stages.length - 1}
+              className="text-fg-muted hover:text-brand disabled:opacity-25 disabled:hover:text-fg-muted"><ChevronDown size={14} /></button>
+          </div>
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
           {editingId === s.id ? (
             <>
