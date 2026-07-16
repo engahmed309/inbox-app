@@ -320,12 +320,16 @@ export default function ConversationsScreen() {
     let readsMap = {}
     if (agent?.id && countsData?.length) {
       const allIds = countsData.map(c => c.id)
-      const { data: readsData } = await supabase
-        .from('conversation_reads')
-        .select('conversation_id, read_at')
-        .eq('agent_id', agent.id)
-        .in('conversation_id', allIds)
-      readsData?.forEach(r => { readsMap[r.conversation_id] = r.read_at })
+      const BATCH_SIZE = 200
+      for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
+        const batch = allIds.slice(i, i + BATCH_SIZE)
+        const { data: readsData } = await supabase
+          .from('conversation_reads')
+          .select('conversation_id, read_at')
+          .eq('agent_id', agent.id)
+          .in('conversation_id', batch)
+        readsData?.forEach(r => { readsMap[r.conversation_id] = r.read_at })
+      }
     }
     const isUnreadForMe = (c) => {
       if (!c.unread_count || c.unread_count <= 0) return false
