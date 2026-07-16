@@ -8,7 +8,7 @@ import RequestAdminModal from '../components/RequestAdminModal'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -103,6 +103,8 @@ export default function ChatScreen() {
   const [activityLogs, setActivityLogs] = useState([])
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [replyingTo, setReplyingTo] = useState(null) // الرسالة اللي الموظف بيرد عليها (ريبلاي)، لو فيه
+  const [actionSheetMsg, setActionSheetMsg] = useState(null) // الرسالة اللي فتحنا لها قائمة نسخ/رد (اضغط مطول)
   const [showStatus, setShowStatus] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [agents, setAgents] = useState([])
@@ -402,11 +404,11 @@ export default function ChatScreen() {
     return urlData.publicUrl
   }
 
-  const sendOne = async (content, content_type, media_url) => {
+  const sendOne = async (content, content_type, media_url, replyToId) => {
     const res = await fetch(`${API_URL}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ conversation_id: id, content, content_type, media_url, agent_id: agent?.id })
+      body: JSON.stringify({ conversation_id: id, content, content_type, media_url, agent_id: agent?.id, reply_to_message_id: replyToId || undefined })
     })
     if (!res.ok) throw new Error()
   }
@@ -414,11 +416,13 @@ export default function ChatScreen() {
   const sendMessage = async () => {
     const msgText = text.trim()
     const pf = pendingFile
+    const replyToId = replyingTo?.id
     if (!msgText && !pf) return
     if (sending) return
     setSending(true)
     setText('')
     setPendingFile(null)
+    setReplyingTo(null)
 
     const tempId = `temp-${Date.now()}`
     tempIdRef.current = tempId
@@ -429,6 +433,7 @@ export default function ChatScreen() {
       content: msgText || pf?.name,
       content_type: pf ? pf.type : 'text',
       media_url: pf?.previewUrl,
+      reply_to_message_id: replyToId || null,
       created_at: new Date().toISOString(),
       _temp: true,
     }])
@@ -436,11 +441,12 @@ export default function ChatScreen() {
 
     let textSent = false
     try {
-      // النص والملف مع بعض بيتبعتوا كرسالتين متتاليتين (فيسبوك مايدعمش caption مع الملف)
-      if (msgText) { await sendOne(msgText, 'text', null); textSent = true }
+      // النص والملف مع بعض بيتبعتوا كرسالتين متتاليتين (فيسبوك مايدعمش caption مع الملف) —
+      // الريبلاي (لو فيه) بيتحط على أول رسالة بتتبعت بس
+      if (msgText) { await sendOne(msgText, 'text', null, replyToId); textSent = true }
       if (pf) {
         const url = await uploadPendingFile(pf)
-        await sendOne(pf.name || 'ملف', pf.type, url)
+        await sendOne(pf.name || 'ملف', pf.type, url, msgText ? null : replyToId)
       }
       await fetchMessages()
       // اتردّ فعلاً، دلوقتي بس تتعلّم "مقروءة"
@@ -461,6 +467,21 @@ export default function ChatScreen() {
     } finally {
       setSending(false)
     }
+  }
+
+  const copyMessage = async (msg) => {
+    try {
+      await navigator.clipboard.writeText(msg.content || '')
+      toast.success('اتنسخت الرسالة')
+    } catch {
+      toast.error('فشل النسخ')
+    }
+  }
+
+  const startReply = (msg) => {
+    setReplyingTo(msg)
+    setActionSheetMsg(null)
+    textareaRef.current?.focus()
   }
 
   const sendNote = async () => {
@@ -722,6 +743,13 @@ export default function ChatScreen() {
     : false
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : Facebook
 
+  // خريطة id → رسالة، عشان نقدر نعرض معاينة سريعة للرسالة الأصلية لما رسالة تانية ترد عليها
+  const messagesById = useMemo(() => {
+    const map = {}
+    messages.forEach(m => { map[m.id] = m })
+    return map
+  }, [messages])
+
   // ─── دمج الرسائل وسجل التعيين في تايم لاين واحد ─────────────
   const timeline = useMemo(() => {
     const msgItems = messages
@@ -891,7 +919,12 @@ export default function ChatScreen() {
               ) : item._kind === 'activity' ? (
                 <ActivityEvent key={item.id} log={item} agentsMap={agentsMap} />
               ) : (
-                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null} onMediaClick={setLightbox} agentsMap={agentsMap} />
+                <MessageBubble key={item.id} msg={item} prev={items[i - 1]?._kind === 'message' ? items[i - 1] : null}
+                  onMediaClick={setLightbox} agentsMap={agentsMap}
+                  repliedMsg={item.reply_to_message_id ? messagesById[item.reply_to_message_id] : null}
+                  canReply={conv?.platform === 'whatsapp' && !item._temp}
+                  onLongPress={() => setActionSheetMsg(item)}
+                  onSwipeReply={() => startReply(item)} />
               ))}
             </div>
           </div>
@@ -1002,6 +1035,21 @@ export default function ChatScreen() {
           </div>
         ) : (
           <div className="flex flex-col gap-2">
+            {replyingTo && (
+              <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 border-r-2 border-brand">
+                <div className="flex-1 min-w-0">
+                  <p className="text-xs font-medium text-brand-light">
+                    {replyingTo.direction === 'outbound' ? 'أنت' : displayName(contact)}
+                  </p>
+                  <p className="text-xs text-fg-muted truncate">
+                    {replyingTo.content_type === 'text' ? replyingTo.content : `📎 ${replyingTo.content || 'ملف'}`}
+                  </p>
+                </div>
+                <button onClick={() => setReplyingTo(null)} className="text-fg-muted hover:text-danger flex-shrink-0">
+                  <X size={16} />
+                </button>
+              </div>
+            )}
             {pendingFile && (
               <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2">
                 {pendingFile.type === 'image' ? (
@@ -1128,6 +1176,28 @@ export default function ChatScreen() {
         <RequestAdminModal type="quick_reply" onClose={() => setShowRequestModal(false)} />
       )}
 
+      {actionSheetMsg && (
+        <div className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/60" onClick={() => setActionSheetMsg(null)}>
+          <div className="w-full sm:max-w-xs bg-surface-2 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
+            style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onClick={e => e.stopPropagation()}>
+            <button onClick={() => { copyMessage(actionSheetMsg); setActionSheetMsg(null) }}
+              className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right">
+              <Copy size={16} className="text-fg-muted" /> نسخ
+            </button>
+            {conv?.platform === 'whatsapp' && (
+              <button onClick={() => startReply(actionSheetMsg)}
+                className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right border-t border-surface-3">
+                <Reply size={16} className="text-fg-muted" /> رد
+              </button>
+            )}
+            <button onClick={() => setActionSheetMsg(null)}
+              className="flex items-center justify-center w-full px-4 py-3.5 text-sm text-fg-muted border-t border-surface-3">
+              إلغاء
+            </button>
+          </div>
+        </div>
+      )}
+
       {showFollowUpModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
           onClick={() => !savingFollowUp && setShowFollowUpModal(false)}>
@@ -1196,7 +1266,65 @@ function ActivityEvent({ log, agentsMap }) {
   )
 }
 
-function MessageBubble({ msg, prev, onMediaClick, agentsMap }) {
+// المسافة اللي لازم تتسحب لحد ما نعتبرها "سحب لتفعيل الرد" فعلي، مش مجرد لمسة عرضية
+const SWIPE_REPLY_THRESHOLD = 56
+
+function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canReply, onLongPress, onSwipeReply }) {
+  const [dragX, setDragX] = useState(0)
+  const dragInfo = useRef({ startX: 0, startY: 0, dragging: false, longPressTimer: null, longPressFired: false })
+
+  const clearLongPress = () => {
+    if (dragInfo.current.longPressTimer) clearTimeout(dragInfo.current.longPressTimer)
+    dragInfo.current.longPressTimer = null
+  }
+
+  const handlePointerDown = (e) => {
+    if (msg.content_type === 'note') return
+    const point = e.touches ? e.touches[0] : e
+    dragInfo.current.startX = point.clientX
+    dragInfo.current.startY = point.clientY
+    dragInfo.current.dragging = false
+    dragInfo.current.longPressFired = false
+    clearLongPress()
+    dragInfo.current.longPressTimer = setTimeout(() => {
+      dragInfo.current.longPressFired = true
+      setDragX(0)
+      onLongPress?.()
+    }, 450)
+  }
+
+  const handlePointerMove = (e) => {
+    if (!dragInfo.current.longPressTimer && !dragInfo.current.dragging) return
+    const point = e.touches ? e.touches[0] : e
+    const dx = point.clientX - dragInfo.current.startX
+    const dy = point.clientY - dragInfo.current.startY
+
+    if (!dragInfo.current.dragging) {
+      // حركة عمودية أوضح من الأفقي = سكرول عادي، سيبها تمشي عادي وألغي أي حاجة تانية
+      if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > 8) {
+        clearLongPress()
+        return
+      }
+      if (Math.abs(dx) > 8) {
+        dragInfo.current.dragging = true
+        clearLongPress()
+      }
+    }
+
+    if (dragInfo.current.dragging && canReply) {
+      setDragX(Math.max(0, Math.min(dx, SWIPE_REPLY_THRESHOLD + 20)))
+    }
+  }
+
+  const handlePointerUp = () => {
+    clearLongPress()
+    if (dragInfo.current.dragging && canReply && dragX >= SWIPE_REPLY_THRESHOLD) {
+      onSwipeReply?.()
+    }
+    dragInfo.current.dragging = false
+    setDragX(0)
+  }
+
   // ملاحظة داخلية — بتتحط جوه المحادثة زي أي رسالة بالترتيب الزمني بالظبط، بس بشكل مميز
   // (لون مختلف، من غير محاذاة يمين/شمال) عشان الموظفين يفرقوها فورًا من رسالة حقيقية للعميل
   if (msg.content_type === 'note') {
@@ -1233,26 +1361,52 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap }) {
           <User size={10} /> {senderName}
         </span>
       )}
-      <div className={`max-w-[78%] px-3.5 py-2.5 text-sm transition-opacity
-        ${isOut ? 'msg-out text-white' : 'msg-in text-fg'}
-        ${isTemp ? 'opacity-50' : 'opacity-100 slide-in'}`}>
-        {msg.content_type === 'image' && msg.media_url ? (
-          <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
-            className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
-        ) : msg.content_type === 'sticker' && msg.media_url ? (
-          <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
-            className="max-w-[100px] max-h-[100px] object-contain cursor-pointer" />
-        ) : msg.content_type === 'video' && msg.media_url ? (
-          <video src={msg.media_url} controls onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
-            className="rounded-lg max-w-full max-h-48 cursor-pointer" />
-        ) : msg.content_type === 'audio' && msg.media_url ? (
-          <audio src={msg.media_url} controls className="max-w-full" style={{ height: 36 }} />
-        ) : msg.content_type === 'file' && msg.media_url ? (
-          <a href={msg.media_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-light underline">
-            📎 {msg.content}
-          </a>
-        ) : (
-          <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+      <div className="relative max-w-[78%]"
+        style={{ transform: dragX ? `translateX(${dragX}px)` : undefined, transition: dragX ? 'none' : 'transform 0.15s' }}
+        onTouchStart={handlePointerDown} onTouchMove={handlePointerMove} onTouchEnd={handlePointerUp}
+        onMouseDown={handlePointerDown} onMouseMove={handlePointerMove} onMouseUp={handlePointerUp} onMouseLeave={handlePointerUp}
+        onContextMenu={e => { e.preventDefault(); onLongPress?.() }}>
+        {dragX > 0 && (
+          <div className="absolute top-1/2 -translate-y-1/2 text-brand" style={{ right: '100%', marginRight: 6 }}>
+            <Reply size={16} className={dragX >= SWIPE_REPLY_THRESHOLD ? 'opacity-100' : 'opacity-40'} />
+          </div>
+        )}
+        <div className={`px-3.5 py-2.5 text-sm transition-opacity select-none
+          ${isOut ? 'msg-out text-white' : 'msg-in text-fg'}
+          ${isTemp ? 'opacity-50' : 'opacity-100 slide-in'}`}>
+          {repliedMsg && (
+            <div className={`mb-1.5 pr-2 border-r-2 rounded-sm ${isOut ? 'border-white/50' : 'border-brand'} bg-black/10`}>
+              <p className={`text-xs font-medium ${isOut ? 'text-white/90' : 'text-brand-light'} truncate px-1.5 pt-1`}>
+                {repliedMsg.direction === 'outbound' ? 'أنت' : 'العميل'}
+              </p>
+              <p className={`text-xs truncate px-1.5 pb-1 ${isOut ? 'text-white/70' : 'text-fg-muted'}`}>
+                {repliedMsg.content_type === 'text' ? repliedMsg.content : `📎 ${repliedMsg.content || 'ملف'}`}
+              </p>
+            </div>
+          )}
+          {msg.content_type === 'image' && msg.media_url ? (
+            <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+              className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
+          ) : msg.content_type === 'sticker' && msg.media_url ? (
+            <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+              className="max-w-[100px] max-h-[100px] object-contain cursor-pointer" />
+          ) : msg.content_type === 'video' && msg.media_url ? (
+            <video src={msg.media_url} controls onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
+              className="rounded-lg max-w-full max-h-48 cursor-pointer" />
+          ) : msg.content_type === 'audio' && msg.media_url ? (
+            <audio src={msg.media_url} controls className="max-w-full" style={{ height: 36 }} />
+          ) : msg.content_type === 'file' && msg.media_url ? (
+            <a href={msg.media_url} target="_blank" rel="noreferrer" className="flex items-center gap-2 text-brand-light underline">
+              📎 {msg.content}
+            </a>
+          ) : (
+            <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+          )}
+        </div>
+        {msg.reaction_emoji && (
+          <span className={`absolute -bottom-2.5 bg-surface-2 border border-surface-3 rounded-full px-1 text-xs shadow ${isOut ? 'left-1' : 'right-1'}`}>
+            {msg.reaction_emoji}
+          </span>
         )}
       </div>
       {isOut && (
