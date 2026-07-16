@@ -119,30 +119,46 @@ function displayName(contact) {
   return 'مجهول'
 }
 
-// كروم ع الأندرويد بيطلق حدث beforeinstallprompt نقدر نتحكم فيه يدوياً (بدل ما نستنى أيقونة المتصفح التلقائية اللي مش دايماً بتظهر).
+// كروم بيطلق حدث beforeinstallprompt مرة واحدة بس لكل تحميل صفحة، مش في كل مرة. المشكلة إن شاشة
+// المحادثات دي بتتشال من الـ DOM وتتبني من الأول كل مرة نروح لشات ونرجع (React Router بيعمل unmount/mount)،
+// فلو الحدث اتخزن جوه state الكومبوننت كان بيضيع أول ما نرجع للشاشة، وزرار التثبيت يختفي فجأة من غير رجعة.
+// الحل: نخزّن الحدث في متغيّر برّه الكومبوننت (module scope) عشان يفضل موجود مهما الكومبوننت اتشال ورجع.
+let capturedInstallPrompt = null
+const installPromptListeners = new Set()
+if (typeof window !== 'undefined') {
+  window.addEventListener('beforeinstallprompt', (e) => {
+    e.preventDefault()
+    capturedInstallPrompt = e
+    installPromptListeners.forEach(fn => fn(e))
+  })
+  window.addEventListener('appinstalled', () => {
+    capturedInstallPrompt = null
+    installPromptListeners.forEach(fn => fn(null))
+  })
+}
+
 // آيفون/سفاري مفيهوش الحدث ده أصلاً، فبنكتشف iOS ونوريله تعليمات "إضافة إلى الشاشة الرئيسية" يدوي.
 function useInstallPrompt() {
-  const [deferredPrompt, setDeferredPrompt] = useState(null)
+  const [deferredPrompt, setDeferredPrompt] = useState(capturedInstallPrompt)
   const [installed, setInstalled] = useState(
     () => window.matchMedia?.('(display-mode: standalone)').matches || window.navigator.standalone === true
   )
   const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent)
 
   useEffect(() => {
-    const onPrompt = (e) => { e.preventDefault(); setDeferredPrompt(e) }
-    const onInstalled = () => { setInstalled(true); setDeferredPrompt(null) }
-    window.addEventListener('beforeinstallprompt', onPrompt)
-    window.addEventListener('appinstalled', onInstalled)
-    return () => {
-      window.removeEventListener('beforeinstallprompt', onPrompt)
-      window.removeEventListener('appinstalled', onInstalled)
+    const onChange = (e) => {
+      setDeferredPrompt(e)
+      if (!e) setInstalled(true)
     }
+    installPromptListeners.add(onChange)
+    return () => installPromptListeners.delete(onChange)
   }, [])
 
   const promptInstall = async () => {
     if (!deferredPrompt) return
     deferredPrompt.prompt()
     await deferredPrompt.userChoice
+    capturedInstallPrompt = null
     setDeferredPrompt(null)
   }
 
