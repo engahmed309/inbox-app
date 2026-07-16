@@ -5,9 +5,55 @@ import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
-import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send } from 'lucide-react'
+import { COUNTRY_MAP } from '../lib/countries'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
+
+// بيقسم الرقم لكود الدولة + باقي الرقم بصيغته المحلية (بصفر في الأول) عشان يبقى واضح ومقروء أكتر
+// من رقم طويل متصل، ونحتفظ بالرقم الكامل من غير مسافات عشان النسخ يبقى دقيق
+function splitPhone(phone, countryCode) {
+  if (!phone) return null
+  const digits = phone.replace(/\D/g, '')
+  const country = countryCode ? COUNTRY_MAP[countryCode] : null
+  if (country && digits.startsWith(country.dial)) {
+    const rest = digits.slice(country.dial.length)
+    return { code: country.code, dial: country.dial, local: country.dial === '1' ? rest : `0${rest}` }
+  }
+  return { code: null, dial: null, local: digits }
+}
+
+function PhoneDisplay({ phone, countryCode }) {
+  const toast = useToast()
+  const [copied, setCopied] = useState(false)
+  const split = splitPhone(phone, countryCode)
+  if (!split) return null
+
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(`+${split.dial || ''}${split.local}`.replace(/\s/g, ''))
+      setCopied(true)
+      toast.success('اترنسخ الرقم')
+      setTimeout(() => setCopied(false), 1500)
+    } catch {
+      toast.error('فشل النسخ')
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 mt-1.5">
+      {split.code && (
+        <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted flex-shrink-0">{split.code}</span>
+      )}
+      <span className="text-sm text-fg flex-1 truncate" dir="ltr">
+        {split.dial ? `+${split.dial} ${split.local}` : split.local}
+      </span>
+      <button onClick={copy} title="انسخ الرقم" className="text-fg-muted hover:text-brand flex-shrink-0">
+        {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+      </button>
+    </div>
+  )
+}
 
 export default function ContactSidebar({ contact, conv, channelLabel, onClose, onUpdate, onDeleted }) {
   const { agent } = useAuth()
@@ -199,6 +245,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           {/* Basic Fields */}
           <Field label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <Field label="الهاتف" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
+          <PhoneDisplay phone={form.phone} countryCode={form.country} />
           <div>
             <label className="block text-xs text-fg-muted mb-1">الدولة</label>
             <CountrySelect value={form.country || null} onChange={v => setForm({ ...form, country: v || '' })} />
