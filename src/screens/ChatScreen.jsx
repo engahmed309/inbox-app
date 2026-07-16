@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -627,6 +627,35 @@ export default function ChatScreen() {
     toast.success('استلمت المحادثة من الـ AI Agent')
   }
 
+  // عكس الـ takeover — يرجّع التحكم للـ AI تاني بعد ما موظف كان استلمها
+  const assignToAi = async () => {
+    const { error } = await supabase.from('conversations').update({ ai_active: true }).eq('id', id)
+    if (error) { toast.error('فشل تحويل المحادثة للـ AI، حاول تاني'); return }
+    setConv(prev => ({ ...prev, ai_active: true }))
+    toast.success('اتحوّلت المحادثة للـ AI Agent')
+  }
+
+  // زرار "عصاية سحرية" — الـ AI بيقترح رد بناءً على المحادثة، والموظف يعدّله ويبعته أو يتجاهله
+  const [suggesting, setSuggesting] = useState(false)
+  const suggestReply = async () => {
+    setSuggesting(true)
+    try {
+      const res = await fetch(`${API_URL}/ai/suggest-reply`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل توليد اقتراح')
+      onTextChange(data.suggestion || '')
+      textareaRef.current?.focus()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSuggesting(false)
+    }
+  }
+
   // ─── اختيار ملف من الجهاز (بريفيو قبل الإرسال) ─────────────────
   const handleFile = (e) => {
     const file = e.target.files[0]
@@ -890,6 +919,13 @@ export default function ChatScreen() {
             )}
           </div>
 
+          {!conv?.ai_active && (
+            <button onClick={assignToAi} title="رجّع التحكم للـ AI Agent"
+              className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-brand/10 text-brand rounded-lg hover:bg-brand/20 flex-shrink-0">
+              <Bot size={12} /> AI
+            </button>
+          )}
+
           <div className="relative">
             <button onClick={() => { setShowStatus(!showStatus); setShowAssign(false) }}
               title={conv?.status === 'follow_up' && conv?.follow_up_at ? `هترجع الساعة ${new Date(conv.follow_up_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}` : undefined}
@@ -1130,6 +1166,10 @@ export default function ChatScreen() {
               <button onClick={() => setShowEmojiPicker(v => !v)}
                 className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-colors ${showEmojiPicker ? 'bg-brand text-white' : 'text-fg-muted hover:text-fg hover:bg-surface-3'}`}>
                 <Smile size={18} />
+              </button>
+              <button onClick={suggestReply} disabled={suggesting} title="اقترح رد بالـ AI"
+                className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-fg-muted hover:text-brand hover:bg-surface-3 transition-colors disabled:opacity-40">
+                {suggesting ? <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" /> : <Wand2 size={18} />}
               </button>
               <textarea
                 ref={textareaRef}
