@@ -33,7 +33,7 @@ function PhoneDisplay({ phone, countryCode }) {
     try {
       await navigator.clipboard.writeText(`+${split.dial || ''}${split.local}`.replace(/\s/g, ''))
       setCopied(true)
-      toast.success('اترنسخ الرقم')
+      toast.success('تم نسخ الرقم')
       setTimeout(() => setCopied(false), 1500)
     } catch {
       toast.error('فشل النسخ')
