@@ -90,8 +90,10 @@ function AgentsTab() {
   const [reassigning, setReassigning] = useState(false)
   const [aiAgentRow, setAiAgentRow] = useState(null)
   const [aiCounts, setAiCounts] = useState({ open: 0, follow_up: 0, closed: 0 })
+  const [aiEnabled, setAiEnabled] = useState(false)
+  const [aiLifecycleBreakdown, setAiLifecycleBreakdown] = useState([]) // [{ stage, count }]
 
-  useEffect(() => { loadAgents(); loadCounts() }, [])
+  useEffect(() => { loadAgents(); loadCounts(); loadAiExtra() }, [])
 
   const loadAgents = async () => {
     const { data } = await supabase.from('agents').select('*').order('created_at')
@@ -114,6 +116,26 @@ function AgentsTab() {
     setCounts(map)
     setTotals(t)
     setAiCounts(ai)
+  }
+
+  // حالة تفعيل الـ AI + توزيع lifecycle للعملاء اللي الـ AI شغال معاهم دلوقتي
+  const loadAiExtra = async () => {
+    const { data: settings } = await supabase.from('ai_settings').select('enabled').limit(1).maybeSingle()
+    setAiEnabled(!!settings?.enabled)
+
+    const { data: stages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
+    const { data: aiConvs } = await supabase
+      .from('conversations').select('contacts(lifecycle_stage_id)').eq('ai_active', true)
+    const stageCounts = {}
+    aiConvs?.forEach(c => {
+      const sid = c.contacts?.lifecycle_stage_id
+      if (!sid) return
+      stageCounts[sid] = (stageCounts[sid] || 0) + 1
+    })
+    const breakdown = (stages || [])
+      .map(s => ({ stage: s, count: stageCounts[s.id] || 0 }))
+      .filter(row => row.count > 0)
+    setAiLifecycleBreakdown(breakdown)
   }
 
   const addAgent = async () => {
@@ -337,11 +359,19 @@ function AgentsTab() {
       {aiAgentRow && (
         <div className="bg-surface-2 rounded-2xl p-4 border border-brand/30">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0">
-              <Bot size={18} className="text-brand" />
+            <div className="relative flex-shrink-0">
+              <div className="w-10 h-10 rounded-full bg-brand/15 flex items-center justify-center">
+                <Bot size={18} className="text-brand" />
+              </div>
+              <span className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
             </div>
             <div className="flex-1">
-              <p className="font-semibold text-sm text-fg">{aiAgentRow.name}</p>
+              <div className="flex items-center gap-1.5">
+                <p className="font-semibold text-sm text-fg">{aiAgentRow.name}</p>
+                <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${aiEnabled ? 'bg-success/15 text-success' : 'bg-surface-3 text-fg-subtle'}`}>
+                  {aiEnabled ? 'مفعّل' : 'متوقف'}
+                </span>
+              </div>
               <p className="text-xs text-fg-muted">بيرد تلقائي على المحادثات الجديدة — تحكّم فيه من تاب "AI Agent"</p>
             </div>
           </div>
@@ -350,6 +380,16 @@ function AgentsTab() {
             <span className="text-[11px] text-follow">متابعة: {aiCounts.follow_up}</span>
             <span className="text-[11px] text-fg-subtle">مغلقة: {aiCounts.closed}</span>
           </div>
+          {aiLifecycleBreakdown.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-surface-3">
+              {aiLifecycleBreakdown.map(({ stage, count }) => (
+                <span key={stage.id} className="flex items-center gap-1 text-[11px] px-2 py-1 rounded-full bg-surface-3 text-fg-muted">
+                  <span className="w-1.5 h-1.5 rounded-full flex-shrink-0" style={{ background: stage.color }} />
+                  {stage.icon && `${stage.icon} `}{stage.name}: {count}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
       )}
 
@@ -1459,6 +1499,10 @@ function AiAgentTab() {
   const [showAddSource, setShowAddSource] = useState(false)
   const [sourceForm, setSourceForm] = useState({ type: 'text', title: '', content: '', url: '' })
   const [usage, setUsage] = useState({ tokens: 0, cost: 0 })
+  const [testContact, setTestContact] = useState(null) // { id, name, phone, platform }
+  const [testContactQuery, setTestContactQuery] = useState('')
+  const [testContactResults, setTestContactResults] = useState([])
+  const [searchingContact, setSearchingContact] = useState(false)
 
   useEffect(() => { load() }, [])
 
@@ -1475,7 +1519,35 @@ function AiAgentTab() {
     const tokens = (usageRows || []).reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0)
     const cost = (usageRows || []).reduce((sum, r) => sum + Number(r.cost_usd), 0)
     setUsage({ tokens, cost })
+    if (s?.test_contact_id) {
+      const { data: c } = await supabase.from('contacts').select('id, name, phone, platform').eq('id', s.test_contact_id).maybeSingle()
+      setTestContact(c || null)
+    } else {
+      setTestContact(null)
+    }
     setLoading(false)
+  }
+
+  const searchTestContacts = async (q) => {
+    setTestContactQuery(q)
+    if (!q.trim()) { setTestContactResults([]); return }
+    setSearchingContact(true)
+    const { data } = await supabase.from('contacts').select('id, name, phone, platform')
+      .or(`name.ilike.%${q}%,phone.ilike.%${q}%`).limit(8)
+    setTestContactResults(data || [])
+    setSearchingContact(false)
+  }
+
+  const pickTestContact = (c) => {
+    setTestContact(c)
+    setSettings(prev => ({ ...prev, test_contact_id: c.id }))
+    setTestContactQuery('')
+    setTestContactResults([])
+  }
+
+  const clearTestContact = () => {
+    setTestContact(null)
+    setSettings(prev => ({ ...prev, test_contact_id: null }))
   }
 
   const save = async () => {
@@ -1545,6 +1617,53 @@ function AiAgentTab() {
             {AI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
         </div>
+      </div>
+
+      {/* وضع الاختبار */}
+      <div className="bg-follow/5 rounded-2xl p-4 space-y-3 border border-follow/30">
+        <Toggle
+          label="وضع الاختبار"
+          sublabel="لو مفعّل، الـ AI يرد بس على عميل الاختبار المحدد تحت — باقي العملاء يتعاملوا وكأن الـ AI متوقف تمامًا"
+          value={settings.test_mode}
+          onChange={v => setSettings({ ...settings, test_mode: v })}
+        />
+        {settings.test_mode && (
+          <div className="space-y-2">
+            {testContact ? (
+              <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-fg truncate">{testContact.name || 'بدون اسم'}</p>
+                  <p className="text-[11px] text-fg-subtle truncate">{testContact.phone || testContact.platform}</p>
+                </div>
+                <button onClick={clearTestContact} className="text-fg-muted hover:text-danger flex-shrink-0"><X size={16} /></button>
+              </div>
+            ) : (
+              <div className="relative">
+                <input value={testContactQuery} onChange={e => searchTestContacts(e.target.value)}
+                  placeholder="ابحث عن عميل بالاسم أو رقم الهاتف عشان تختاره للاختبار..."
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                {testContactQuery && (
+                  <div className="absolute right-0 left-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto">
+                    {searchingContact ? (
+                      <p className="text-xs text-fg-subtle text-center py-3">بيدور...</p>
+                    ) : testContactResults.length === 0 ? (
+                      <p className="text-xs text-fg-subtle text-center py-3">مفيش نتايج</p>
+                    ) : testContactResults.map(c => (
+                      <button key={c.id} onClick={() => pickTestContact(c)}
+                        className="flex flex-col w-full px-3 py-2.5 hover:bg-surface-3 text-right border-t border-surface-3 first:border-t-0">
+                        <span className="text-sm text-fg">{c.name || 'بدون اسم'}</span>
+                        <span className="text-[11px] text-fg-subtle">{c.phone || c.platform}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+            <p className="text-[11px] text-fg-subtle leading-relaxed">
+              لو العميل ده معاه محادثة مفتوحة بالفعل، افتحها ودوس زرار "AI" في أعلى الشات عشان تبدأ الاختبار عليها فورًا — أي عميل جديد يبعت هيتفعل الاختبار تلقائي.
+            </p>
+          </div>
+        )}
       </div>
 
       {/* التعليمات */}

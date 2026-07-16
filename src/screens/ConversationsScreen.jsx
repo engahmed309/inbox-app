@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 
@@ -178,6 +178,7 @@ const screenCache = {
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
   lifecycleCounts: {}, lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
   agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
+  aiEnabled: false, aiOpenCount: 0,
 }
 
 export default function ConversationsScreen() {
@@ -202,6 +203,8 @@ export default function ConversationsScreen() {
   const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
   const [agentOpenCounts, setAgentOpenCounts] = useState(screenCache.agentOpenCounts) // { agent_id: عدد المحادثات المفتوحة المعينة له }
   const [unassignedOpenCount, setUnassignedOpenCount] = useState(screenCache.unassignedOpenCount)
+  const [aiEnabled, setAiEnabled] = useState(screenCache.aiEnabled || false)
+  const [aiOpenCount, setAiOpenCount] = useState(screenCache.aiOpenCount || 0)
   const [allChannels, setAllChannels] = useState(screenCache.allChannels) // كل القنوات المتربطة، كل المنصات
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
@@ -253,6 +256,9 @@ export default function ConversationsScreen() {
     const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
     setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
 
+    const { data: aiSettings } = await supabase.from('ai_settings').select('enabled').limit(1).maybeSingle()
+    setAiEnabled(!!aiSettings?.enabled); screenCache.aiEnabled = !!aiSettings?.enabled
+
     // كل القنوات المتربطة (ممكن يكون أكتر من واحدة لنفس المنصة) — عشان نعرض تاب منفصل لكل واحدة
     // بدل ما يترصوا فوق بعض، ونوري اسم القناة جوه كل كارت محادثة وجوه الشات نفسه
     try {
@@ -282,6 +288,8 @@ export default function ConversationsScreen() {
         q = q.eq('assigned_agent_id', agent?.id)
       } else if (agentFilter === 'unassigned') {
         q = q.is('assigned_agent_id', null)
+      } else if (agentFilter === 'ai') {
+        q = q.eq('ai_active', true)
       } else if (agentFilter) {
         q = q.eq('assigned_agent_id', agentFilter)
       } else if (viewMode === 'mine') {
@@ -312,7 +320,7 @@ export default function ConversationsScreen() {
     // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس، من غير فلتر الموظف
     // نفسه، عشان نقدر نقارن كل الموظفين مع بعض في قائمة الفلتر
     if (canSeeAll) {
-      let agentCountQuery = supabase.from('conversations').select('assigned_agent_id').eq('status', 'open')
+      let agentCountQuery = supabase.from('conversations').select('assigned_agent_id, ai_active').eq('status', 'open')
       const cf = parseChannelFilter(channel)
       if (cf) {
         agentCountQuery = agentCountQuery.eq('platform', cf.platform)
@@ -321,12 +329,15 @@ export default function ConversationsScreen() {
       const { data: agentCountData } = await agentCountQuery
       const aCounts = {}
       let unassigned = 0
+      let aiCount = 0
       agentCountData?.forEach(c => {
+        if (c.ai_active) aiCount++
         if (c.assigned_agent_id) aCounts[c.assigned_agent_id] = (aCounts[c.assigned_agent_id] || 0) + 1
         else unassigned++
       })
       setAgentOpenCounts(aCounts); screenCache.agentOpenCounts = aCounts
       setUnassignedOpenCount(unassigned); screenCache.unassignedOpenCount = unassigned
+      setAiOpenCount(aiCount); screenCache.aiOpenCount = aiCount
     }
 
     // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
@@ -453,6 +464,7 @@ export default function ConversationsScreen() {
       // البحث مش زي القائمة العادية — بيدور في كل المحادثات حتى المتعينة لموظفين تانيين، عشان لو
       // موظف دوّر على شات مع زميله يلاقيه في النتايج (بس معلّم باسم الموظف صاحبه)، ويقدر يطلب نقله له
       if (agentFilter === 'unassigned') query = query.is('assigned_agent_id', null)
+      else if (agentFilter === 'ai') query = query.eq('ai_active', true)
       else if (agentFilter) query = query.eq('assigned_agent_id', agentFilter)
       else if (viewMode === 'mine') query = query.eq('assigned_agent_id', agent?.id)
 
@@ -701,6 +713,16 @@ export default function ConversationsScreen() {
         <Users size={14} className="text-fg-muted flex-shrink-0" />
         <span className="flex-1">كل الموظفين</span>
       </button>
+      <button onClick={() => { setAgentFilter('ai'); setShowAgentFilter(false) }}
+        title={aiEnabled ? 'الـ AI Agent مفعّل' : 'الـ AI Agent متوقف'}
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
+        <span className="relative flex-shrink-0">
+          <span className="w-[22px] h-[22px] rounded-full bg-brand/15 flex items-center justify-center text-brand"><Bot size={13} /></span>
+          <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
+        </span>
+        <span className="flex-1 truncate">AI Agent</span>
+        <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة بيرد عليها الـ AI">{aiOpenCount}</span>
+      </button>
       {agentsList.map(a => {
         const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
         return (
@@ -859,6 +881,11 @@ export default function ConversationsScreen() {
                 <>
                   <UserX size={14} className="text-fg-muted flex-shrink-0" />
                   <span className="flex-1 text-right truncate">غير معينة</span>
+                </>
+              ) : agentFilter === 'ai' ? (
+                <>
+                  <Bot size={14} className="text-brand flex-shrink-0" />
+                  <span className="flex-1 text-right truncate">AI Agent</span>
                 </>
               ) : agentFilter ? (
                 <>
