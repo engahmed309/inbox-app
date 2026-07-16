@@ -4,13 +4,14 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe } from 'lucide-react'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
 } from 'recharts'
 
 const SECTIONS = [
+  { key: 'ai', label: 'تقارير AI', icon: Sparkles },
   { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
   { key: 'customers', label: 'العملاء', icon: Users2 },
   { key: 'countries', label: 'الدول', icon: Globe },
@@ -70,6 +71,7 @@ export default function ReportsScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {section === 'ai' && <AiReportsTab />}
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}
         {section === 'countries' && <CountriesTab />}
@@ -77,6 +79,95 @@ export default function ReportsScreen() {
         {section === 'performance' && <PerformanceTab />}
         {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
+      </div>
+    </div>
+  )
+}
+
+// ─── تقارير بالذكاء الاصطناعي — سؤال بالعربي، رد نصي مباشر من الأدوات المضبوطة نفس التقارير ────
+const SUGGESTED_QUESTIONS = [
+  'كام عميل جديد الأسبوع ده؟',
+  'مين أكتر موظف بعت رسايل الشهر ده؟',
+  'كام محادثة مفتوحة دلوقتي؟',
+  'عدد الرسايل الواردة لكل قناة النهاردة',
+]
+
+function AiReportsTab() {
+  const [question, setQuestion] = useState('')
+  const [history, setHistory] = useState([]) // [{ question, answer, loading, error }]
+  const [asking, setAsking] = useState(false)
+
+  const ask = async (q) => {
+    const text = (q || question).trim()
+    if (!text || asking) return
+    setQuestion('')
+    setAsking(true)
+    const idx = history.length
+    setHistory(prev => [...prev, { question: text, answer: null, loading: true, error: null }])
+    try {
+      const res = await fetch(`${API_URL}/ai/reports-query`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ question: text })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الحصول على إجابة')
+      setHistory(prev => prev.map((h, i) => i === idx ? { ...h, answer: data.answer, loading: false } : h))
+    } catch (err) {
+      setHistory(prev => prev.map((h, i) => i === idx ? { ...h, error: err.message, loading: false } : h))
+    } finally {
+      setAsking(false)
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-4 flex flex-col h-full">
+      <h2 className="font-semibold text-fg flex items-center gap-2"><Sparkles size={18} className="text-brand" /> تقارير بالـ AI</h2>
+      <p className="text-xs text-fg-subtle -mt-2">اكتب سؤالك عن التقارير بالعربي العادي (تاريخ، موظف، قناة، دولة...) وهيرد عليك مباشرة.</p>
+
+      {history.length === 0 && (
+        <div className="flex flex-wrap gap-2">
+          {SUGGESTED_QUESTIONS.map(q => (
+            <button key={q} onClick={() => ask(q)}
+              className="px-3 py-1.5 bg-surface-3 hover:bg-surface-2 rounded-full text-xs text-fg-muted">
+              {q}
+            </button>
+          ))}
+        </div>
+      )}
+
+      <div className="flex-1 space-y-3 overflow-y-auto">
+        {history.map((h, i) => (
+          <div key={i} className="space-y-1.5">
+            <div className="flex justify-end">
+              <div className="bg-brand text-white rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-[85%]">{h.question}</div>
+            </div>
+            <div className="flex justify-start">
+              <div className="bg-surface-2 border border-surface-3 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-fg max-w-[85%]">
+                {h.loading ? (
+                  <div className="flex items-center gap-2 text-fg-subtle">
+                    <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> بيدوّر في التقارير...
+                  </div>
+                ) : h.error ? (
+                  <span className="text-danger">خطأ: {h.error}</span>
+                ) : (
+                  <span className="whitespace-pre-wrap">{h.answer}</span>
+                )}
+              </div>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="flex items-center gap-2 flex-shrink-0">
+        <input value={question} onChange={e => setQuestion(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask() } }}
+          placeholder="اسأل عن أي حاجة في التقارير..."
+          className="flex-1 bg-surface-2 border border-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+        <button onClick={() => ask()} disabled={asking || !question.trim()}
+          className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-brand hover:bg-brand-dark text-white rounded-xl transition-colors disabled:opacity-40">
+          <Send size={16} />
+        </button>
       </div>
     </div>
   )
