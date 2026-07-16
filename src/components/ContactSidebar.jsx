@@ -27,7 +27,9 @@ function PhoneDisplay({ phone, countryCode }) {
   const toast = useToast()
   const [copied, setCopied] = useState(false)
   const split = splitPhone(phone, countryCode)
-  if (!split) return null
+  if (!split) return (
+    <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg-subtle">لا يوجد رقم</div>
+  )
 
   const copy = async () => {
     try {
@@ -41,7 +43,7 @@ function PhoneDisplay({ phone, countryCode }) {
   }
 
   return (
-    <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 mt-1.5">
+    <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5">
       {split.code && (
         <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-2 text-fg-muted flex-shrink-0">{split.code}</span>
       )}
@@ -244,8 +246,10 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
           {/* Basic Fields */}
           <Field label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <Field label="الهاتف" value={form.phone} onChange={v => setForm({ ...form, phone: v })} />
-          <PhoneDisplay phone={form.phone} countryCode={form.country} />
+          <div>
+            <label className="block text-xs text-fg-muted mb-1">الهاتف</label>
+            <PhoneDisplay phone={form.phone} countryCode={form.country} />
+          </div>
           <div>
             <label className="block text-xs text-fg-muted mb-1">الدولة</label>
             <CountrySelect value={form.country || null} onChange={v => setForm({ ...form, country: v || '' })} />
