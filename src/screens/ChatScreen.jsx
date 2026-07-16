@@ -5,10 +5,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
 import RequestAdminModal from '../components/RequestAdminModal'
+import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -118,6 +119,7 @@ export default function ChatScreen() {
   const [libraryItems, setLibraryItems] = useState([])
   const [librarySearch, setLibrarySearch] = useState('')
   const [showRequestModal, setShowRequestModal] = useState(false)
+  const [showEmojiPicker, setShowEmojiPicker] = useState(false)
 
   const [showSearch, setShowSearch] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
@@ -713,6 +715,20 @@ export default function ChatScreen() {
     }
   }
 
+  // بيحط الإيموجي مكان الكيرسور بالظبط بدل ما يضيفه في آخر النص دايماً
+  const insertEmoji = (emoji) => {
+    const el = textareaRef.current
+    const start = el?.selectionStart ?? text.length
+    const end = el?.selectionEnd ?? text.length
+    const newText = text.slice(0, start) + emoji + text.slice(end)
+    setText(newText)
+    setShowEmojiPicker(false)
+    requestAnimationFrame(() => {
+      el?.focus()
+      el?.setSelectionRange(start + emoji.length, start + emoji.length)
+    })
+  }
+
   const pickQuickReply = (qr) => {
     const slashIdx = text.lastIndexOf('/')
     const before = slashIdx !== -1 ? text.slice(0, slashIdx) : text
@@ -814,7 +830,7 @@ export default function ChatScreen() {
               <button onClick={() => setShowLifecycle(v => !v)}
                 className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-1.5 rounded-full text-white max-w-[90px]"
                 style={{ background: currentLifecycle?.color || '#64748B' }}>
-                <span className="truncate">{currentLifecycle?.name || 'بدون مرحلة'}</span> <ChevronDown size={9} className="flex-shrink-0" />
+                <span className="truncate">{currentLifecycle ? `${currentLifecycle.icon ? currentLifecycle.icon + ' ' : ''}${currentLifecycle.name}` : 'بدون مرحلة'}</span> <ChevronDown size={9} className="flex-shrink-0" />
               </button>
               {showLifecycle && (
                 <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
@@ -827,7 +843,7 @@ export default function ChatScreen() {
                     <button key={l.id} onClick={() => changeLifecycle(l.id)}
                       className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                      {l.name}
+                      {l.icon && `${l.icon} `}{l.name}
                     </button>
                   ))}
                 </div>
@@ -972,6 +988,7 @@ export default function ChatScreen() {
             </div>
           </div>
         )}
+        {showEmojiPicker && <EmojiPicker onPick={insertEmoji} />}
         {showQuickReplies && (
           <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden flex flex-col">
             <div className="p-2 border-b border-surface-3 flex-shrink-0">
@@ -1086,6 +1103,10 @@ export default function ChatScreen() {
                   </div>
                 )}
               </div>
+              <button onClick={() => setShowEmojiPicker(v => !v)}
+                className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-colors ${showEmojiPicker ? 'bg-brand text-white' : 'text-fg-muted hover:text-fg hover:bg-surface-3'}`}>
+                <Smile size={18} />
+              </button>
               <textarea
                 ref={textareaRef}
                 value={text}

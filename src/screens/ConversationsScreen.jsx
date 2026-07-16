@@ -347,7 +347,7 @@ export default function ConversationsScreen() {
     // Conversations query — بنجيب أول visibleLimit بس مش كل المحادثات دفعة واحدة (يزيد بـ"تحميل المزيد")
     let query = applyScope(supabase
       .from('conversations')
-      .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
+      .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
       .order('last_message_at', { ascending: false })
       .range(0, visibleLimit - 1))
     if (status !== 'all') query = query.eq('status', status)
@@ -402,7 +402,7 @@ export default function ConversationsScreen() {
       let query;
       if (searchType === 'contact') {
         query = supabase.from('conversations')
-          .select('*, contacts!inner(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
+          .select('*, contacts!inner(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .ilike('contacts.name', `%${q}%`)
       } else {
         let msgQuery = supabase.from('messages').select('conversation_id').ilike('content', `%${q}%`).limit(300)
@@ -410,7 +410,7 @@ export default function ConversationsScreen() {
         const { data: msgs } = await msgQuery
         const convIds = [...new Set((msgs || []).map(m => m.conversation_id))]
         query = supabase.from('conversations')
-          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color))')
+          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .in('id', convIds.length ? convIds : ['00000000-0000-0000-0000-000000000000'])
       }
 
@@ -876,7 +876,7 @@ export default function ConversationsScreen() {
                 <button key={l.id} onClick={() => { setSelectedLifecycle(prev => prev === l.id ? null : l.id); setMobileMenuOpen(false) }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                  <span className="flex-1 text-right truncate">{l.name}</span>
+                  <span className="flex-1 text-right truncate">{l.icon && `${l.icon} `}{l.name}</span>
                   {lifecycleCounts[l.id] > 0 && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
                       {lifecycleCounts[l.id]}
@@ -1131,7 +1131,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
             {contact?.lifecycle_stages && (
               <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: contact.lifecycle_stages.color }}>
-                {contact.lifecycle_stages.name}
+                {contact.lifecycle_stages.icon && `${contact.lifecycle_stages.icon} `}{contact.lifecycle_stages.name}
               </span>
             )}
           </span>

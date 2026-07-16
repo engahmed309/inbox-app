@@ -887,9 +887,10 @@ function ConnectNewChannel() {
 function LifecycleTab() {
   const [stages, setStages] = useState([])
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', color: '#3B82F6' })
+  const [form, setForm] = useState({ name: '', color: '#3B82F6', icon: '' })
   const [editingId, setEditingId] = useState(null)
   const [editName, setEditName] = useState('')
+  const [editIcon, setEditIcon] = useState('')
 
   useEffect(() => { loadStages() }, [])
   const loadStages = async () => {
@@ -898,8 +899,8 @@ function LifecycleTab() {
   }
 
   const add = async () => {
-    await supabase.from('lifecycle_stages').insert({ ...form, stage_order: stages.length })
-    setForm({ name: '', color: '#3B82F6' })
+    await supabase.from('lifecycle_stages').insert({ ...form, icon: form.icon.trim() || null, stage_order: stages.length })
+    setForm({ name: '', color: '#3B82F6', icon: '' })
     setShowAdd(false)
     loadStages()
   }
@@ -910,10 +911,10 @@ function LifecycleTab() {
     loadStages()
   }
 
-  const startEdit = (s) => { setEditingId(s.id); setEditName(s.name) }
+  const startEdit = (s) => { setEditingId(s.id); setEditName(s.name); setEditIcon(s.icon || '') }
   const saveEdit = async () => {
     if (!editName.trim()) return
-    await supabase.from('lifecycle_stages').update({ name: editName.trim() }).eq('id', editingId)
+    await supabase.from('lifecycle_stages').update({ name: editName.trim(), icon: editIcon.trim() || null }).eq('id', editingId)
     setEditingId(null)
     loadStages()
   }
@@ -946,6 +947,7 @@ function LifecycleTab() {
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
           <InputField label="اسم المرحلة" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label="إيموجي (اختياري)" value={form.icon} onChange={v => setForm({ ...form, icon: v })} placeholder="🔥" />
           <div>
             <label className="block text-xs text-fg-muted mb-1">اللون</label>
             <div className="flex items-center gap-2">
@@ -972,6 +974,8 @@ function LifecycleTab() {
           <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: s.color }} />
           {editingId === s.id ? (
             <>
+              <input value={editIcon} onChange={e => setEditIcon(e.target.value)}
+                placeholder="🔥" className="w-10 flex-shrink-0 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg text-center focus:outline-none focus:ring-1 focus:ring-brand" />
               <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveEdit()}
                 className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
@@ -980,7 +984,7 @@ function LifecycleTab() {
             </>
           ) : (
             <>
-              <span className="flex-1 text-sm text-fg">{s.name}</span>
+              <span className="flex-1 text-sm text-fg">{s.icon && `${s.icon} `}{s.name}</span>
               <span className="text-xs text-fg-subtle">#{i + 1}</span>
               <button onClick={() => startEdit(s)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
               <button onClick={() => remove(s.id)} className="text-fg-muted hover:text-danger">

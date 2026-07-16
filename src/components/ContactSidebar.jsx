@@ -301,13 +301,13 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             >
               <option value="">— بدون —</option>
               {lifecycles.map(l => (
-                <option key={l.id} value={l.id}>{l.name}</option>
+                <option key={l.id} value={l.id}>{l.icon ? `${l.icon} ` : ''}{l.name}</option>
               ))}
             </select>
             {currentStage && (
               <div className="mt-1.5 flex items-center gap-1.5">
                 <span className="w-2.5 h-2.5 rounded-full" style={{ background: currentStage.color }} />
-                <span className="text-xs text-fg-muted">{currentStage.name}</span>
+                <span className="text-xs text-fg-muted">{currentStage.icon && `${currentStage.icon} `}{currentStage.name}</span>
               </div>
             )}
             {agent?.role !== 'admin' && (
