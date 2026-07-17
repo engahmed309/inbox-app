@@ -1503,19 +1503,22 @@ function AiAgentTab() {
   const [testContactQuery, setTestContactQuery] = useState('')
   const [testContactResults, setTestContactResults] = useState([])
   const [searchingContact, setSearchingContact] = useState(false)
+  const [channels, setChannels] = useState([])
 
   useEffect(() => { load() }, [])
 
   const load = async () => {
     setLoading(true)
-    const [{ data: s }, { data: src }, { data: usageRows }] = await Promise.all([
+    const [{ data: s }, { data: src }, { data: usageRows }, { data: chans }] = await Promise.all([
       supabase.from('ai_settings').select('*').limit(1).single(),
       supabase.from('ai_knowledge_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('ai_usage_log').select('input_tokens, output_tokens, cost_usd, source')
-        .gte('day', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
+        .gte('day', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)),
+      supabase.from('channels').select('id, platform, display_name, custom_name, status').order('platform')
     ])
     setSettings(s)
     setSources(src || [])
+    setChannels(chans || [])
     const tokens = (usageRows || []).reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0)
     const cost = (usageRows || []).reduce((sum, r) => sum + Number(r.cost_usd), 0)
     const bySource = (source) => {
@@ -1651,6 +1654,43 @@ function AiAgentTab() {
             className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
             {AI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
           </select>
+        </div>
+        <div>
+          <label className="block text-xs text-fg-muted mb-1">نطاق القنوات</label>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setSettings({ ...settings, channel_scope: 'all' })}
+              className={`flex-1 rounded-xl px-3 py-2.5 text-sm border transition-colors ${(settings.channel_scope || 'all') === 'all' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
+              كل القنوات
+            </button>
+            <button
+              onClick={() => setSettings({ ...settings, channel_scope: 'specific' })}
+              className={`flex-1 rounded-xl px-3 py-2.5 text-sm border transition-colors ${settings.channel_scope === 'specific' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
+              قنوات محددة
+            </button>
+          </div>
+          {settings.channel_scope === 'specific' && (
+            <div className="mt-2 space-y-1.5">
+              {channels.length === 0 ? (
+                <p className="text-[11px] text-fg-subtle">مفيش قنوات متصلة</p>
+              ) : channels.map(c => {
+                const checked = (settings.allowed_channel_ids || []).includes(c.id)
+                const label = `${c.platform === 'whatsapp' ? 'واتساب' : c.platform === 'facebook' ? 'فيسبوك' : 'انستجرام'} — ${c.custom_name || c.display_name || c.id}`
+                return (
+                  <label key={c.id} className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-3 py-2 cursor-pointer">
+                    <input type="checkbox" checked={checked} onChange={e => {
+                      const ids = new Set(settings.allowed_channel_ids || [])
+                      if (e.target.checked) ids.add(c.id); else ids.delete(c.id)
+                      setSettings({ ...settings, allowed_channel_ids: Array.from(ids) })
+                    }} className="w-4 h-4 accent-brand" />
+                    <span className="text-sm text-fg flex-1">{label}</span>
+                    {c.status !== 'active' && <span className="text-[10px] text-fg-subtle">({c.status})</span>}
+                  </label>
+                )
+              })}
+              <p className="text-[11px] text-fg-subtle">الـ AI هيرد بس على القنوات المحددة هنا — أي قناة تانية هتتعامل زي ما لو كان متوقف تمامًا.</p>
+            </div>
+          )}
         </div>
       </div>
 
