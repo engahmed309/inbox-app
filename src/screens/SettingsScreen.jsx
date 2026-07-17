@@ -1762,13 +1762,42 @@ function AiAgentTab() {
         <Toggle label="إضافة/تعديل تاجات العميل" value={settings.can_update_tags} onChange={v => setSettings({ ...settings, can_update_tags: v })} />
       </div>
 
-      {/* سقف الاستهلاك */}
+      {/* سقف الاستهلاك الشهري */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
         <MaxConversationsField
           value={settings.monthly_token_budget}
           onChange={v => setSettings({ ...settings, monthly_token_budget: v })}
         />
         <p className="text-[11px] text-fg-subtle -mt-2">لو حطيت سقف، الـ AI هيتوقف تلقائي لو الاستهلاك الشهري وصله (هتوصلك رسالة تنبيه).</p>
+      </div>
+
+      {/* سقف لكل محادثة */}
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <div className="flex items-center justify-between">
+          <label className="block text-xs text-fg-muted">سقف لكل محادثة لوحدها</label>
+          <button type="button" onClick={() => setSettings({ ...settings, conversation_limit_value: settings.conversation_limit_value == null ? 20000 : null })}
+            className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${settings.conversation_limit_value == null ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+            {settings.conversation_limit_value == null ? 'غير محدود' : 'محدود'}
+          </button>
+        </div>
+        {settings.conversation_limit_value != null && (
+          <>
+            <div className="flex gap-2">
+              <button onClick={() => setSettings({ ...settings, conversation_limit_type: 'tokens' })}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm border transition-colors ${(settings.conversation_limit_type || 'tokens') === 'tokens' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
+                توكنز
+              </button>
+              <button onClick={() => setSettings({ ...settings, conversation_limit_type: 'cost' })}
+                className={`flex-1 rounded-xl px-3 py-2 text-sm border transition-colors ${settings.conversation_limit_type === 'cost' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
+                دولار ($)
+              </button>
+            </div>
+            <input type="number" step={settings.conversation_limit_type === 'cost' ? '0.01' : '1'} value={settings.conversation_limit_value ?? ''}
+              onChange={e => setSettings({ ...settings, conversation_limit_value: parseFloat(e.target.value) || 0 })}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          </>
+        )}
+        <p className="text-[11px] text-fg-subtle">بمجرد ما محادثة واحدة توصل للسقف ده، الـ AI بيوقف عليها ويحوّلها لموظف بشري تلقائي — بغض النظر عن باقي المحادثات.</p>
       </div>
 
       {/* استهلاك الشهر الحالي */}
