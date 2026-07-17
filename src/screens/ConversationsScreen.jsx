@@ -353,9 +353,20 @@ export default function ConversationsScreen() {
     }
 
     // عدد المحادثات المفتوحة لكل مرحلة lifecycle (بنفس نطاق القناة/الموظف بس، من غير فلتر التاج/المرحلة نفسها)
-    const { data: lcCountData } = await applyBaseScope(
-      supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)').eq('status', 'open')
-    )
+    // بصفحات من غير حد أقصى، لنفس سبب عدادات التابات تحت — سوبابيز بيوقف عند ١٠٠٠ صف افتراضيًا
+    let lcCountData = []
+    {
+      const PAGE = 1000
+      let offset = 0
+      while (true) {
+        const { data: page } = await applyBaseScope(
+          supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)').eq('status', 'open')
+        ).range(offset, offset + PAGE - 1)
+        lcCountData = lcCountData.concat(page || [])
+        if (!page || page.length < PAGE) break
+        offset += PAGE
+      }
+    }
     const lcCounts = {}
     lcCountData?.forEach(c => {
       const sid = c.contacts?.lifecycle_stage_id
@@ -367,13 +378,26 @@ export default function ConversationsScreen() {
     // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس، من غير فلتر الموظف
     // نفسه، عشان نقدر نقارن كل الموظفين مع بعض في قائمة الفلتر
     if (canSeeAll) {
-      let agentCountQuery = supabase.from('conversations').select('assigned_agent_id, ai_active').eq('status', 'open')
-      const cf = parseChannelFilter(channel)
-      if (cf) {
-        agentCountQuery = agentCountQuery.eq('platform', cf.platform)
-        if (cf.channelId) agentCountQuery = agentCountQuery.eq('channel_id', cf.channelId)
+      const buildAgentCountQuery = () => {
+        let q = supabase.from('conversations').select('assigned_agent_id, ai_active').eq('status', 'open')
+        const cf = parseChannelFilter(channel)
+        if (cf) {
+          q = q.eq('platform', cf.platform)
+          if (cf.channelId) q = q.eq('channel_id', cf.channelId)
+        }
+        return q
       }
-      const { data: agentCountData } = await agentCountQuery
+      let agentCountData = []
+      {
+        const PAGE = 1000
+        let offset = 0
+        while (true) {
+          const { data: page } = await buildAgentCountQuery().range(offset, offset + PAGE - 1)
+          agentCountData = agentCountData.concat(page || [])
+          if (!page || page.length < PAGE) break
+          offset += PAGE
+        }
+      }
       const aCounts = {}
       let unassigned = 0
       let aiCount = 0
@@ -387,9 +411,19 @@ export default function ConversationsScreen() {
       setAiOpenCount(aiCount); screenCache.aiOpenCount = aiCount
     }
 
-    // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
-    const countsQuery = applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at'))
-    const { data: countsData } = await countsQuery
+    // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي — بنجيبها بصفحات من غير حد
+    // أقصى، لأن سوبابيز بيوقف عند ١٠٠٠ صف افتراضيًا في أي كويري عادي حتى لو العدد الحقيقي أكبر
+    let countsData = []
+    {
+      const PAGE = 1000
+      let offset = 0
+      while (true) {
+        const { data: page } = await applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at')).range(offset, offset + PAGE - 1)
+        countsData = countsData.concat(page || [])
+        if (!page || page.length < PAGE) break
+        offset += PAGE
+      }
+    }
 
     // قراءة كل موظف الشخصية لكل محادثة (عشان نحدد المقروء/غير المقروء على مستوى اليوزر)
     let readsMap = {}
