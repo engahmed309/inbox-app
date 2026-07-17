@@ -1498,7 +1498,7 @@ function AiAgentTab() {
   const [sources, setSources] = useState([])
   const [showAddSource, setShowAddSource] = useState(false)
   const [sourceForm, setSourceForm] = useState({ type: 'text', title: '', content: '', url: '' })
-  const [usage, setUsage] = useState({ tokens: 0, cost: 0 })
+  const [usage, setUsage] = useState({ tokens: 0, cost: 0, agent: { tokens: 0, cost: 0 }, reports: { tokens: 0, cost: 0 } })
   const [testContact, setTestContact] = useState(null) // { id, name, phone, platform }
   const [testContactQuery, setTestContactQuery] = useState('')
   const [testContactResults, setTestContactResults] = useState([])
@@ -1511,14 +1511,21 @@ function AiAgentTab() {
     const [{ data: s }, { data: src }, { data: usageRows }] = await Promise.all([
       supabase.from('ai_settings').select('*').limit(1).single(),
       supabase.from('ai_knowledge_sources').select('*').order('created_at', { ascending: false }),
-      supabase.from('ai_usage_log').select('input_tokens, output_tokens, cost_usd')
+      supabase.from('ai_usage_log').select('input_tokens, output_tokens, cost_usd, source')
         .gte('day', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10))
     ])
     setSettings(s)
     setSources(src || [])
     const tokens = (usageRows || []).reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0)
     const cost = (usageRows || []).reduce((sum, r) => sum + Number(r.cost_usd), 0)
-    setUsage({ tokens, cost })
+    const bySource = (source) => {
+      const rows = (usageRows || []).filter(r => (r.source || 'agent') === source)
+      return {
+        tokens: rows.reduce((sum, r) => sum + r.input_tokens + r.output_tokens, 0),
+        cost: rows.reduce((sum, r) => sum + Number(r.cost_usd), 0)
+      }
+    }
+    setUsage({ tokens, cost, agent: bySource('agent'), reports: bySource('reports') })
     if (s?.test_contact_id) {
       const { data: c } = await supabase.from('contacts').select('id, name, phone, platform').eq('id', s.test_contact_id).maybeSingle()
       setTestContact(c || null)
@@ -1730,16 +1737,34 @@ function AiAgentTab() {
         {usage.tokens === 0 ? (
           <p className="text-xs text-fg-subtle">لسه مفيش استهلاك مسجل — محرك الـ AI لسه في مرحلة الإعداد</p>
         ) : (
-          <div className="flex gap-4">
-            <div>
-              <p className="text-lg font-bold text-fg">{usage.tokens.toLocaleString()}</p>
-              <p className="text-[11px] text-fg-subtle">توكن</p>
+          <>
+            <div className="flex gap-4">
+              <div>
+                <p className="text-lg font-bold text-fg">{usage.tokens.toLocaleString()}</p>
+                <p className="text-[11px] text-fg-subtle">توكن</p>
+              </div>
+              <div>
+                <p className="text-lg font-bold text-fg">${usage.cost.toFixed(2)}</p>
+                <p className="text-[11px] text-fg-subtle">تكلفة تقريبية</p>
+              </div>
+              {settings.monthly_token_budget ? (
+                <div>
+                  <p className="text-lg font-bold text-fg">{Math.max(0, settings.monthly_token_budget - usage.tokens).toLocaleString()}</p>
+                  <p className="text-[11px] text-fg-subtle">متبقي من السقف الشهري</p>
+                </div>
+              ) : null}
             </div>
-            <div>
-              <p className="text-lg font-bold text-fg">${usage.cost.toFixed(2)}</p>
-              <p className="text-[11px] text-fg-subtle">تكلفة تقريبية</p>
+            <div className="mt-3 pt-3 border-t border-surface-3 flex gap-6">
+              <div>
+                <p className="text-[11px] text-fg-subtle mb-0.5">AI Agent (ردود العملاء)</p>
+                <p className="text-sm font-semibold text-fg">{usage.agent.tokens.toLocaleString()} توكن — ${usage.agent.cost.toFixed(2)}</p>
+              </div>
+              <div>
+                <p className="text-[11px] text-fg-subtle mb-0.5">تقارير AI</p>
+                <p className="text-sm font-semibold text-fg">{usage.reports.tokens.toLocaleString()} توكن — ${usage.reports.cost.toFixed(2)}</p>
+              </div>
             </div>
-          </div>
+          </>
         )}
       </div>
 
