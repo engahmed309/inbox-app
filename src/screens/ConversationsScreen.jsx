@@ -1223,6 +1223,11 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         <div className="absolute -bottom-0.5 -left-0.5 bg-surface p-0.5 rounded-full">
           {PLATFORM_ICONS[conv.platform]}
         </div>
+        {conv.ai_active && (
+          <div className="absolute -top-0.5 -left-0.5 bg-brand text-white p-0.5 rounded-full" title="الـ AI Agent شغال على المحادثة دي">
+            <Bot size={11} />
+          </div>
+        )}
       </div>
 
       {/* Content */}
