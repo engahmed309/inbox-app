@@ -1431,18 +1431,28 @@ const DISTRIBUTION_MODES = [
 
 function RoundRobinTab() {
   const [mode, setMode] = useState('least_busy')
+  const [followupEnabled, setFollowupEnabled] = useState(false)
+  const [followupMinutes, setFollowupMinutes] = useState(60)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
 
   useEffect(() => { load() }, [])
   const load = async () => {
-    const { data } = await supabase.from('app_settings').select('distribution_mode').eq('id', true).maybeSingle()
-    if (data) setMode(data.distribution_mode)
+    const { data } = await supabase.from('app_settings').select('distribution_mode, followup_reassign_enabled, followup_reassign_minutes').eq('id', true).maybeSingle()
+    if (data) {
+      setMode(data.distribution_mode)
+      setFollowupEnabled(data.followup_reassign_enabled)
+      setFollowupMinutes(data.followup_reassign_minutes || 60)
+    }
   }
 
   const save = async () => {
     setSaving(true)
-    await supabase.from('app_settings').update({ distribution_mode: mode }).eq('id', true)
+    await supabase.from('app_settings').update({
+      distribution_mode: mode,
+      followup_reassign_enabled: followupEnabled,
+      followup_reassign_minutes: followupMinutes
+    }).eq('id', true)
     setSaving(false)
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
@@ -1474,6 +1484,28 @@ function RoundRobinTab() {
           <p>٥. أول ما موظف يتاح (يفتح شات أو يرجع Online)، المحادثات المستنية بتتوزع عليه تلقائياً.</p>
         </div>
 
+        <button onClick={save} disabled={saving}
+          className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
+          {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
+        </button>
+      </div>
+
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <Toggle
+          label="أقصى مدة انتظار رد بعد المتابعة"
+          sublabel="لما محادثة 'متابعة' يرجع يبعت فيها العميل، تفضل مع نفس الموظف زي العادة. لو مفعّل، وموظف معدّش رد خلال المدة دي، المحادثة تتحول لموظف تاني أونلاين — أو تتشال منه لحد ما حد يدخل لو محدش أونلاين"
+          value={followupEnabled}
+          onChange={setFollowupEnabled}
+        />
+        {followupEnabled && (
+          <div>
+            <label className="block text-xs text-fg-muted mb-1">المدة بالدقايق</label>
+            <input type="number" min={1} value={followupMinutes}
+              onChange={e => setFollowupMinutes(parseInt(e.target.value) || 1)}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+            <p className="text-[11px] text-fg-subtle mt-1">مثلاً 60 = ساعة. الإعداد ده بيأثر بس على محادثات المتابعة اللي رجعت تتفتح، مش المحادثات المفتوحة العادية.</p>
+          </div>
+        )}
         <button onClick={save} disabled={saving}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
           {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
