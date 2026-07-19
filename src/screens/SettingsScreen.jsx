@@ -1531,7 +1531,7 @@ function AiAgentTab() {
   const [showAddSource, setShowAddSource] = useState(false)
   const [sourceForm, setSourceForm] = useState({ type: 'text', title: '', content: '', url: '' })
   const [usage, setUsage] = useState({ tokens: 0, cost: 0, agent: { tokens: 0, cost: 0 }, reports: { tokens: 0, cost: 0 } })
-  const [testContact, setTestContact] = useState(null) // { id, name, phone, platform }
+  const [testContacts, setTestContacts] = useState([]) // [{ id, name, phone, platform }]
   const [testContactQuery, setTestContactQuery] = useState('')
   const [testContactResults, setTestContactResults] = useState([])
   const [searchingContact, setSearchingContact] = useState(false)
@@ -1561,11 +1561,11 @@ function AiAgentTab() {
       }
     }
     setUsage({ tokens, cost, agent: bySource('agent'), reports: bySource('reports') })
-    if (s?.test_contact_id) {
-      const { data: c } = await supabase.from('contacts').select('id, name, phone, platform').eq('id', s.test_contact_id).maybeSingle()
-      setTestContact(c || null)
+    if (s?.test_contact_ids?.length) {
+      const { data: c } = await supabase.from('contacts').select('id, name, phone, platform').in('id', s.test_contact_ids)
+      setTestContacts(c || [])
     } else {
-      setTestContact(null)
+      setTestContacts([])
     }
     setLoading(false)
   }
@@ -1581,15 +1581,18 @@ function AiAgentTab() {
   }
 
   const pickTestContact = (c) => {
-    setTestContact(c)
-    setSettings(prev => ({ ...prev, test_contact_id: c.id }))
+    if (testContacts.some(t => t.id === c.id)) { setTestContactQuery(''); setTestContactResults([]); return }
+    const next = [...testContacts, c]
+    setTestContacts(next)
+    setSettings(prev => ({ ...prev, test_contact_ids: next.map(t => t.id) }))
     setTestContactQuery('')
     setTestContactResults([])
   }
 
-  const clearTestContact = () => {
-    setTestContact(null)
-    setSettings(prev => ({ ...prev, test_contact_id: null }))
+  const removeTestContact = (id) => {
+    const next = testContacts.filter(t => t.id !== id)
+    setTestContacts(next)
+    setSettings(prev => ({ ...prev, test_contact_ids: next.map(t => t.id) }))
   }
 
   const save = async () => {
@@ -1730,44 +1733,43 @@ function AiAgentTab() {
       <div className="bg-follow/5 rounded-2xl p-4 space-y-3 border border-follow/30">
         <Toggle
           label="وضع الاختبار"
-          sublabel="لو مفعّل، الـ AI يرد بس على عميل الاختبار المحدد تحت — باقي العملاء يتعاملوا وكأن الـ AI متوقف تمامًا"
+          sublabel="لو مفعّل، الـ AI يرد بس على عملاء الاختبار المحددين تحت (تقدري تضيفي أكتر من واحد) — باقي العملاء يتعاملوا وكأن الـ AI متوقف تمامًا"
           value={settings.test_mode}
           onChange={v => setSettings({ ...settings, test_mode: v })}
         />
         {settings.test_mode && (
           <div className="space-y-2">
-            {testContact ? (
-              <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5">
+            {testContacts.map(tc => (
+              <div key={tc.id} className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-fg truncate">{testContact.name || 'بدون اسم'}</p>
-                  <p className="text-[11px] text-fg-subtle truncate">{testContact.phone || testContact.platform}</p>
+                  <p className="text-sm text-fg truncate">{tc.name || 'بدون اسم'}</p>
+                  <p className="text-[11px] text-fg-subtle truncate">{tc.phone || tc.platform}</p>
                 </div>
-                <button onClick={clearTestContact} className="text-fg-muted hover:text-danger flex-shrink-0"><X size={16} /></button>
+                <button onClick={() => removeTestContact(tc.id)} className="text-fg-muted hover:text-danger flex-shrink-0"><X size={16} /></button>
               </div>
-            ) : (
-              <div className="relative">
-                <input value={testContactQuery} onChange={e => searchTestContacts(e.target.value)}
-                  placeholder="ابحث عن عميل بالاسم أو رقم الهاتف عشان تختاره للاختبار..."
-                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
-                {testContactQuery && (
-                  <div className="absolute right-0 left-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto">
-                    {searchingContact ? (
-                      <p className="text-xs text-fg-subtle text-center py-3">بيدور...</p>
-                    ) : testContactResults.length === 0 ? (
-                      <p className="text-xs text-fg-subtle text-center py-3">مفيش نتايج</p>
-                    ) : testContactResults.map(c => (
-                      <button key={c.id} onClick={() => pickTestContact(c)}
-                        className="flex flex-col w-full px-3 py-2.5 hover:bg-surface-3 text-right border-t border-surface-3 first:border-t-0">
-                        <span className="text-sm text-fg">{c.name || 'بدون اسم'}</span>
-                        <span className="text-[11px] text-fg-subtle">{c.phone || c.platform}</span>
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
+            ))}
+            <div className="relative">
+              <input value={testContactQuery} onChange={e => searchTestContacts(e.target.value)}
+                placeholder="ابحث عن عميل بالاسم أو رقم الهاتف عشان تضيفه للاختبار..."
+                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              {testContactQuery && (
+                <div className="absolute right-0 left-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto">
+                  {searchingContact ? (
+                    <p className="text-xs text-fg-subtle text-center py-3">بيدور...</p>
+                  ) : testContactResults.length === 0 ? (
+                    <p className="text-xs text-fg-subtle text-center py-3">مفيش نتايج</p>
+                  ) : testContactResults.map(c => (
+                    <button key={c.id} onClick={() => pickTestContact(c)}
+                      className="flex flex-col w-full px-3 py-2.5 hover:bg-surface-3 text-right border-t border-surface-3 first:border-t-0">
+                      <span className="text-sm text-fg">{c.name || 'بدون اسم'}</span>
+                      <span className="text-[11px] text-fg-subtle">{c.phone || c.platform}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
             <p className="text-[11px] text-fg-subtle leading-relaxed">
-              لو العميل ده معاه محادثة مفتوحة بالفعل، افتحها ودوس زرار "AI" في أعلى الشات عشان تبدأ الاختبار عليها فورًا — أي عميل جديد يبعت هيتفعل الاختبار تلقائي.
+              لو عميل من دول معاه محادثة مفتوحة بالفعل، افتحها ودوس زرار "AI" في أعلى الشات عشان تبدأ الاختبار عليها فورًا — أي عميل جديد منهم يبعت هيتفعل الاختبار تلقائي.
             </p>
           </div>
         )}
