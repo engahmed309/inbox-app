@@ -514,12 +514,15 @@ export default function ConversationsScreen() {
     try {
       let query;
       if (searchType === 'contact') {
-        // بندور على اسم العميل أو رقم هاتفه (للواتساب) في جدول contacts نفسه، بعدين نجيب
-        // المحادثات بتاعت العملاء دول — بنفس الأسلوب المستخدم في بحث الرسايل/التعليقات تحت
+        // بندور على اسم العميل أو رقم هاتفه (للواتساب) أو الـ platform_id في جدول contacts نفسه،
+        // بعدين نجيب المحادثات بتاعت العملاء دول. لو العميل مالوش اسم محفوظ، الواجهة بتعرضه باسم
+        // مؤقت "زائر ####" (آخر ٤ أرقام من platform_id) — الاسم ده مش محفوظ في القاعدة، فلو حد
+        // نسخ ولصق "زائر ####" كامل من الشاشة، بنشيل كلمة "زائر" ونبحث بالأرقام بس عشان تلاقيه
+        const cleaned = q.replace(/^زائر\s*/, '').trim() || q
         const { data: contactRows } = await supabase
           .from('contacts')
           .select('id')
-          .or(`name.ilike.%${q}%,phone.ilike.%${q}%`)
+          .or(`name.ilike.%${cleaned}%,phone.ilike.%${cleaned}%,platform_id.ilike.%${cleaned}%`)
           .limit(300)
         const contactIds = [...new Set((contactRows || []).map(c => c.id))]
         query = supabase.from('conversations')
