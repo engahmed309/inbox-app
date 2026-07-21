@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles } from 'lucide-react'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -19,6 +19,7 @@ const SECTIONS = [
   { key: 'performance', label: 'أداء الموظفين', icon: Zap },
   { key: 'volume', label: 'رسايل القنوات', icon: Radio },
   { key: 'tags', label: 'التاجات', icon: Tag },
+  { key: 'export', label: 'تصدير البيانات', icon: Download },
 ]
 
 // بتجيب كل صفوف كويري معينة من غير ما تقف عند حد الـ 1000 صف الافتراضي بتاع سوبابيز — بتلف
@@ -79,6 +80,7 @@ export default function ReportsScreen() {
         {section === 'performance' && <PerformanceTab />}
         {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
+        {section === 'export' && <ExportTab />}
       </div>
     </div>
   )
@@ -1565,6 +1567,117 @@ function ChannelVolumeTab() {
           )}
         </>
       )}
+    </div>
+  )
+}
+
+// ─── تصدير بيانات العملاء (Backup) ──────────────────────────────────────
+// بيحمّل ملف CSV فيه كل عميل كلّم العيادة بكل البيانات المتاحة عنه: بيانات أساسية، المرحلة،
+// التاجات، وكل حقل مخصص عرّفه الأدمن — نسخة احتياطية كاملة تتفتح في إكسل عادي
+function csvCell(value) {
+  const s = value == null ? '' : String(value)
+  return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
+}
+
+function ExportTab() {
+  const [exporting, setExporting] = useState(false)
+  const [progress, setProgress] = useState('')
+  const toast = useToast()
+
+  const exportBackup = async () => {
+    setExporting(true)
+    try {
+      setProgress('بيجيب العملاء...')
+      const contacts = await fetchAllRows(() => supabase.from('contacts').select('*').order('created_at', { ascending: true }))
+
+      setProgress('بيجيب المراحل والتاجات والحقول المخصصة...')
+      const [{ data: stages }, { data: tags }, { data: fieldDefs }] = await Promise.all([
+        supabase.from('lifecycle_stages').select('id, name'),
+        supabase.from('tags').select('id, name'),
+        supabase.from('custom_field_definitions').select('id, name').order('name')
+      ])
+      const stageMap = Object.fromEntries((stages || []).map(s => [s.id, s.name]))
+      const tagMap = Object.fromEntries((tags || []).map(t => [t.id, t.name]))
+
+      setProgress('بيجيب تاجات وحقول كل عميل...')
+      const [contactTags, customValues] = await Promise.all([
+        fetchAllRows(() => supabase.from('contact_tags').select('contact_id, tag_id')),
+        fetchAllRows(() => supabase.from('contact_custom_fields').select('contact_id, field_id, value'))
+      ])
+      const tagsByContact = {}
+      contactTags.forEach(r => {
+        if (!tagsByContact[r.contact_id]) tagsByContact[r.contact_id] = []
+        if (tagMap[r.tag_id]) tagsByContact[r.contact_id].push(tagMap[r.tag_id])
+      })
+      const customByContact = {}
+      customValues.forEach(r => {
+        if (!customByContact[r.contact_id]) customByContact[r.contact_id] = {}
+        customByContact[r.contact_id][r.field_id] = r.value
+      })
+
+      setProgress('بيبني الملف...')
+      const PLATFORM_LABEL = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'انستجرام' }
+      const baseHeaders = ['الاسم', 'رقم الهاتف', 'الدولة', 'المنصة', 'تاريخ أول تواصل', 'مرحلة الـ Lifecycle', 'التاجات', 'ملاحظات', 'محظور؟']
+      const fieldHeaders = (fieldDefs || []).map(f => f.name)
+      const headers = [...baseHeaders, ...fieldHeaders]
+
+      const rows = contacts.map(c => {
+        const base = [
+          c.name || '',
+          c.phone || '',
+          c.country || '',
+          PLATFORM_LABEL[c.platform] || c.platform || '',
+          c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '',
+          stageMap[c.lifecycle_stage_id] || '',
+          (tagsByContact[c.id] || []).join(' / '),
+          c.notes || '',
+          c.is_blocked ? 'نعم' : 'لا'
+        ]
+        const fields = (fieldDefs || []).map(f => customByContact[c.id]?.[f.id] ?? '')
+        return [...base, ...fields]
+      })
+
+      const csv = '﻿' + [headers, ...rows].map(row => row.map(csvCell).join(',')).join('\n')
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `عملاء-نسخة-احتياطية-${new Date().toISOString().slice(0, 10)}.csv`
+      document.body.appendChild(a)
+      a.click()
+      a.remove()
+      URL.revokeObjectURL(url)
+      toast.success(`اتحمّل ملف فيه ${contacts.length} عميل`)
+    } catch (err) {
+      toast.error('خطأ في التصدير: ' + err.message)
+    } finally {
+      setExporting(false)
+      setProgress('')
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">تصدير بيانات العملاء (Backup)</h2>
+      <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 space-y-3">
+        <p className="text-sm text-fg-muted leading-relaxed">
+          بتحمّل ملف Excel/CSV فيه كل عميل كلّم العيادة من أي قناة، بكل البيانات المتاحة عنه: الاسم، رقم الهاتف، الدولة، المنصة، مرحلة الـ Lifecycle، التاجات، الملاحظات، وكل الحقول المخصصة اللي عرّفتها.
+        </p>
+        <button onClick={exportBackup} disabled={exporting}
+          className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold bg-brand hover:bg-brand-dark text-white transition-colors disabled:opacity-60">
+          {exporting ? (
+            <>
+              <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              {progress || 'جاري التحميل...'}
+            </>
+          ) : (
+            <>
+              <Download size={16} />
+              تحميل نسخة احتياطية (CSV)
+            </>
+          )}
+        </button>
+      </div>
     </div>
   )
 }
