@@ -10,8 +10,8 @@ import './index.css'
 
 // أي تحديث جديد بنرفعه لايف كان محتاج مسح كاش/تابات يدوي عشان يظهر — مش لأن الريلود مش شغال، لكن
 // لأن حد مايتفحصش نسخة السيرفر أصلاً طول ما التطبيق (PWA متثبتة) فاتح في الخلفية من غير ما يتقفل
-// تمامًا. الفحص كان بيحصل مرة واحدة بس وقت أول تحميل. دلوقتي بنفحص كل شوية وكل مرة الموظف يرجع
-// يفتح التطبيق (visibilitychange)، وبمجرد ما نسخة جديدة تتلاقي بنعمل ريلود فوري تلقائي
+// تمامًا. دلوقتي بنفحص كل مرة الموظف يرجع يفتح التطبيق (visibilitychange)، وبمجرد ما نسخة جديدة
+// تتلاقي بنعمل ريلود فوري تلقائي
 registerSW({
   immediate: true,
   onNeedRefresh() {
@@ -19,10 +19,8 @@ registerSW({
   },
   onRegisteredSW(swUrl, registration) {
     if (!registration) return
-    const checkForUpdate = () => registration.update().catch(() => {})
-    setInterval(checkForUpdate, 3 * 60 * 1000)
     document.addEventListener('visibilitychange', () => {
-      if (document.visibilityState === 'visible') checkForUpdate()
+      if (document.visibilityState === 'visible') registration.update().catch(() => {})
     })
   }
 })
