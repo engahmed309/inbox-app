@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 
@@ -1226,6 +1226,11 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         {conv.ai_active && (
           <div className="absolute -top-0.5 -left-0.5 bg-brand text-white p-0.5 rounded-full" title="الـ AI Agent شغال على المحادثة دي">
             <Bot size={11} />
+          </div>
+        )}
+        {conv.ad_referral && (
+          <div className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white p-0.5 rounded-full" title="العميل ده جاي من إعلان ممول — لازم اهتمام">
+            <DollarSign size={11} />
           </div>
         )}
       </div>
