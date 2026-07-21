@@ -6,7 +6,7 @@ import { logActivity } from '../lib/activityLog'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
 import { COUNTRY_MAP } from '../lib/countries'
-import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio, Megaphone } from 'lucide-react'
 
 const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
 
@@ -255,6 +255,28 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
               </span>
             )}
           </div>
+
+          {/* مصدر الإعلان — لو العميل جاي من إعلان ممول (فيسبوك/انستجرام/واتساب)، بيتحط هنا صورة
+              وعنوان الإعلان اللي دخل منه، بيانات جاية من ميتا نفسها مع أول رسالة */}
+          {conv?.ad_referral && (
+            <div className="bg-surface-3 rounded-xl p-3 space-y-2">
+              <p className="text-xs font-medium text-fg-muted flex items-center gap-1.5"><Megaphone size={12} /> جاي من إعلان ممول</p>
+              {conv.ad_referral.image_url && (
+                <img src={conv.ad_referral.image_url} alt="" className="w-full rounded-lg object-cover max-h-40" />
+              )}
+              {conv.ad_referral.headline && (
+                <p className="text-sm text-fg font-medium">{conv.ad_referral.headline}</p>
+              )}
+              {conv.ad_referral.body && (
+                <p className="text-xs text-fg-muted">{conv.ad_referral.body}</p>
+              )}
+              {conv.ad_referral.source_url && (
+                <a href={conv.ad_referral.source_url} target="_blank" rel="noreferrer" className="text-[11px] text-brand hover:underline block truncate">
+                  {conv.ad_referral.source_url}
+                </a>
+              )}
+            </div>
+          )}
 
           {/* القنوات المتصلة — لو العميل كلّم من أكتر من رقم واتساب، بتتجمّع كلها هنا */}
           {connectedChannels.length > 1 && (
