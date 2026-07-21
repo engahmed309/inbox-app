@@ -1602,7 +1602,7 @@ function ExportTab() {
       setProgress('بيجيب تاجات وحقول كل عميل...')
       const [contactTags, customValues] = await Promise.all([
         fetchAllRows(() => supabase.from('contact_tags').select('contact_id, tag_id')),
-        fetchAllRows(() => supabase.from('contact_custom_fields').select('contact_id, field_id, value'))
+        fetchAllRows(() => supabase.from('contact_custom_fields').select('contact_id, field_definition_id, value'))
       ])
       const tagsByContact = {}
       contactTags.forEach(r => {
@@ -1612,7 +1612,7 @@ function ExportTab() {
       const customByContact = {}
       customValues.forEach(r => {
         if (!customByContact[r.contact_id]) customByContact[r.contact_id] = {}
-        customByContact[r.contact_id][r.field_id] = r.value
+        customByContact[r.contact_id][r.field_definition_id] = r.value
       })
 
       setProgress('بيبني الملف...')
