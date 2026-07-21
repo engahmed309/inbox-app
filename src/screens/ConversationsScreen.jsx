@@ -796,7 +796,7 @@ export default function ConversationsScreen() {
             </div>
             {expanded && (
               <div className="min-w-0">
-                <p className="font-bold text-fg text-sm leading-tight truncate">صحة وعافية</p>
+                <p className="font-bold text-fg text-sm leading-tight truncate">Bridge - صحة وعافية</p>
                 <p className="text-xs text-fg-subtle leading-tight truncate">{agent?.name}</p>
               </div>
             )}
