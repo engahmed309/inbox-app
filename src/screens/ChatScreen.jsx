@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2
+  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -993,6 +993,27 @@ export default function ChatScreen() {
               className="text-xs text-brand font-medium px-3 py-1.5 rounded-full bg-surface-2 hover:bg-surface-3 transition-colors disabled:opacity-50">
               {loadingOlder ? 'جاري التحميل...' : 'تحميل رسائل أقدم'}
             </button>
+          </div>
+        )}
+        {!hasMoreMessages && !searchQuery && conv?.ad_referral && (
+          <div className="flex justify-start mb-3">
+            <div className="max-w-[85%] sm:max-w-sm bg-surface-2 border border-surface-3 rounded-2xl overflow-hidden">
+              <p className="text-[11px] text-fg-subtle px-3 pt-2 flex items-center gap-1">
+                <Megaphone size={11} /> جاي من إعلان ممول
+              </p>
+              {conv.ad_referral.image_url && (
+                <img src={conv.ad_referral.image_url} alt="" className="w-full max-h-48 object-cover" />
+              )}
+              <div className="p-3 space-y-1">
+                {conv.ad_referral.headline && <p className="text-sm text-fg font-medium">{conv.ad_referral.headline}</p>}
+                {conv.ad_referral.body && <p className="text-xs text-fg-muted">{conv.ad_referral.body}</p>}
+                {conv.ad_referral.source_url && (
+                  <a href={conv.ad_referral.source_url} target="_blank" rel="noreferrer" className="text-[11px] text-brand hover:underline block truncate">
+                    {conv.ad_referral.source_url}
+                  </a>
+                )}
+              </div>
+            </div>
           </div>
         )}
         {Object.entries(groupedMessages).map(([date, items]) => (
