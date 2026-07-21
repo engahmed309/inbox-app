@@ -272,6 +272,119 @@ function DateRangeFilter({ range, setRange, customFrom, setCustomFrom, customTo,
 // تقريرين قريبين من بعض في تاب واحد بتبديلة: "عملاء جدد" = أول مرة يبقى ليهم contact في الداتابيز
 // خالص (contacts.created_at)، و"كل العملاء اللي كلموا" = أي عميل بعت رسالة في اليوم ده حتى لو
 // مش أول مرة (عدد مختلف كل يوم، من غير تكرار لو كلّم أكتر من مرة في نفس اليوم)
+// بتجيب مجموعة IDs العملاء اللي بيطابقوا كل الفلاتر المفعّلة مع بعض (AND بين الأنواع المختلفة).
+// null معناها مفيش فلتر خالص (كل العملاء). كل فلتر بيتحسب لوحده كـ Set وبعدين بنتقاطعهم مع بعض
+async function getFilteredContactIds({ lifecycle, tag, channel, campaign }, campaignsList) {
+  const sets = []
+  if (lifecycle) {
+    const rows = await fetchAllRows(() => supabase.from('contacts').select('id').eq('lifecycle_stage_id', lifecycle))
+    sets.push(new Set(rows.map(r => r.id)))
+  }
+  if (tag) {
+    const rows = await fetchAllRows(() => supabase.from('contact_tags').select('contact_id').eq('tag_id', tag))
+    sets.push(new Set(rows.map(r => r.contact_id)))
+  }
+  if (channel) {
+    const rows = await fetchAllRows(() => supabase.from('conversations').select('contact_id').eq('channel_id', channel))
+    sets.push(new Set(rows.map(r => r.contact_id)))
+  }
+  if (campaign) {
+    const [type, id] = campaign.split(':')
+    let rows
+    if (type === 'ad') {
+      rows = await fetchAllRows(() => supabase.from('conversations').select('contact_id').eq('ad_referral->>ad_id', id))
+    } else {
+      // فلتر حملة كاملة — نلاقي كل الإعلانات اللي تحتها من القايمة الجاية من ميتا، ونفلتر بيهم كلهم
+      const campaignAdIds = (campaignsList.find(c => c.id === id)?.ads || []).map(a => a.id)
+      rows = campaignAdIds.length
+        ? await fetchAllRows(() => supabase.from('conversations').select('contact_id').in('ad_referral->>ad_id', campaignAdIds))
+        : []
+    }
+    sets.push(new Set(rows.map(r => r.contact_id)))
+  }
+  if (!sets.length) return null
+  return sets.reduce((a, b) => new Set([...a].filter(x => b.has(x))))
+}
+
+// فلتر العملاء الإضافي — لايف سايكل، تاج، قناة، وحملة/إعلان ممول. بيتحط جنب فلتر المدة الزمنية
+// وينفع يتجمّع أكتر من فلتر مع بعض. قايمة الحملات جاية من حساب الإعلانات على ميتا نفسه
+function CustomerFiltersPanel({ filters, setFilters, campaigns }) {
+  const [open, setOpen] = useState(false)
+  const [lifecycles, setLifecycles] = useState([])
+  const [tags, setTags] = useState([])
+  const [channels, setChannels] = useState([])
+
+  useEffect(() => {
+    supabase.from('lifecycle_stages').select('id, name').order('stage_order').then(({ data }) => setLifecycles(data || []))
+    supabase.from('tags').select('id, name').order('name').then(({ data }) => setTags(data || []))
+    supabase.from('channels').select('id, platform, display_name, custom_name').order('platform').then(({ data }) => setChannels(data || []))
+  }, [])
+
+  const activeCount = Object.values(filters).filter(Boolean).length
+  const clear = () => setFilters({ lifecycle: '', tag: '', channel: '', campaign: '' })
+
+  return (
+    <div className="bg-surface-2 rounded-2xl border border-surface-3">
+      <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3 text-sm text-fg">
+        <span className="flex items-center gap-2">
+          <Zap size={14} className="text-fg-muted" />
+          فلاتر إضافية {activeCount > 0 && <span className="text-[10px] bg-brand text-white px-1.5 py-0.5 rounded-full">{activeCount}</span>}
+        </span>
+        <ChevronDown size={16} className={`text-fg-muted transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+      {open && (
+        <div className="px-4 pb-4 space-y-2.5">
+          <div>
+            <label className="block text-[11px] text-fg-muted mb-1">مرحلة الـ Lifecycle</label>
+            <select value={filters.lifecycle} onChange={e => setFilters({ ...filters, lifecycle: e.target.value })}
+              className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
+              <option value="">الكل</option>
+              {lifecycles.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-fg-muted mb-1">التاج</label>
+            <select value={filters.tag} onChange={e => setFilters({ ...filters, tag: e.target.value })}
+              className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
+              <option value="">الكل</option>
+              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-fg-muted mb-1">القناة</label>
+            <select value={filters.channel} onChange={e => setFilters({ ...filters, channel: e.target.value })}
+              className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
+              <option value="">الكل</option>
+              {channels.map(c => (
+                <option key={c.id} value={c.id}>
+                  {(c.platform === 'whatsapp' ? 'واتساب' : c.platform === 'facebook' ? 'فيسبوك' : 'انستجرام') + ' — ' + (c.custom_name || c.display_name || c.id)}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label className="block text-[11px] text-fg-muted mb-1">الإعلانات الممولة / الحملات</label>
+            <select value={filters.campaign} onChange={e => setFilters({ ...filters, campaign: e.target.value })}
+              className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
+              <option value="">الكل</option>
+              {campaigns.length === 0 && <option value="" disabled>مفيش حملات متاحة (اتأكدي إن حساب الإعلانات متظبط)</option>}
+              {campaigns.map(c => (
+                <optgroup key={c.id} label={c.name}>
+                  <option value={`campaign:${c.id}`}>كل إعلانات الحملة دي</option>
+                  {c.ads.map(a => <option key={a.id} value={`ad:${a.id}`}>↳ {a.name}</option>)}
+                </optgroup>
+              ))}
+            </select>
+          </div>
+          {activeCount > 0 && (
+            <button onClick={clear} className="text-xs text-danger hover:underline">مسح كل الفلاتر</button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function CustomersTab() {
   const { theme } = useTheme()
   const isDark = theme === 'dark'
@@ -279,18 +392,25 @@ function CustomersTab() {
   const [range, setRange] = useState('month')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [filters, setFilters] = useState({ lifecycle: '', tag: '', channel: '', campaign: '' })
+  const [campaigns, setCampaigns] = useState([])
   const [chartData, setChartData] = useState([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
+    fetch(`${API_URL}/ads/campaigns`).then(r => r.json()).then(d => setCampaigns(d.campaigns || [])).catch(() => setCampaigns([]))
+  }, [])
+
+  useEffect(() => {
     if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
     load()
-  }, [metric, range, customFrom, customTo])
+  }, [metric, range, customFrom, customTo, filters])
 
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
+    const allowedIds = await getFilteredContactIds(filters, campaigns)
 
     let dayOf // (row) => Date لليوم اللي الصف ده بيتحسب عليه
     let entries
@@ -299,6 +419,7 @@ function CustomersTab() {
         let q = supabase.from('contacts').select('id, created_at').order('created_at', { ascending: true })
         if (from) q = q.gte('created_at', from)
         if (to) q = q.lte('created_at', to)
+        if (allowedIds) q = q.in('id', allowedIds.size ? [...allowedIds] : ['00000000-0000-0000-0000-000000000000'])
         return q
       }
       entries = await fetchAllRows(buildQ)
@@ -314,6 +435,7 @@ function CustomersTab() {
         return q
       }
       entries = await fetchAllRows(buildQ)
+      if (allowedIds) entries = entries.filter(r => allowedIds.has(r.conversations?.contact_id))
       dayOf = (r) => new Date(r.created_at)
     }
 
@@ -387,6 +509,7 @@ function CustomersTab() {
       </p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+      <CustomerFiltersPanel filters={filters} setFilters={setFilters} campaigns={campaigns} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
         <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
