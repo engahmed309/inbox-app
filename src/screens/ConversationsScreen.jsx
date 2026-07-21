@@ -352,21 +352,43 @@ export default function ConversationsScreen() {
       return q
     }
 
-    // عدد المحادثات المفتوحة لكل مرحلة lifecycle (بنفس نطاق القناة/الموظف بس، من غير فلتر التاج/المرحلة نفسها)
-    // بصفحات من غير حد أقصى، لنفس سبب عدادات التابات تحت — سوبابيز بيوقف عند ١٠٠٠ صف افتراضيًا
-    let lcCountData = []
-    {
+    // بيجيب كل صفوف كويري معينة بصفحات من ١٠٠٠ (سوبابيز بيوقف عند الحد ده افتراضيًا)، بس بالتوازي
+    // مش بالتتابع — أول صفحة بتحدد لو فيه صفحات تانية، والباقي بيتجابوا مع بعض دفعة واحدة، عشان
+    // منعملش عشرات الـ round trips المتتالية على قاعدة بيانات فيها آلاف الصفوف
+    const fetchAllPaged = async (buildQuery) => {
       const PAGE = 1000
-      let offset = 0
-      while (true) {
-        const { data: page } = await applyBaseScope(
-          supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)').eq('status', 'open')
-        ).range(offset, offset + PAGE - 1)
-        lcCountData = lcCountData.concat(page || [])
-        if (!page || page.length < PAGE) break
-        offset += PAGE
+      const { data: first, count } = await buildQuery().range(0, PAGE - 1)
+      let all = first || []
+      const total = count ?? all.length
+      if (total > PAGE) {
+        const pageIdxs = []
+        for (let offset = PAGE; offset < total; offset += PAGE) pageIdxs.push(offset)
+        const rest = await Promise.all(pageIdxs.map(offset => buildQuery().range(offset, offset + PAGE - 1).then(r => r.data || [])))
+        rest.forEach(page => { all = all.concat(page) })
       }
+      return all
     }
+
+    // الكويريز التلاتة دي مستقلة عن بعض تمامًا — بنجيبهم بالتوازي بدل ما نستنى واحد يخلص قبل ما نبدأ التاني
+    const [lcCountData, agentCountData, countsData] = await Promise.all([
+      // عدد المحادثات المفتوحة لكل مرحلة lifecycle (بنفس نطاق القناة/الموظف، من غير فلتر التاج/المرحلة نفسها)
+      fetchAllPaged(() => applyBaseScope(
+        supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)', { count: 'exact' }).eq('status', 'open')
+      )),
+      // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس
+      canSeeAll ? fetchAllPaged(() => {
+        let q = supabase.from('conversations').select('assigned_agent_id, ai_active', { count: 'exact' }).eq('status', 'open')
+        const cf = parseChannelFilter(channel)
+        if (cf) {
+          q = q.eq('platform', cf.platform)
+          if (cf.channelId) q = q.eq('channel_id', cf.channelId)
+        }
+        return q
+      }) : Promise.resolve([]),
+      // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي
+      fetchAllPaged(() => applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at', { count: 'exact' })))
+    ])
+
     const lcCounts = {}
     lcCountData?.forEach(c => {
       const sid = c.contacts?.lifecycle_stage_id
@@ -375,29 +397,7 @@ export default function ConversationsScreen() {
     })
     setLifecycleCounts(lcCounts); screenCache.lifecycleCounts = lcCounts
 
-    // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس، من غير فلتر الموظف
-    // نفسه، عشان نقدر نقارن كل الموظفين مع بعض في قائمة الفلتر
     if (canSeeAll) {
-      const buildAgentCountQuery = () => {
-        let q = supabase.from('conversations').select('assigned_agent_id, ai_active').eq('status', 'open')
-        const cf = parseChannelFilter(channel)
-        if (cf) {
-          q = q.eq('platform', cf.platform)
-          if (cf.channelId) q = q.eq('channel_id', cf.channelId)
-        }
-        return q
-      }
-      let agentCountData = []
-      {
-        const PAGE = 1000
-        let offset = 0
-        while (true) {
-          const { data: page } = await buildAgentCountQuery().range(offset, offset + PAGE - 1)
-          agentCountData = agentCountData.concat(page || [])
-          if (!page || page.length < PAGE) break
-          offset += PAGE
-        }
-      }
       const aCounts = {}
       let unassigned = 0
       let aiCount = 0
@@ -411,34 +411,21 @@ export default function ConversationsScreen() {
       setAiOpenCount(aiCount); screenCache.aiOpenCount = aiCount
     }
 
-    // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي — بنجيبها بصفحات من غير حد
-    // أقصى، لأن سوبابيز بيوقف عند ١٠٠٠ صف افتراضيًا في أي كويري عادي حتى لو العدد الحقيقي أكبر
-    let countsData = []
-    {
-      const PAGE = 1000
-      let offset = 0
-      while (true) {
-        const { data: page } = await applyScope(supabase.from('conversations').select('id, status, unread_count, last_inbound_at')).range(offset, offset + PAGE - 1)
-        countsData = countsData.concat(page || [])
-        if (!page || page.length < PAGE) break
-        offset += PAGE
-      }
-    }
-
-    // قراءة كل موظف الشخصية لكل محادثة (عشان نحدد المقروء/غير المقروء على مستوى اليوزر)
+    // قراءة كل موظف الشخصية — لازمة بس للمحادثات المفتوحة (هي الوحيدة اللي بتتفحص مقروءة/لأ تحت)،
+    // فبنجيبها للمفتوحة بس مش كل الحالات، وبالتوازي مش بالتتابع
     let readsMap = {}
-    if (agent?.id && countsData?.length) {
-      const allIds = countsData.map(c => c.id)
+    const openIds = (countsData || []).filter(c => c.status === 'open').map(c => c.id)
+    if (agent?.id && openIds.length) {
       const BATCH_SIZE = 200
-      for (let i = 0; i < allIds.length; i += BATCH_SIZE) {
-        const batch = allIds.slice(i, i + BATCH_SIZE)
-        const { data: readsData } = await supabase
-          .from('conversation_reads')
-          .select('conversation_id, read_at')
-          .eq('agent_id', agent.id)
-          .in('conversation_id', batch)
-        readsData?.forEach(r => { readsMap[r.conversation_id] = r.read_at })
-      }
+      const batches = []
+      for (let i = 0; i < openIds.length; i += BATCH_SIZE) batches.push(openIds.slice(i, i + BATCH_SIZE))
+      const results = await Promise.all(batches.map(batch => supabase
+        .from('conversation_reads')
+        .select('conversation_id, read_at')
+        .eq('agent_id', agent.id)
+        .in('conversation_id', batch)
+      ))
+      results.forEach(({ data: readsData }) => readsData?.forEach(r => { readsMap[r.conversation_id] = r.read_at }))
     }
     const isUnreadForMe = (c) => {
       if (!c.unread_count || c.unread_count <= 0) return false
