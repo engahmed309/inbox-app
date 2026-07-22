@@ -427,17 +427,41 @@ function CustomersTab() {
       entries = await fetchAllRows(buildQ)
       dayOf = (r) => new Date(r.created_at)
     } else {
+      // Monthly Active Contacts بتقسيم يومي (زي respond.io): العميل بيتعدّ مرة واحدة بس في الشهر —
+      // يوم أول رسالة منه في الشهر ده، بغض النظر لو كان عميل قديم أو جديد أو كلّم قبل كده امتى.
+      // لو كلّم تاني في نفس الشهر مايتعدش تاني، ولو الشهر خلص وكلّم في اللي بعده بيتعد جديد فيه.
+      // عشان نحدد "أول رسالة في الشهر" صح حتى لو الفترة المختارة بادئة من نص الشهر، بنجيب الرسايل
+      // من أول الشهر اللي فيه بداية الفترة، ونعرض بس الأيام اللي جوه الفترة المطلوبة فعليًا
+      const rangeStart = from ? new Date(from) : null
+      const monthStart = rangeStart ? new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1) : null
+
       const buildQ = () => {
         let q = supabase.from('messages')
-          .select('created_at, conversations!inner(contact_id)')
+          .select('created_at, conversations!inner(contact_id, channel_id)')
           .eq('direction', 'inbound').neq('content_type', 'note')
           .order('created_at', { ascending: true })
-        if (from) q = q.gte('created_at', from)
+        if (monthStart) q = q.gte('created_at', monthStart.toISOString())
         if (to) q = q.lte('created_at', to)
+        if (filters.channel) q = q.eq('conversations.channel_id', filters.channel)
         return q
       }
-      entries = await fetchAllRows(buildQ)
-      if (allowedIds) entries = entries.filter(r => allowedIds.has(r.conversations?.contact_id))
+      const raw = await fetchAllRows(buildQ)
+      const filtered = allowedIds ? raw.filter(r => allowedIds.has(r.conversations?.contact_id)) : raw
+
+      const firstInMonth = {} // "contactId|YYYY-M" -> أقدم Date لرسالة العميل ده في الشهر ده
+      filtered.forEach(r => {
+        const contactId = r.conversations?.contact_id
+        if (!contactId) return
+        const d = new Date(r.created_at)
+        const mKey = `${contactId}|${d.getFullYear()}-${d.getMonth()}`
+        if (!firstInMonth[mKey] || d < firstInMonth[mKey]) firstInMonth[mKey] = d
+      })
+
+      const fromDate = from ? new Date(from) : null
+      const toDate = to ? new Date(to) : null
+      entries = Object.values(firstInMonth)
+        .filter(d => (!fromDate || d >= fromDate) && (!toDate || d <= toDate))
+        .map(d => ({ created_at: d.toISOString() }))
       dayOf = (r) => new Date(r.created_at)
     }
 
@@ -448,6 +472,8 @@ function CustomersTab() {
     const spanDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
     const granularity = spanDays > 45 ? 'week' : 'day'
 
+    // entries هنا دايمًا مجموعة "لحظة تُحسب" واحدة لكل عدّة (مش محتاجين dedup تاني هنا — الـ
+    // dedup الشهري لمتريك "active" اتعمل فوق قبل ما نوصل هنا)
     const buckets = []
     const bucketMap = {}
     if (granularity === 'day') {
@@ -455,7 +481,7 @@ function CustomersTab() {
       const last = new Date(endDate); last.setHours(0, 0, 0, 0)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: formatShort(cur), count: 0, _set: metric === 'active' ? new Set() : null }
+        const entry = { key, label: formatShort(cur), count: 0 }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 1)
       }
@@ -464,7 +490,7 @@ function CustomersTab() {
       const last = mondayOf(endDate)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: `أسبوع ${formatShort(cur)}`, count: 0, _set: metric === 'active' ? new Set() : null }
+        const entry = { key, label: `أسبوع ${formatShort(cur)}`, count: 0 }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 7)
       }
@@ -474,19 +500,11 @@ function CustomersTab() {
       const d = dayOf(r)
       const key = granularity === 'day' ? dayKey(d) : dayKey(mondayOf(d))
       const bucket = bucketMap[key]
-      if (!bucket) return
-      if (metric === 'active') {
-        const contactId = r.conversations?.contact_id
-        if (contactId && !bucket._set.has(contactId)) { bucket._set.add(contactId); bucket.count++ }
-      } else {
-        bucket.count++
-      }
+      if (bucket) bucket.count++
     })
 
     setChartData(buckets.map(({ key, label, count }) => ({ key, label, count })))
-    setTotal(metric === 'active'
-      ? new Set(entries.map(r => r.conversations?.contact_id).filter(Boolean)).size
-      : entries.length)
+    setTotal(entries.length)
     setLoading(false)
   }
 
@@ -501,13 +519,13 @@ function CustomersTab() {
         </button>
         <button onClick={() => setMetric('active')}
           className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${metric === 'active' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-          كل العملاء اللي كلموا
+          عملاء نشطين (شهريًا)
         </button>
       </div>
       <p className="text-xs text-fg-subtle -mt-2">
         {metric === 'new'
           ? 'كام عميل جديد اتكلم مع العيادة لأول مرة في كل يوم.'
-          : 'كام عميل (جديد أو قديم) بعت رسالة في كل يوم — العميل بيتعدّ مرة واحدة بس لو بعت أكتر من رسالة في نفس اليوم.'}
+          : 'كام عميل كلّمك في كل يوم — بغض النظر لو قديم أو جديد أو كلّمك قبل كده امتى. العميل بيتعدّ مرة واحدة بس في الشهر (يوم أول رسالة منه في الشهر ده)، ولو استمر يكلّمك باقي الشهر مايتعدّش تاني؛ الشهر اللي بعده بيتعدّ من جديد.'}
       </p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
@@ -522,7 +540,7 @@ function CustomersTab() {
       ) : (
         <>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
-            <p className="text-xs text-fg-muted mb-1">{metric === 'new' ? 'إجمالي العملاء الجدد' : 'إجمالي العملاء المختلفين'}</p>
+            <p className="text-xs text-fg-muted mb-1">{metric === 'new' ? 'إجمالي العملاء الجدد' : 'إجمالي العملاء النشطين (شهريًا)'}</p>
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
