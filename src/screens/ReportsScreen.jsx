@@ -105,12 +105,15 @@ function AiReportsTab() {
     setQuestion('')
     setAsking(true)
     const idx = history.length
+    // بنبعت الأسئلة والردود اللي فاتت في نفس الشات عشان الـ AI يفهم السياق (زي رد على سؤال
+    // توضيحي هو سألها) بدل ما يتعامل مع كل رسالة كأنها محادثة جديدة من الصفر
+    const priorHistory = history.filter(h => h.answer && !h.error).map(h => ({ question: h.question, answer: h.answer }))
     setHistory(prev => [...prev, { question: text, answer: null, loading: true, error: null }])
     try {
       const res = await fetch(`${API_URL}/ai/reports-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ question: text })
+        body: JSON.stringify({ question: text, history: priorHistory })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'فشل الحصول على إجابة')
