@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -127,6 +127,13 @@ export default function ChatScreen() {
   const [showNoteBox, setShowNoteBox] = useState(false)
   const [noteText, setNoteText] = useState('')
   const [sendingNote, setSendingNote] = useState(false)
+
+  // بيكتب دلوقتي — { label: expiresAtMs } لأي حد فاتح نفس المحادثة (موظف تاني، الـ AI). كل إشارة
+  // ليها صلاحية قصيرة (بتتجدد باستمرار طول ما هو بيكتب)، فلو حد قفل التاب فجأة من غير ما يبعت
+  // إشارة "خلصت" هتختفي لوحدها من غير ما تفضل عالقة
+  const [typingUsers, setTypingUsers] = useState({})
+  const typingChannelRef = useRef(null)
+  const myTypingRef = useRef({ lastSentAt: 0, offTimeout: null })
 
   // القنوات المتصلة بمحادثة واتساب واحدة (كل الأرقام اللي العميل كلّم بيها) — لو أكتر من رقم لسه
   // في نافذة الـ٢٤ ساعة، الموظف يقدر يختار يرد من أنهي رقم بدل ما يبقى مقفول على آخر رقم رد بيه بس
@@ -258,6 +265,8 @@ export default function ChatScreen() {
         await supabase.from('conversation_reads')
           .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
       }
+      // إيصال قراءة فعلي على المنصة نفسها (تيك أزرق للعميل) — منفصل تمامًا عن القراءة الداخلية فوق
+      fetch(`${API_URL}/conversations/${id}/mark-seen`, { method: 'POST' }).catch(() => {})
 
       // القنوات المتصلة بمحادثة الواتساب دي (كل رقم كلّم بيه العميل) — لتحديد رقم افتراضي وعرضها للموظف
       if (convData?.platform === 'whatsapp') {
@@ -310,6 +319,16 @@ export default function ChatScreen() {
         // ملحوظة: مبنعملش mark as read هنا — تفضل غير مقروءة لحد ما نرد فعلياً
       })
       .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+      }, (payload) => {
+        // بيغطي تحديث حالة التسليم/القراءة (sent/delivered/read) وأي تعديل تاني على رسالة موجودة
+        const updated = payload.new
+        if (updated.conversation_id !== id) return
+        setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m))
+      })
+      .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_assignment_log',
@@ -341,6 +360,35 @@ export default function ChatScreen() {
         }
       })
 
+    // بث "بيكتب" — قناة منفصلة تمامًا عن رسايل الداتابيز فوق، مفيش أي حاجة بتتسجل هنا. أي حد
+    // (موظف تاني أو الـ AI) فاتح نفس المحادثة بيشوف اللي بيكتبوا دلوقتي، وبيختفي تلقائي بعد ٤
+    // ثواني من آخر إشارة وصلت (حماية لو إشارة "خلص" ضاعت)
+    typingChannelRef.current = supabase
+      .channel(`typing:${id}`)
+      .on('broadcast', { event: 'typing' }, ({ payload }) => {
+        if (payload.agentId && payload.agentId === agent?.id) return // متجاهلش إشارة نفسك
+        setTypingUsers(prev => {
+          const next = { ...prev }
+          if (payload.typing) next[payload.label] = Date.now() + 4000
+          else delete next[payload.label]
+          return next
+        })
+      })
+      .subscribe()
+
+    const typingCleanup = setInterval(() => {
+      setTypingUsers(prev => {
+        const now = Date.now()
+        const next = {}
+        let changed = false
+        Object.entries(prev).forEach(([label, expiresAt]) => {
+          if (expiresAt > now) next[label] = expiresAt
+          else changed = true
+        })
+        return changed ? next : prev
+      })
+    }, 1000)
+
     // لو التاب/التطبيق راح للخلفية (زي فتح تطبيق تاني تبعت منه) وبعدين رجع،
     // المتصفح ممكن يكون وقف اتصال الـ Realtime، فلما يرجع نجيب أي رسايل فاتت فوراً
     const handleVisibility = () => { fetchMessages() }
@@ -354,6 +402,9 @@ export default function ChatScreen() {
 
     return () => {
       realtimeRef.current?.unsubscribe()
+      typingChannelRef.current?.unsubscribe()
+      clearInterval(typingCleanup)
+      clearTimeout(myTypingRef.current.offTimeout)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
       clearInterval(pollInterval)
@@ -446,6 +497,7 @@ export default function ChatScreen() {
     if (!msgText && !pf) return
     if (sending) return
     setSending(true)
+    sendTyping(false)
     setText('')
     setPendingFile(null)
     setReplyingTo(null)
@@ -778,6 +830,34 @@ export default function ChatScreen() {
       setShowQuickReplies(true)
     } else {
       setShowQuickReplies(false)
+    }
+    sendTyping(v.trim().length > 0)
+  }
+
+  // بيبعت إشارة "بيكتب" — داخليًا (لأي حد فاتح نفس المحادثة) وللعميل نفسه على المنصة (لو مدعومة).
+  // متردّدة (throttled) عشان مانضربش الـ API/الـ Realtime مع كل حرف — إشارة "بدأ" كل ٥ ثواني بس
+  // طول ما لسه بيكتب، وإشارة "خلص" واحدة بعد ٣ ثواني سكوت أو لما يبعت فعليًا
+  const sendTyping = (isTyping) => {
+    const ref = myTypingRef.current
+    clearTimeout(ref.offTimeout)
+    if (isTyping) {
+      const now = Date.now()
+      if (now - ref.lastSentAt > 5000) {
+        ref.lastSentAt = now
+        const label = agent?.name || 'موظف'
+        typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: true, label, agentId: agent?.id } })
+        fetch(`${API_URL}/conversations/${id}/typing`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: true })
+        }).catch(() => {})
+      }
+      ref.offTimeout = setTimeout(() => sendTyping(false), 3000)
+    } else {
+      ref.lastSentAt = 0
+      const label = agent?.name || 'موظف'
+      typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: false, label, agentId: agent?.id } })
+      fetch(`${API_URL}/conversations/${id}/typing`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: false })
+      }).catch(() => {})
     }
   }
 
@@ -1199,6 +1279,11 @@ export default function ChatScreen() {
                   ))}
               </div>
             )}
+            {Object.keys(typingUsers).length > 0 && (
+              <p className="text-[11px] text-brand px-1 animate-pulse">
+                {Object.keys(typingUsers).join('، ')} {Object.keys(typingUsers).length > 1 ? 'بيكتبوا الآن...' : 'بيكتب الآن...'}
+              </p>
+            )}
             <div className="flex items-end gap-2">
               <input type="file" ref={fileInputRef} onChange={handleFile} className="hidden"
                 accept="image/*,video/*,audio/*,.pdf,.doc,.docx" />
@@ -1552,8 +1637,10 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
         )}
       </div>
       {isOut && (
-        <span className="text-xs text-fg-subtle mt-0.5 px-1">
-          {isTemp ? <span className="animate-pulse">...</span> : <CheckCheck size={12} className="inline" />}
+        <span className={`text-xs mt-0.5 px-1 ${msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
+          {isTemp ? <span className="animate-pulse">...</span>
+            : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
+            : <Check size={12} className="inline" />}
         </span>
       )}
     </div>
