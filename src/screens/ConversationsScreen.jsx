@@ -1132,8 +1132,11 @@ export default function ConversationsScreen() {
           <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
         </div>
 
-        {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض */}
-        <div className="relative flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+        {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض. الـ overflow-x-auto جوه
+            الصف بيخلي أي عنصر overflow-y محسوب auto تلقائي حسب مواصفة CSS، فبيقص أي حاجة absolute
+            زي بانل الفلتر لو اتحطت جواه — عشان كده حاططين البانل برّه في wrapper منفصل مش بيعمل scroll */}
+        <div className="relative">
+        <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
           {channelTabs.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -1154,21 +1157,22 @@ export default function ConversationsScreen() {
             فلتر
             {advFilterActiveCount > 0 && <span className="text-[10px] font-bold bg-white/25 rounded-full px-1.5">{advFilterActiveCount}</span>}
           </button>
-          {showAdvFilter && (
-            <AdvancedFilterPanel
-              tagsList={tagsList} campaigns={campaigns}
-              selectedTagIds={selectedTagIds} toggleTagId={toggleTagId}
-              selectedAdIds={selectedAdIds} toggleAdId={toggleAdId} toggleCampaign={toggleCampaign}
-              dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo}
-              onClose={() => setShowAdvFilter(false)} onClear={clearAdvFilters} activeCount={advFilterActiveCount}
-            />
-          )}
           <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
           <button onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectionMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <CheckSquare size={11} />
             {selectionMode ? 'إلغاء التحديد' : 'تحديد'}
           </button>
+        </div>
+        {showAdvFilter && (
+          <AdvancedFilterPanel
+            tagsList={tagsList} campaigns={campaigns}
+            selectedTagIds={selectedTagIds} toggleTagId={toggleTagId}
+            selectedAdIds={selectedAdIds} toggleAdId={toggleAdId} toggleCampaign={toggleCampaign}
+            dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo}
+            onClose={() => setShowAdvFilter(false)} onClear={clearAdvFilters} activeCount={advFilterActiveCount}
+          />
+        )}
         </div>
 
         {/* List */}
