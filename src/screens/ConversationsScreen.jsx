@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 
@@ -149,6 +149,91 @@ function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFi
   )
 }
 
+// فلتر متقدّم للمحادثات — تاجات وإعلانات/حملات (اختيار متعدد، أي واحد فيهم يطابق = OR جوّه نفس النوع)
+// وفلتر تاريخ (يوم واحد أو مدى)، وكل الأنواع دي بتتجمع مع بعض بـ AND (لازم يطابق كل نوع مفعّل)
+function AdvancedFilterPanel({
+  tagsList, campaigns, selectedTagIds, toggleTagId, selectedAdIds, toggleAdId, toggleCampaign,
+  dateFrom, setDateFrom, dateTo, setDateTo, onClose, onClear, activeCount
+}) {
+  return (
+    <div className="absolute left-4 right-4 lg:right-auto lg:left-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 w-auto lg:w-80 max-h-[70vh] overflow-y-auto">
+      <div className="flex items-center justify-between px-3 py-2.5 border-b border-surface-3 sticky top-0 bg-surface-2">
+        <span className="text-sm font-semibold text-fg">فلتر متقدّم</span>
+        <div className="flex items-center gap-2">
+          {activeCount > 0 && <button onClick={onClear} className="text-xs text-danger hover:underline">مسح الكل</button>}
+          <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={15} /></button>
+        </div>
+      </div>
+
+      <div className="p-3 border-b border-surface-3">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
+          <Calendar size={12} /> التاريخ
+        </p>
+        <div className="flex items-center gap-2">
+          <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
+            className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+          <span className="text-fg-subtle text-xs flex-shrink-0">إلى</span>
+          <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
+            className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+        </div>
+        <p className="text-[10px] text-fg-subtle mt-1">لفلترة يوم واحد بس، اختاري نفس التاريخ في الخانتين</p>
+      </div>
+
+      <div className="p-3 border-b border-surface-3">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
+          <TagIcon size={12} /> التاجات {selectedTagIds.length > 0 && <span className="text-brand">({selectedTagIds.length})</span>}
+        </p>
+        {tagsList.length === 0 ? (
+          <p className="text-xs text-fg-subtle">مفيش تاجات متاحة</p>
+        ) : (
+          <div className="space-y-1">
+            {tagsList.map(t => (
+              <label key={t.id} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-sm">
+                <input type="checkbox" checked={selectedTagIds.includes(t.id)} onChange={() => toggleTagId(t.id)}
+                  className="accent-brand w-3.5 h-3.5" />
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
+                <span className="text-fg truncate">{t.name}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="p-3">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
+          <Megaphone size={12} /> الإعلانات / الحملات {selectedAdIds.length > 0 && <span className="text-brand">({selectedAdIds.length})</span>}
+        </p>
+        {campaigns.length === 0 ? (
+          <p className="text-xs text-fg-subtle">مفيش حملات متاحة (اتأكدي إن حساب الإعلانات متظبط)</p>
+        ) : (
+          <div className="space-y-2.5">
+            {campaigns.map(c => {
+              const allSelected = c.ads.length > 0 && c.ads.every(a => selectedAdIds.includes(a.id))
+              return (
+                <div key={c.id}>
+                  <label className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-xs font-semibold">
+                    <input type="checkbox" checked={allSelected} onChange={() => toggleCampaign(c)} className="accent-brand w-3.5 h-3.5" />
+                    <span className="text-fg truncate">{c.name}</span>
+                  </label>
+                  <div className="pr-5 space-y-1">
+                    {c.ads.map(a => (
+                      <label key={a.id} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-xs">
+                        <input type="checkbox" checked={selectedAdIds.includes(a.id)} onChange={() => toggleAdId(a.id)}
+                          className="accent-brand w-3.5 h-3.5" />
+                        <span className="text-fg-muted truncate">{a.name}</span>
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 function timeAgo(dateStr) {
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
@@ -226,6 +311,7 @@ const screenCache = {
   lifecycleCounts: {}, lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
   agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
   aiEnabled: false, aiOpenCount: 0,
+  selectedTagIds: [], selectedAdIds: [], dateFrom: '', dateTo: '', tagsList: [], campaigns: [],
 }
 
 export default function ConversationsScreen() {
@@ -255,6 +341,13 @@ export default function ConversationsScreen() {
   const [allChannels, setAllChannels] = useState(screenCache.allChannels) // كل القنوات المتربطة، كل المنصات
   const [selectedLifecycle, setSelectedLifecycle] = useState(screenCache.selectedLifecycle)
   const [visibleLimit, setVisibleLimit] = useState(screenCache.visibleLimit)
+  const [tagsList, setTagsList] = useState(screenCache.tagsList)
+  const [campaigns, setCampaigns] = useState(screenCache.campaigns)
+  const [selectedTagIds, setSelectedTagIds] = useState(screenCache.selectedTagIds)
+  const [selectedAdIds, setSelectedAdIds] = useState(screenCache.selectedAdIds)
+  const [dateFrom, setDateFrom] = useState(screenCache.dateFrom)
+  const [dateTo, setDateTo] = useState(screenCache.dateTo)
+  const [showAdvFilter, setShowAdvFilter] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
@@ -314,15 +407,30 @@ export default function ConversationsScreen() {
       const chs = (data.channels || []).filter(c => c.id && c.status === 'active')
       setAllChannels(chs); screenCache.allChannels = chs
     } catch { /* لو فشل، هتفضل التابات العادية شغالة زي ما هي */ }
+
+    const { data: tagRows } = await supabase.from('tags').select('id, name, color').order('name')
+    setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
+
+    try {
+      const res = await fetch(`${API_URL}/ads/campaigns`)
+      const data = await res.json()
+      setCampaigns(data.campaigns || []); screenCache.campaigns = data.campaigns || []
+    } catch { /* لو فشل، فلتر الحملات هيفضل فاضي بس باقي الفلاتر تفضل شغالة */ }
   }, [])
 
   const fetchConversations = useCallback(async () => {
-    // لو فيه فلتر مرحلة lifecycle، جيب الـ contacts اللي مطابقة
-    let scopeContactIds = null
+    // لو فيه فلتر مرحلة lifecycle و/أو تاجات، جيب الـ contacts اللي مطابقة كل نوع لوحده (أي تاج من
+    // التاجات المختارة = OR جوّه نفس النوع)، وبعدين قاطعهم مع بعض (AND بين lifecycle والتاجات)
+    const idSets = []
     if (selectedLifecycle) {
       const { data: lcRows } = await supabase.from('contacts').select('id').eq('lifecycle_stage_id', selectedLifecycle)
-      scopeContactIds = new Set((lcRows || []).map(r => r.id))
+      idSets.push(new Set((lcRows || []).map(r => r.id)))
     }
+    if (selectedTagIds.length > 0) {
+      const { data: tagRows } = await supabase.from('contact_tags').select('contact_id').in('tag_id', selectedTagIds)
+      idSets.push(new Set((tagRows || []).map(r => r.contact_id)))
+    }
+    const scopeContactIds = idSets.length ? idSets.reduce((a, b) => new Set([...a].filter(x => b.has(x)))) : null
 
     // فلاتر القناة/الموظف بس (من غير تاج/lifecycle) — مستخدمة في عدادات الـ lifecycle نفسها
     const applyBaseScope = (q) => {
@@ -342,10 +450,13 @@ export default function ConversationsScreen() {
       } else if (viewMode === 'mine') {
         q = q.eq('assigned_agent_id', agent?.id)
       }
+      if (selectedAdIds.length > 0) q = q.in('ad_referral->>ad_id', selectedAdIds)
+      if (dateFrom) q = q.gte('created_at', `${dateFrom}T00:00:00`)
+      if (dateTo) q = q.lte('created_at', `${dateTo}T23:59:59`)
       return q
     }
 
-    // فلاتر مشتركة (القناة/الموظف/اللايف سايكل) بنطبقها على أي كويري
+    // فلاتر مشتركة (القناة/الموظف/اللايف سايكل/التاج/الحملة/التاريخ) بنطبقها على أي كويري
     const applyScope = (q) => {
       q = applyBaseScope(q)
       if (scopeContactIds) q = q.in('contact_id', scopeContactIds.size ? [...scopeContactIds] : ['00000000-0000-0000-0000-000000000000'])
@@ -489,7 +600,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit])
+  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo])
 
   // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
   // فلاتر القناة/الموظف/الحالة الحالية. searchType بيحدد نبحث فين: اسم العميل، محتوى رسالة حقيقية،
@@ -616,7 +727,7 @@ export default function ConversationsScreen() {
   useEffect(() => {
     if (!filtersMountedRef.current) { filtersMountedRef.current = true; return }
     setVisibleLimit(CONVERSATIONS_PAGE_SIZE)
-  }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly])
+  }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, selectedTagIds, selectedAdIds, dateFrom, dateTo])
 
   // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
   useEffect(() => {
@@ -630,7 +741,11 @@ export default function ConversationsScreen() {
     screenCache.unrepliedOnly = unrepliedOnly
     screenCache.sidebarOpen = sidebarOpen
     screenCache.visibleLimit = visibleLimit
-  }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit])
+    screenCache.selectedTagIds = selectedTagIds
+    screenCache.selectedAdIds = selectedAdIds
+    screenCache.dateFrom = dateFrom
+    screenCache.dateTo = dateTo
+  }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo])
 
   // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل دقيقتين بس
   useEffect(() => {
@@ -679,6 +794,16 @@ export default function ConversationsScreen() {
       clearInterval(pollInterval)
     }
   }, [fetchConversations, agent])
+
+  const toggleTagId = (id) => setSelectedTagIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleAdId = (id) => setSelectedAdIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+  const toggleCampaign = (campaign) => {
+    const adIds = campaign.ads.map(a => a.id)
+    const allSelected = adIds.length > 0 && adIds.every(id => selectedAdIds.includes(id))
+    setSelectedAdIds(prev => allSelected ? prev.filter(id => !adIds.includes(id)) : [...new Set([...prev, ...adIds])])
+  }
+  const clearAdvFilters = () => { setSelectedTagIds([]); setSelectedAdIds([]); setDateFrom(''); setDateTo('') }
+  const advFilterActiveCount = selectedTagIds.length + selectedAdIds.length + (dateFrom ? 1 : 0) + (dateTo ? 1 : 0)
 
   const handleSignOut = async () => {
     await signOut()
@@ -1008,7 +1133,7 @@ export default function ConversationsScreen() {
         </div>
 
         {/* Channel Filter — ظاهر فوق القائمة على الموبايل والديسكتوب مع بعض */}
-        <div className="flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
+        <div className="relative flex items-center gap-2 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto scrollbar-hide">
           {channelTabs.map(ch => (
             <button key={ch.key} onClick={() => setChannel(ch.key)}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${channel === ch.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -1022,6 +1147,22 @@ export default function ConversationsScreen() {
             <CircleDot size={11} />
             بدون رد
           </button>
+          <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
+          <button onClick={() => setShowAdvFilter(v => !v)}
+            className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${advFilterActiveCount > 0 ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+            <Filter size={11} />
+            فلتر
+            {advFilterActiveCount > 0 && <span className="text-[10px] font-bold bg-white/25 rounded-full px-1.5">{advFilterActiveCount}</span>}
+          </button>
+          {showAdvFilter && (
+            <AdvancedFilterPanel
+              tagsList={tagsList} campaigns={campaigns}
+              selectedTagIds={selectedTagIds} toggleTagId={toggleTagId}
+              selectedAdIds={selectedAdIds} toggleAdId={toggleAdId} toggleCampaign={toggleCampaign}
+              dateFrom={dateFrom} setDateFrom={setDateFrom} dateTo={dateTo} setDateTo={setDateTo}
+              onClose={() => setShowAdvFilter(false)} onClear={clearAdvFilters} activeCount={advFilterActiveCount}
+            />
+          )}
           <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
           <button onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectionMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
