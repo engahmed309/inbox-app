@@ -2,7 +2,7 @@ import { createClient } from '@supabase/supabase-js'
 
 export const supabase = createClient(
   'https://qqrztdowbtjzjlpfuyig.supabase.co',
-  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InFxcnp0ZG93YnRqempscGZ1eWlnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODM3MjU0NjUsImV4cCI6MjA5OTMwMTQ2NX0.jHjqu-524YhZd_Z9I_Y1HfA_-rxVb7XX2I0Ag_aWOiI'
+  'sb_publishable_1nV_E71tcHwJ2LxtYzwyTg_8OYfRdLV'
 )
 
 export const API_URL = 'https://inbox-api.sehawafeya.com'
