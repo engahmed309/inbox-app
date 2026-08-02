@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -29,7 +29,7 @@ const WINDOW_EXPIRED_TEXT = {
   instagram: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — انستجرام بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
   facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
 }
-const PLATFORM_LABEL = { facebook: 'فيسبوك', instagram: 'إنستجرام', whatsapp: 'واتساب' }
+const PLATFORM_LABEL = { facebook: 'فيسبوك', instagram: 'إنستجرام', whatsapp: 'واتساب', tiktok: 'تيك توك' }
 
 // الاسم اللي بيظهر للقناة: الاسم المختصر لو المستخدم حطه، وإلا لكل واتساب بنعرض اسم الـ WABA +
 // آخر رقمين من الـ ID عشان نفرّق بين أرقام كتير بنفس الاسم، ولباقي المنصات بنرجع لاسم الحساب من ميتا
@@ -903,7 +903,7 @@ export default function ChatScreen() {
   const isWindowExpired = conv?.last_inbound_at
     ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > MESSAGE_WINDOW_HOURS
     : false
-  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : Facebook
+  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'tiktok' ? Music2 : Facebook
 
   // خريطة id → رسالة، عشان نقدر نعرض معاينة سريعة للرسالة الأصلية لما رسالة تانية ترد عليها
   const messagesById = useMemo(() => {

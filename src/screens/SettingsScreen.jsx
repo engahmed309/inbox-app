@@ -1,13 +1,13 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID } from '../lib/supabase'
+import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw
+  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2
 } from 'lucide-react'
 
 const TABS = [
@@ -571,6 +571,7 @@ const PLATFORM_META = {
   facebook: { label: 'فيسبوك', icon: Facebook, color: 'text-blue-400' },
   instagram: { label: 'إنستجرام', icon: Instagram, color: 'text-pink-400' },
   whatsapp: { label: 'واتساب', icon: Phone, color: 'text-green-400' },
+  tiktok: { label: 'تيك توك', icon: Music2, color: 'text-fg' },
 }
 
 function ChannelsTab() {
@@ -677,7 +678,7 @@ function ConnectedChannelsList() {
 
   return (
     <div className="space-y-3 pt-1">
-      {['facebook', 'instagram', 'whatsapp'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
         // فيسبوك وانستجرام لسه رقم واحد بس، بس الواتساب ممكن يكون فيه أكتر من رقم مربوط
@@ -900,6 +901,17 @@ function ConnectNewChannel() {
     window.location.href = `https://www.instagram.com/oauth/authorize?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`
   }
 
+  // فلو تيك توك أبسط من الباقي — التحويل بيروح للباك إند مباشرة (مش للفرونت إند) اللي بيبدّل
+  // الكود بتوكن ويحفظ القناة لوحده، فمش محتاجين أي معالجة رجوع هنا خالص
+  const connectTiktok = () => {
+    if (!TIKTOK_APP_ID) {
+      toast.error('محتاجين نضيف TIKTOK_APP_ID الأول')
+      return
+    }
+    const redirectUri = `${API_URL}/tiktok/callback`
+    window.location.href = `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_APP_ID}&state=${agent?.id || ''}&redirect_uri=${encodeURIComponent(redirectUri)}`
+  }
+
   const finishWhatsAppConnect = async (code, sessionInfo) => {
     try {
       const res = await fetch(`${API_URL}/channels/whatsapp/connect`, {
@@ -923,12 +935,12 @@ function ConnectNewChannel() {
   return (
     <div className="space-y-3 pt-1">
       <p className="text-xs text-fg-subtle -mt-1">اختار القناة اللي عايز تربطها. هتتحول لصفحة ميتا تختار منها الصفحة أو الحساب وتوافق على الصلاحيات.</p>
-      {['facebook', 'instagram', 'whatsapp'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook'
+        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook' || platform === 'tiktok'
         const isConnecting = connecting === platform
-        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook }
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok }
         return (
           <button key={platform}
             disabled={!isReady || isConnecting}
