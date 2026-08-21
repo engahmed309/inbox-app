@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID } from '../lib/supabase'
+import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
@@ -902,14 +902,23 @@ function ConnectNewChannel() {
   }
 
   // فلو تيك توك أبسط من الباقي — التحويل بيروح للباك إند مباشرة (مش للفرونت إند) اللي بيبدّل
-  // الكود بتوكن ويحفظ القناة لوحده، فمش محتاجين أي معالجة رجوع هنا خالص
+  // الكود بتوكن ويحفظ القناة لوحده، فمش محتاجين أي معالجة رجوع هنا خالص.
+  // مهم: ده رابط "TikTok account holder" (tiktok.com/v2/auth) مش رابط المعلنين (business-api.tiktok.com/portal/auth)
+  // — ده الوحيد اللي بيطلب صلاحيات الرسايل (message.list.*)، والتاني بيرفض الربط أصلاً
   const connectTiktok = () => {
     if (!TIKTOK_APP_ID) {
       toast.error('محتاجين نضيف TIKTOK_APP_ID الأول')
       return
     }
     const redirectUri = `${API_URL}/tiktok/callback`
-    window.location.href = `https://business-api.tiktok.com/portal/auth?app_id=${TIKTOK_APP_ID}&state=${agent?.id || ''}&redirect_uri=${encodeURIComponent(redirectUri)}`
+    const params = new URLSearchParams({
+      client_key: TIKTOK_APP_ID,
+      scope: TIKTOK_SCOPES,
+      response_type: 'code',
+      redirect_uri: redirectUri,
+      state: agent?.id || ''
+    })
+    window.location.href = `https://www.tiktok.com/v2/auth/authorize?${params.toString()}`
   }
 
   const finishWhatsAppConnect = async (code, sessionInfo) => {
