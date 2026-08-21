@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download } from 'lucide-react'
+import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2 } from 'lucide-react'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -185,6 +185,7 @@ const PLATFORMS = [
   { key: 'facebook', label: 'فيسبوك', icon: Facebook, color: { light: '#3B82F6', dark: '#3B82F6' } },
   { key: 'instagram', label: 'إنستجرام', icon: Instagram, color: { light: '#EC4899', dark: '#EC4899' } },
   { key: 'whatsapp', label: 'واتساب', icon: Phone, color: { light: '#22C55E', dark: '#16A34A' } },
+  { key: 'tiktok', label: 'تيك توك', icon: Music2, color: { light: '#0F172A', dark: '#E2E8F0' } },
 ]
 
 const RANGE_OPTS = [
@@ -362,7 +363,7 @@ function CustomerFiltersPanel({ filters, setFilters, campaigns }) {
               <option value="">الكل</option>
               {channels.map(c => (
                 <option key={c.id} value={c.id}>
-                  {(c.platform === 'whatsapp' ? 'واتساب' : c.platform === 'facebook' ? 'فيسبوك' : 'انستجرام') + ' — ' + (c.custom_name || c.display_name || c.id)}
+                  {(PLATFORMS.find(p => p.key === c.platform)?.label || c.platform) + ' — ' + (c.custom_name || c.display_name || c.id)}
                 </option>
               ))}
             </select>
@@ -1637,7 +1638,7 @@ function ExportTab() {
       })
 
       setProgress('بيبني الملف...')
-      const PLATFORM_LABEL = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'انستجرام' }
+      const PLATFORM_LABEL = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'انستجرام', tiktok: 'تيك توك' }
       const baseHeaders = ['الاسم', 'رقم الهاتف', 'الدولة', 'المنصة', 'تاريخ أول تواصل', 'مرحلة الـ Lifecycle', 'التاجات', 'ملاحظات', 'محظور؟']
       const fieldHeaders = (fieldDefs || []).map(f => f.name)
       const headers = [...baseHeaders, ...fieldHeaders]

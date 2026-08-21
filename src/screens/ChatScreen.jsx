@@ -23,8 +23,11 @@ const MESSAGES_PAGE_SIZE = 50 // بنجيب آخر ٥٠ رسالة بس، وال
 
 // فيسبوك وانستجرام وواتساب كلهم بيطبّقوا "نافذة الـ٢٤ ساعة": من آخر رسالة العميل بعتها، عندنا ٢٤ ساعة
 // نرد فيها برسالة عادية — بعد كده الرد بيترفض (واتساب بيتطلب Template معتمد، فيسبوك/انستجرام بيمنعوا الرد خالص)
+// نافذة الرد المسموحة بتختلف من منصة للتانية — ميتا/واتساب ٢٤ ساعة، وتيك توك ٤٨ ساعة
 const MESSAGE_WINDOW_HOURS = 24
+const PLATFORM_WINDOW_HOURS = { tiktok: 48 }
 const WINDOW_EXPIRED_TEXT = {
+  tiktok: 'عدّت ٤٨ ساعة من آخر رسالة للعميل — تيك توك بيرفض أي رد بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
   whatsapp: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — واتساب مايسمحش برسالة عادية دلوقتي، لازم تبعت Template معتمد مسبقاً من ميتا.',
   instagram: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — انستجرام بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
   facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
@@ -736,6 +739,10 @@ export default function ChatScreen() {
     if (!file) return
     e.target.value = ''
     const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'file'
+    if (isTiktok && type !== 'image') {
+      toast.error('تيك توك بيقبل صور بس — مش بيدعم إرسال فيديو أو صوت أو ملفات')
+      return
+    }
     setPendingFile({ file, url: null, previewUrl: URL.createObjectURL(file), type, name: file.name })
   }
 
@@ -758,6 +765,10 @@ export default function ChatScreen() {
   }
 
   const pickFromLibrary = (item) => {
+    if (isTiktok && item.file_type !== 'image') {
+      toast.error('تيك توك بيقبل صور بس — مش بيدعم إرسال فيديو أو ملفات')
+      return
+    }
     setPendingFile({ file: null, url: item.file_url, previewUrl: item.file_url, type: item.file_type, name: item.name })
     setShowLibraryModal(false)
   }
@@ -901,9 +912,12 @@ export default function ChatScreen() {
   const currentStatus = STATUS_OPTS.find(s => s.key === conv?.status) || STATUS_OPTS[0]
   const currentLifecycle = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)
   const isWindowExpired = conv?.last_inbound_at
-    ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > MESSAGE_WINDOW_HOURS
+    ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > (PLATFORM_WINDOW_HOURS[conv.platform] || MESSAGE_WINDOW_HOURS)
     : false
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'tiktok' ? Music2 : Facebook
+  // تيك توك بيقبل نص وصور بس في الـ Business Messaging API — لا فيديو ولا صوت ولا ملفات،
+  // فبنخفي أزرار الحاجات دي بدل ما الموظف يبعتها ويكتشف إنها فشلت (أو الأسوأ: توصل كنص فيه اسم الملف)
+  const isTiktok = conv?.platform === 'tiktok'
 
   // خريطة id → رسالة، عشان نقدر نعرض معاينة سريعة للرسالة الأصلية لما رسالة تانية ترد عليها
   const messagesById = useMemo(() => {
@@ -1286,9 +1300,10 @@ export default function ChatScreen() {
             )}
             <div className="flex items-end gap-2">
               <input type="file" ref={fileInputRef} onChange={handleFile} className="hidden"
-                accept="image/*,video/*,audio/*,.pdf,.doc,.docx" />
+                accept={isTiktok ? 'image/*' : 'image/*,video/*,audio/*,.pdf,.doc,.docx'} />
               <div className="relative flex-shrink-0">
                 <button onClick={() => setShowAttachMenu(v => !v)}
+                  title={isTiktok ? 'تيك توك بيقبل صور بس' : undefined}
                   className="w-10 h-10 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
                   <Paperclip size={18} />
                 </button>
@@ -1337,6 +1352,9 @@ export default function ChatScreen() {
                     : <Send size={16} />
                   }
                 </button>
+              ) : isTiktok ? (
+                // تيك توك مابيدعمش رسايل صوتية خالص — بنخفي الزرار بدل ما الموظف يسجل ويكتشف إنها فشلت
+                null
               ) : (
                 <button onClick={startRecording}
                   className="w-10 h-10 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">

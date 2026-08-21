@@ -1731,7 +1731,7 @@ function AiAgentTab() {
                 <p className="text-[11px] text-fg-subtle">مفيش قنوات متصلة</p>
               ) : channels.map(c => {
                 const checked = (settings.allowed_channel_ids || []).includes(c.id)
-                const label = `${c.platform === 'whatsapp' ? 'واتساب' : c.platform === 'facebook' ? 'فيسبوك' : 'انستجرام'} — ${c.custom_name || c.display_name || c.id}`
+                const label = `${PLATFORM_META[c.platform]?.label || c.platform} — ${c.custom_name || c.display_name || c.id}`
                 return (
                   <label key={c.id} className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-3 py-2 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={e => {
