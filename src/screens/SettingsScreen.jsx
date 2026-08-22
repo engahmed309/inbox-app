@@ -606,6 +606,7 @@ function ConnectedChannelsList() {
   const [editingId, setEditingId] = useState(null)
   const [editValue, setEditValue] = useState('')
   const [savingId, setSavingId] = useState(null)
+  const [settingsChannel, setSettingsChannel] = useState(null)
 
   useEffect(() => { load() }, [])
   const load = async () => {
@@ -749,21 +750,10 @@ function ConnectedChannelsList() {
                     </span>
                   )}
                   {ch?.id && (
-                    <>
-                      <button onClick={() => startEdit(ch)} title="سمّي القناة"
-                        className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-fg rounded-lg hover:bg-surface-3 flex-shrink-0">
-                        <Edit2 size={13} />
-                      </button>
-                      <button onClick={() => disconnectChannel(ch)} disabled={deletingId === ch.id}
-                        title="فصل القناة"
-                        className="w-7 h-7 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
-                        {deletingId === ch.id ? (
-                          <div className="w-3.5 h-3.5 border-2 border-danger border-t-transparent rounded-full animate-spin" />
-                        ) : (
-                          <Trash2 size={14} />
-                        )}
-                      </button>
-                    </>
+                    <button onClick={() => setSettingsChannel(ch)} title="إعدادات القناة"
+                      className="w-8 h-8 flex items-center justify-center text-fg-subtle hover:text-fg rounded-lg hover:bg-surface-3 flex-shrink-0">
+                      <Settings2 size={15} />
+                    </button>
                   )}
                 </>
               )}
@@ -771,10 +761,119 @@ function ConnectedChannelsList() {
             {ch?.status_reason && (
               <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
             )}
-            {ch?.platform === 'whatsapp' && ch?.status === 'active' && <ChannelTemplates channel={ch} />}
           </div>
         ))
       })}
+
+      {settingsChannel && (
+        <ChannelSettingsPanel
+          channel={settingsChannel}
+          onClose={() => setSettingsChannel(null)}
+          onChanged={() => { load(); setSettingsChannel(null) }}
+        />
+      )}
+    </div>
+  )
+}
+
+// لوحة إعدادات قناة واحدة — كل العمليات الخاصة بيها في مكان واحد بدل ما تكون أزرار متفرقة
+// على الكارت. بتتفتح من الترس، وبتتقفل بالضغط بره أو على X
+function ChannelSettingsPanel({ channel, onClose, onChanged }) {
+  const toast = useToast()
+  const [name, setName] = useState(channel.custom_name || '')
+  const [saving, setSaving] = useState(false)
+  const [disconnecting, setDisconnecting] = useState(false)
+
+  const meta = PLATFORM_META[channel.platform] || { label: channel.platform, icon: Radio, color: 'text-fg' }
+  const Icon = meta.icon
+
+  const saveName = async () => {
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ custom_name: name.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الحفظ')
+      toast.success('اتحفظ الاسم')
+      onChanged()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const disconnect = async () => {
+    if (!confirm(`فصل ${channel.custom_name || channel.display_name || meta.label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
+    setDisconnecting(true)
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الفصل')
+      toast.success('اتفصلت القناة')
+      onChanged()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+      setDisconnecting(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2 z-10">
+          <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+            <Icon size={15} className={meta.color} />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-fg truncate">{channel.custom_name || meta.label}</p>
+            <p className="text-xs text-fg-muted truncate">{channel.display_name}</p>
+          </div>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-5">
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">الاسم المختصر</label>
+            <div className="flex items-center gap-2">
+              <input value={name} onChange={e => setName(e.target.value)} placeholder={meta.label}
+                className="flex-1 min-w-0 bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              <button onClick={saveName} disabled={saving}
+                className="px-3 py-2 rounded-xl text-xs font-semibold bg-brand text-white disabled:opacity-50 flex-shrink-0">
+                {saving ? '...' : 'حفظ'}
+              </button>
+            </div>
+            <p className="text-[11px] text-fg-subtle mt-1">اسم بيظهر لك في التطبيق بدل اسم الحساب الرسمي</p>
+          </div>
+
+          {channel.platform === 'whatsapp' && channel.status === 'active' && (
+            <ChannelTemplates channel={channel} />
+          )}
+
+          <div className="pt-1 space-y-1.5">
+            {channel.waba_id && (
+              <p className="text-[11px] text-fg-subtle">WABA ID: {channel.waba_id}</p>
+            )}
+            <p className="text-[11px] text-fg-subtle">معرّف القناة: {channel.external_id}</p>
+          </div>
+
+          <div className="pt-3 border-t border-surface-3">
+            <button onClick={disconnect} disabled={disconnecting}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition-colors disabled:opacity-50">
+              {disconnecting ? (
+                <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <><Trash2 size={14} /> فصل القناة</>
+              )}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
@@ -794,10 +893,14 @@ const TEMPLATE_CATEGORY = { MARKETING: 'تسويقي', UTILITY: 'خدمي', AUTH
 // قوالب واتساب المعتمدة — الطريقة الوحيدة للرد بعد ما تعدي نافذة الـ٢٤ ساعة.
 // بنحمّلها بس لما المستخدم يفتح القسم، عشان منضربش Graph API لكل رقم مع كل فتح للإعدادات
 function ChannelTemplates({ channel }) {
-  const [open, setOpen] = useState(false)
+  const toast = useToast()
   const [templates, setTemplates] = useState(null)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [showCreate, setShowCreate] = useState(false)
+  const [deleting, setDeleting] = useState(null)
+
+  useEffect(() => { load() }, [])
 
   const load = async () => {
     setLoading(true)
@@ -814,66 +917,227 @@ function ChannelTemplates({ channel }) {
     }
   }
 
-  const toggle = () => {
-    const next = !open
-    setOpen(next)
-    if (next && templates === null) load()
+  const removeTemplate = async (tpl) => {
+    if (!confirm(`حذف القالب "${tpl.name}"؟ مش هتقدر تبعته تاني، ولو عايزاه بعدين هتعمليه من الأول وتستني موافقة ميتا.`)) return
+    setDeleting(tpl.name)
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}/templates/${encodeURIComponent(tpl.name)}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الحذف')
+      toast.success('اتحذف القالب')
+      load()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setDeleting(null)
+    }
   }
 
   // نص القالب نفسه موجود في مكوّن BODY — بنعرضه كمعاينة عشان الموظف يفرق بين القوالب من غير ما يفتحها
   const bodyOf = (tpl) => tpl.components?.find(c => c.type === 'BODY')?.text || ''
 
   return (
-    <div className="mt-3 pt-3 border-t border-surface-3">
-      <button onClick={toggle} className="w-full flex items-center gap-2 text-xs text-fg-muted hover:text-fg">
-        <FileText size={13} />
-        <span className="flex-1 text-right">القوالب المعتمدة</span>
+    <div className="pt-4 border-t border-surface-3">
+      <div className="flex items-center gap-2 mb-2.5">
+        <FileText size={13} className="text-fg-muted" />
+        <span className="text-xs font-semibold text-fg flex-1">القوالب</span>
         {templates && <span className="text-[10px] text-fg-subtle">{templates.length}</span>}
-        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-      </button>
+        <button onClick={() => setShowCreate(true)}
+          className="flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
+          <Plus size={12} /> قالب جديد
+        </button>
+      </div>
 
-      {open && (
-        <div className="mt-2.5 space-y-2">
-          {loading ? (
-            <div className="flex justify-center py-3">
-              <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-            </div>
-          ) : error ? (
-            <div className="space-y-1.5">
-              <p className="text-xs text-danger bg-danger/5 rounded-lg px-2.5 py-1.5">{error}</p>
-              <button onClick={load} className="text-[11px] text-brand">إعادة المحاولة</button>
-            </div>
-          ) : templates?.length === 0 ? (
-            <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-lg px-2.5 py-2 leading-relaxed">
-              مفيش قوالب على الرقم ده لسه. القوالب بتتعمل من ميتا وبتحتاج موافقتهم قبل ما تقدر تبعتها،
-              وبتستخدم للرد بعد ما تعدي نافذة الـ٢٤ ساعة.
-            </p>
-          ) : (
-            templates?.map(tpl => {
-              const st = TEMPLATE_STATUS[tpl.status] || { label: tpl.status, cls: 'bg-surface-3 text-fg-muted' }
-              return (
-                <div key={tpl.id || tpl.name} className="bg-surface-3/50 rounded-lg px-2.5 py-2">
-                  <div className="flex items-center gap-2">
-                    <span className="text-xs text-fg font-medium truncate flex-1">{tpl.name}</span>
-                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
-                  </div>
-                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-fg-subtle">
-                    <span>{TEMPLATE_CATEGORY[tpl.category] || tpl.category}</span>
-                    <span>·</span>
-                    <span>{tpl.language}</span>
-                  </div>
-                  {bodyOf(tpl) && (
-                    <p className="text-[11px] text-fg-muted mt-1.5 line-clamp-2 leading-relaxed">{bodyOf(tpl)}</p>
-                  )}
-                  {tpl.status === 'REJECTED' && tpl.rejected_reason && (
-                    <p className="text-[10px] text-danger mt-1">سبب الرفض: {tpl.rejected_reason}</p>
-                  )}
+      <p className="text-[11px] text-fg-subtle mb-2.5 leading-relaxed">
+        القوالب هي الطريقة الوحيدة للرد بعد ما تعدي ٢٤ ساعة من آخر رسالة للعميل. لازم ميتا توافق عليها الأول،
+        وبتتحاسبي عليها من واتساب.
+      </p>
+
+      <div className="space-y-2">
+        {loading ? (
+          <div className="flex justify-center py-3">
+            <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
+        ) : error ? (
+          <div className="space-y-1.5">
+            <p className="text-xs text-danger bg-danger/5 rounded-lg px-2.5 py-1.5">{error}</p>
+            <button onClick={load} className="text-[11px] text-brand">إعادة المحاولة</button>
+          </div>
+        ) : templates?.length === 0 ? (
+          <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-lg px-2.5 py-2">
+            مفيش قوالب على الرقم ده لسه.
+          </p>
+        ) : (
+          templates?.map(tpl => {
+            const st = TEMPLATE_STATUS[tpl.status] || { label: tpl.status, cls: 'bg-surface-3 text-fg-muted' }
+            return (
+              <div key={tpl.id || tpl.name} className="bg-surface-3/50 rounded-lg px-2.5 py-2">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs text-fg font-medium truncate flex-1">{tpl.name}</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
+                  <button onClick={() => removeTemplate(tpl)} disabled={deleting === tpl.name}
+                    title="حذف القالب"
+                    className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
+                    {deleting === tpl.name ? (
+                      <div className="w-3 h-3 border-2 border-danger border-t-transparent rounded-full animate-spin" />
+                    ) : (
+                      <Trash2 size={12} />
+                    )}
+                  </button>
                 </div>
-              )
-            })
-          )}
-        </div>
+                <div className="flex items-center gap-1.5 mt-1 text-[10px] text-fg-subtle">
+                  <span>{TEMPLATE_CATEGORY[tpl.category] || tpl.category}</span>
+                  <span>·</span>
+                  <span>{tpl.language}</span>
+                </div>
+                {bodyOf(tpl) && (
+                  <p className="text-[11px] text-fg-muted mt-1.5 leading-relaxed">{bodyOf(tpl)}</p>
+                )}
+                {tpl.status === 'REJECTED' && tpl.rejected_reason && (
+                  <p className="text-[10px] text-danger mt-1">سبب الرفض: {tpl.rejected_reason}</p>
+                )}
+              </div>
+            )
+          })
+        )}
+      </div>
+
+      {showCreate && (
+        <CreateTemplateModal channel={channel}
+          onClose={() => setShowCreate(false)}
+          onCreated={() => { setShowCreate(false); load() }} />
       )}
+    </div>
+  )
+}
+
+const TEMPLATE_LANGS = [
+  { code: 'ar', label: 'عربي' },
+  { code: 'en', label: 'إنجليزي' },
+  { code: 'en_US', label: 'إنجليزي (أمريكي)' },
+]
+
+function CreateTemplateModal({ channel, onClose, onCreated }) {
+  const toast = useToast()
+  const [form, setForm] = useState({ name: '', language: 'ar', category: 'UTILITY', body: '', footer: '' })
+  const [examples, setExamples] = useState([])
+  const [saving, setSaving] = useState(false)
+
+  // عدد المتغيرات {{1}} {{2}} في النص — ميتا بترفض القالب لو فيه متغيرات من غير أمثلة ليها
+  const varCount = (form.body.match(/\{\{\d+\}\}/g) || []).length
+
+  const addVariable = () => {
+    setForm(f => ({ ...f, body: `${f.body}{{${varCount + 1}}}` }))
+  }
+
+  const submit = async () => {
+    if (!form.name.trim() || !form.body.trim()) {
+      toast.error('الاسم والنص مطلوبين')
+      return
+    }
+    setSaving(true)
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}/templates`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...form, name: form.name.trim(), examples })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل إنشاء القالب')
+      toast.success('اتبعت القالب لميتا للمراجعة')
+      onCreated()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/60" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
+          <p className="text-sm font-semibold text-fg">قالب جديد</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">اسم القالب</label>
+            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
+              placeholder="booking_reminder"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+            <p className="text-[11px] text-fg-subtle mt-1">حروف إنجليزي صغيرة وأرقام و _ بس (شرط من ميتا)</p>
+          </div>
+
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-fg mb-1.5">اللغة</label>
+              <select value={form.language} onChange={e => setForm({ ...form, language: e.target.value })}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
+                {TEMPLATE_LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-fg mb-1.5">التصنيف</label>
+              <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
+                <option value="UTILITY">خدمي</option>
+                <option value="MARKETING">تسويقي</option>
+              </select>
+            </div>
+          </div>
+          <p className="text-[11px] text-fg-subtle -mt-2">
+            الخدمي للتذكيرات والتأكيدات (أرخص). التسويقي للعروض (أغلى، وميتا أدق في مراجعته).
+          </p>
+
+          <div>
+            <div className="flex items-center justify-between mb-1.5">
+              <label className="text-xs font-semibold text-fg">نص الرسالة</label>
+              <button onClick={addVariable} className="text-[11px] text-brand hover:underline">+ متغيّر</button>
+            </div>
+            <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })}
+              rows={4} placeholder="أهلاً {{1}}، حابين نفكرك بموعدك يوم {{2}}."
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
+            <p className="text-[11px] text-fg-subtle mt-1">
+              استخدمي {'{{1}}'} و{'{{2}}'} للأجزاء اللي هتتغير في كل رسالة (زي اسم العميل أو الميعاد)
+            </p>
+          </div>
+
+          {varCount > 0 && (
+            <div className="space-y-2 bg-surface-3/50 rounded-xl p-3">
+              <p className="text-[11px] font-semibold text-fg">أمثلة للمتغيرات</p>
+              <p className="text-[11px] text-fg-subtle -mt-1">ميتا بتطلبها عشان تفهم القالب وتوافق عليه — مش بتظهر للعميل</p>
+              {Array.from({ length: varCount }, (_, i) => (
+                <input key={i} value={examples[i] || ''}
+                  onChange={e => { const next = [...examples]; next[i] = e.target.value; setExamples(next) }}
+                  placeholder={`مثال لـ {{${i + 1}}}`}
+                  className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              ))}
+            </div>
+          )}
+
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">تذييل (اختياري)</label>
+            <input value={form.footer} onChange={e => setForm({ ...form, footer: e.target.value })}
+              placeholder="صحة وعافية"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+
+          <div className="flex gap-2 pt-1">
+            <button onClick={onClose} disabled={saving}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-50">
+              إلغاء
+            </button>
+            <button onClick={submit} disabled={saving || !form.name.trim() || !form.body.trim()}
+              className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
+              {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'ابعت للمراجعة'}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   )
 }

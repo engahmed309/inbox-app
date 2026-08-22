@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -119,6 +119,7 @@ export default function ChatScreen() {
   const [lightbox, setLightbox] = useState(null) // { type: 'image'|'video', url }
   const [showAttachMenu, setShowAttachMenu] = useState(false)
   const [showLibraryModal, setShowLibraryModal] = useState(false)
+  const [showTemplates, setShowTemplates] = useState(false)
   const [libraryItems, setLibraryItems] = useState([])
   const [librarySearch, setLibrarySearch] = useState('')
   const [showRequestModal, setShowRequestModal] = useState(false)
@@ -1243,9 +1244,18 @@ export default function ChatScreen() {
             </button>
           </div>
         ) : isWindowExpired ? (
-          <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
-            <Clock size={18} className="flex-shrink-0 text-follow" />
-            <span>{WINDOW_EXPIRED_TEXT[conv?.platform] || WINDOW_EXPIRED_TEXT.facebook}</span>
+          <div className="flex flex-col gap-2">
+            <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
+              <Clock size={18} className="flex-shrink-0 text-follow" />
+              <span>{WINDOW_EXPIRED_TEXT[conv?.platform] || WINDOW_EXPIRED_TEXT.facebook}</span>
+            </div>
+            {/* الواتساب هو الوحيد اللي عنده قوالب معتمدة تشتغل بعد انتهاء النافذة */}
+            {conv?.platform === 'whatsapp' && (
+              <button onClick={() => setShowTemplates(true)}
+                className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors">
+                <FileText size={15} /> ابعت قالب معتمد
+              </button>
+            )}
           </div>
         ) : (
           <div className="flex flex-col gap-2">
@@ -1373,6 +1383,16 @@ export default function ChatScreen() {
       )}
 
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+
+      {showTemplates && (
+        <SendTemplateModal
+          conversationId={id}
+          channelId={selectedChannelId || conv?.channel_id}
+          agentId={agent?.id}
+          onClose={() => setShowTemplates(false)}
+          onSent={() => { setShowTemplates(false); fetchMessages() }}
+        />
+      )}
 
       {showLibraryModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
@@ -1661,6 +1681,121 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             : <Check size={12} className="inline" />}
         </span>
       )}
+    </div>
+  )
+}
+
+// إرسال قالب واتساب معتمد — بيظهر بس لما تعدي نافذة الـ٢٤ ساعة، لأنه الطريقة الوحيدة المسموحة ساعتها.
+// بنعرض القوالب المعتمدة بس (اللي لسه تحت المراجعة أو مرفوضة ميتا هترفض إرسالها)
+function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent }) {
+  const toast = useToast()
+  const [templates, setTemplates] = useState(null)
+  const [error, setError] = useState('')
+  const [selected, setSelected] = useState(null)
+  const [params, setParams] = useState([])
+  const [sending, setSending] = useState(false)
+
+  useEffect(() => {
+    if (!channelId) { setError('مفيش رقم واتساب محدد للمحادثة دي'); return }
+    fetch(`${API_URL}/channels/${channelId}/templates`)
+      .then(r => r.json())
+      .then(d => {
+        if (d.error) throw new Error(d.error)
+        setTemplates((d.templates || []).filter(t => t.status === 'APPROVED'))
+      })
+      .catch(err => setError(err.message))
+  }, [channelId])
+
+  const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
+  const varCount = selected ? (bodyOf(selected).match(/\{\{\d+\}\}/g) || []).length : 0
+  // معاينة حية بنفس منطق السيرفر — الموظف يشوف الرسالة النهائية قبل ما يبعتها
+  const preview = selected ? bodyOf(selected).replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] || `{{${n}}}`) : ''
+
+  const send = async () => {
+    if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
+      toast.error('املا كل المتغيرات الأول')
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch(`${API_URL}/reply-template`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          conversation_id: conversationId, template_name: selected.name,
+          language: selected.language, parameters: params.slice(0, varCount),
+          agent_id: agentId, channel_id: channelId
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل إرسال القالب')
+      toast.success('اتبعت القالب')
+      onSent()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[420px] max-h-[80vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
+          <p className="text-sm font-semibold text-fg">{selected ? selected.name : 'اختار قالب'}</p>
+          <button onClick={selected ? () => { setSelected(null); setParams([]) } : onClose}
+            className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-3">
+          {error ? (
+            <p className="text-xs text-danger bg-danger/5 rounded-lg px-3 py-2">{error}</p>
+          ) : templates === null ? (
+            <div className="flex justify-center py-4">
+              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : templates.length === 0 ? (
+            <p className="text-xs text-fg-muted bg-surface-3/50 rounded-lg px-3 py-2.5 leading-relaxed">
+              مفيش قوالب معتمدة على الرقم ده. تقدري تعملي قالب من الإعدادات ← القنوات ← ترس القناة،
+              بس محتاج موافقة ميتا الأول.
+            </p>
+          ) : !selected ? (
+            templates.map(tpl => (
+              <button key={tpl.id || tpl.name} onClick={() => { setSelected(tpl); setParams([]) }}
+                className="w-full text-right bg-surface-3/50 hover:bg-surface-3 rounded-xl px-3 py-2.5 transition-colors">
+                <p className="text-xs font-medium text-fg">{tpl.name}</p>
+                <p className="text-[11px] text-fg-muted mt-1 leading-relaxed line-clamp-2">{bodyOf(tpl)}</p>
+              </button>
+            ))
+          ) : (
+            <>
+              {varCount > 0 && (
+                <div className="space-y-2">
+                  <p className="text-xs font-semibold text-fg">املا المتغيرات</p>
+                  {Array.from({ length: varCount }, (_, i) => (
+                    <input key={i} value={params[i] || ''} autoFocus={i === 0}
+                      onChange={e => { const next = [...params]; next[i] = e.target.value; setParams(next) }}
+                      placeholder={`القيمة رقم ${i + 1}`}
+                      className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                  ))}
+                </div>
+              )}
+              <div>
+                <p className="text-xs font-semibold text-fg mb-1.5">معاينة</p>
+                <div className="bg-brand/10 rounded-xl px-3 py-2.5">
+                  <p className="text-sm text-fg whitespace-pre-wrap leading-relaxed">{preview}</p>
+                </div>
+              </div>
+              <button onClick={send} disabled={sending}
+                className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
+                {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={15} /> ابعت</>}
+              </button>
+            </>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
