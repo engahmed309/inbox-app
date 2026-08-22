@@ -898,6 +898,7 @@ function ChannelTemplates({ channel }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [showCreate, setShowCreate] = useState(false)
+  const [editing, setEditing] = useState(null)
   const [deleting, setDeleting] = useState(null)
 
   useEffect(() => { load() }, [])
@@ -975,6 +976,13 @@ function ChannelTemplates({ channel }) {
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-fg font-medium truncate flex-1">{tpl.name}</span>
                   <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
+                  {/* ميتا بتسمح بالتعديل للمرفوض والمعتمد والموقوف بس — اللي تحت المراجعة مقفول */}
+                  {['REJECTED', 'APPROVED', 'PAUSED'].includes(tpl.status) && (
+                    <button onClick={() => setEditing(tpl)} title="عدّل وابعت تاني"
+                      className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-brand rounded-lg hover:bg-brand/10 flex-shrink-0">
+                      <Edit2 size={12} />
+                    </button>
+                  )}
                   <button onClick={() => removeTemplate(tpl)} disabled={deleting === tpl.name}
                     title="حذف القالب"
                     className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
@@ -1007,6 +1015,12 @@ function ChannelTemplates({ channel }) {
           onClose={() => setShowCreate(false)}
           onCreated={() => { setShowCreate(false); load() }} />
       )}
+
+      {editing && (
+        <CreateTemplateModal channel={channel} existing={editing}
+          onClose={() => setEditing(null)}
+          onCreated={() => { setEditing(null); load() }} />
+      )}
     </div>
   )
 }
@@ -1017,10 +1031,24 @@ const TEMPLATE_LANGS = [
   { code: 'en_US', label: 'إنجليزي (أمريكي)' },
 ]
 
-function CreateTemplateModal({ channel, onClose, onCreated }) {
+// نفس النموذج بيستخدم للإنشاء وللتعديل — لو اتبعتله قالب موجود بيشتغل في وضع التعديل
+// (الاسم واللغة بيتقفلوا لأن ميتا مابتسمحش بتغييرهم بعد الإنشاء)
+function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
   const toast = useToast()
-  const [form, setForm] = useState({ name: '', language: 'ar', category: 'UTILITY', body: '', footer: '' })
-  const [examples, setExamples] = useState([])
+  const isEdit = Boolean(existing)
+  const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
+  const footerOf = (tpl) => tpl?.components?.find(c => c.type === 'FOOTER')?.text || ''
+
+  const [form, setForm] = useState({
+    name: existing?.name || '',
+    language: existing?.language || 'ar',
+    category: existing?.category || 'UTILITY',
+    body: bodyOf(existing),
+    footer: footerOf(existing)
+  })
+  const [examples, setExamples] = useState(
+    existing?.components?.find(c => c.type === 'BODY')?.example?.body_text?.[0] || []
+  )
   const [saving, setSaving] = useState(false)
 
   // عدد المتغيرات {{1}} {{2}} في النص — ميتا بترفض القالب لو فيه متغيرات من غير أمثلة ليها
@@ -1037,13 +1065,17 @@ function CreateTemplateModal({ channel, onClose, onCreated }) {
     }
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}/templates`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
+      const url = isEdit
+        ? `${API_URL}/channels/${channel.id}/templates/${existing.id}`
+        : `${API_URL}/channels/${channel.id}/templates`
+      const res = await fetch(url, {
+        method: isEdit ? 'PATCH' : 'POST',
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...form, name: form.name.trim(), examples })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إنشاء القالب')
-      toast.success('اتبعت القالب لميتا للمراجعة')
+      if (!res.ok) throw new Error(data.error || (isEdit ? 'فشل تعديل القالب' : 'فشل إنشاء القالب'))
+      toast.success(isEdit ? 'اتبعت التعديل لميتا للمراجعة' : 'اتبعت القالب لميتا للمراجعة')
       onCreated()
     } catch (err) {
       toast.error('خطأ: ' + err.message)
@@ -1057,26 +1089,36 @@ function CreateTemplateModal({ channel, onClose, onCreated }) {
       <div onClick={e => e.stopPropagation()}
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
-          <p className="text-sm font-semibold text-fg">قالب جديد</p>
+          <p className="text-sm font-semibold text-fg">{isEdit ? 'تعديل القالب' : 'قالب جديد'}</p>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             <X size={16} />
           </button>
         </div>
 
         <div className="p-5 space-y-4">
+          {isEdit && existing.status === 'REJECTED' && existing.rejected_reason && (
+            <div className="bg-danger/10 rounded-xl px-3 py-2.5">
+              <p className="text-[11px] font-semibold text-danger mb-0.5">ميتا رفضت القالب ده</p>
+              <p className="text-[11px] text-danger leading-relaxed">{existing.rejected_reason}</p>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-fg mb-1.5">اسم القالب</label>
-            <input value={form.name} onChange={e => setForm({ ...form, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
+            <input value={form.name} disabled={isEdit}
+              onChange={e => setForm({ ...form, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
               placeholder="booking_reminder"
-              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
-            <p className="text-[11px] text-fg-subtle mt-1">حروف إنجليزي صغيرة وأرقام و _ بس (شرط من ميتا)</p>
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60" />
+            <p className="text-[11px] text-fg-subtle mt-1">
+              {isEdit ? 'الاسم واللغة مالهمش تعديل بعد الإنشاء (شرط من ميتا)' : 'حروف إنجليزي صغيرة وأرقام و _ بس (شرط من ميتا)'}
+            </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="block text-xs font-semibold text-fg mb-1.5">اللغة</label>
-              <select value={form.language} onChange={e => setForm({ ...form, language: e.target.value })}
-                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
+              <select value={form.language} disabled={isEdit} onChange={e => setForm({ ...form, language: e.target.value })}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none disabled:opacity-60">
                 {TEMPLATE_LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
               </select>
             </div>
@@ -1133,7 +1175,9 @@ function CreateTemplateModal({ channel, onClose, onCreated }) {
             </button>
             <button onClick={submit} disabled={saving || !form.name.trim() || !form.body.trim()}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
-              {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'ابعت للمراجعة'}
+              {saving
+                ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                : isEdit ? 'ابعت التعديل للمراجعة' : 'ابعت للمراجعة'}
             </button>
           </div>
         </div>
