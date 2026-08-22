@@ -771,9 +771,109 @@ function ConnectedChannelsList() {
             {ch?.status_reason && (
               <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
             )}
+            {ch?.platform === 'whatsapp' && ch?.status === 'active' && <ChannelTemplates channel={ch} />}
           </div>
         ))
       })}
+    </div>
+  )
+}
+
+// حالة القالب عند ميتا — بتتغير لوحدها بعد المراجعة، فبنقراها منهم مباشرة كل مرة
+const TEMPLATE_STATUS = {
+  APPROVED: { label: 'معتمد', cls: 'bg-success/15 text-success' },
+  PENDING: { label: 'تحت المراجعة', cls: 'bg-follow/15 text-follow' },
+  IN_APPEAL: { label: 'تظلّم', cls: 'bg-follow/15 text-follow' },
+  REJECTED: { label: 'مرفوض', cls: 'bg-danger/15 text-danger' },
+  PAUSED: { label: 'موقوف', cls: 'bg-surface-3 text-fg-muted' },
+  DISABLED: { label: 'معطّل', cls: 'bg-surface-3 text-fg-muted' },
+}
+
+const TEMPLATE_CATEGORY = { MARKETING: 'تسويقي', UTILITY: 'خدمي', AUTHENTICATION: 'تحقق' }
+
+// قوالب واتساب المعتمدة — الطريقة الوحيدة للرد بعد ما تعدي نافذة الـ٢٤ ساعة.
+// بنحمّلها بس لما المستخدم يفتح القسم، عشان منضربش Graph API لكل رقم مع كل فتح للإعدادات
+function ChannelTemplates({ channel }) {
+  const [open, setOpen] = useState(false)
+  const [templates, setTemplates] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState('')
+
+  const load = async () => {
+    setLoading(true)
+    setError('')
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}/templates`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل تحميل القوالب')
+      setTemplates(data.templates || [])
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const toggle = () => {
+    const next = !open
+    setOpen(next)
+    if (next && templates === null) load()
+  }
+
+  // نص القالب نفسه موجود في مكوّن BODY — بنعرضه كمعاينة عشان الموظف يفرق بين القوالب من غير ما يفتحها
+  const bodyOf = (tpl) => tpl.components?.find(c => c.type === 'BODY')?.text || ''
+
+  return (
+    <div className="mt-3 pt-3 border-t border-surface-3">
+      <button onClick={toggle} className="w-full flex items-center gap-2 text-xs text-fg-muted hover:text-fg">
+        <FileText size={13} />
+        <span className="flex-1 text-right">القوالب المعتمدة</span>
+        {templates && <span className="text-[10px] text-fg-subtle">{templates.length}</span>}
+        <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {open && (
+        <div className="mt-2.5 space-y-2">
+          {loading ? (
+            <div className="flex justify-center py-3">
+              <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : error ? (
+            <div className="space-y-1.5">
+              <p className="text-xs text-danger bg-danger/5 rounded-lg px-2.5 py-1.5">{error}</p>
+              <button onClick={load} className="text-[11px] text-brand">إعادة المحاولة</button>
+            </div>
+          ) : templates?.length === 0 ? (
+            <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-lg px-2.5 py-2 leading-relaxed">
+              مفيش قوالب على الرقم ده لسه. القوالب بتتعمل من ميتا وبتحتاج موافقتهم قبل ما تقدر تبعتها،
+              وبتستخدم للرد بعد ما تعدي نافذة الـ٢٤ ساعة.
+            </p>
+          ) : (
+            templates?.map(tpl => {
+              const st = TEMPLATE_STATUS[tpl.status] || { label: tpl.status, cls: 'bg-surface-3 text-fg-muted' }
+              return (
+                <div key={tpl.id || tpl.name} className="bg-surface-3/50 rounded-lg px-2.5 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs text-fg font-medium truncate flex-1">{tpl.name}</span>
+                    <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 mt-1 text-[10px] text-fg-subtle">
+                    <span>{TEMPLATE_CATEGORY[tpl.category] || tpl.category}</span>
+                    <span>·</span>
+                    <span>{tpl.language}</span>
+                  </div>
+                  {bodyOf(tpl) && (
+                    <p className="text-[11px] text-fg-muted mt-1.5 line-clamp-2 leading-relaxed">{bodyOf(tpl)}</p>
+                  )}
+                  {tpl.status === 'REJECTED' && tpl.rejected_reason && (
+                    <p className="text-[10px] text-danger mt-1">سبب الرفض: {tpl.rejected_reason}</p>
+                  )}
+                </div>
+              )
+            })
+          )}
+        </div>
+      )}
     </div>
   )
 }
