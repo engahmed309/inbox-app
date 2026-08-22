@@ -1327,6 +1327,13 @@ export default function ChatScreen() {
                       className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
                       <Paperclip size={14} className="text-fg-muted" /> من الجهاز
                     </button>
+                    {/* القوالب مفيدة جوه الـ٢٤ ساعة كمان (تذكير بموعد مثلاً)، مش بس لما النافذة تقفل */}
+                    {conv?.platform === 'whatsapp' && (
+                      <button onClick={() => { setShowAttachMenu(false); setShowTemplates(true) }}
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap border-t border-surface-3">
+                        <FileText size={14} className="text-fg-muted" /> قالب معتمد
+                      </button>
+                    )}
                   </div>
                 )}
               </div>
@@ -1689,22 +1696,41 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
 // بنعرض القوالب المعتمدة بس (اللي لسه تحت المراجعة أو مرفوضة ميتا هترفض إرسالها)
 function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent }) {
   const toast = useToast()
+  const [numbers, setNumbers] = useState([])
+  const [activeChannelId, setActiveChannelId] = useState(channelId || null)
   const [templates, setTemplates] = useState(null)
   const [error, setError] = useState('')
   const [selected, setSelected] = useState(null)
   const [params, setParams] = useState([])
   const [sending, setSending] = useState(false)
 
+  // القوالب بتتعمل على مستوى كل رقم لوحده، فالموظف لازم يقدر يختار الرقم اللي هيبعت منه —
+  // مش بس رقم المحادثة الحالي. بنجيب كل أرقام الواتساب النشطة مش اللي كلّمت العميل بس
   useEffect(() => {
-    if (!channelId) { setError('مفيش رقم واتساب محدد للمحادثة دي'); return }
-    fetch(`${API_URL}/channels/${channelId}/templates`)
+    fetch(`${API_URL}/channels`)
+      .then(r => r.json())
+      .then(d => {
+        const wa = (d.channels || []).filter(c => c.platform === 'whatsapp' && c.status === 'active')
+        setNumbers(wa)
+        if (!activeChannelId && wa.length) setActiveChannelId(wa[0].id)
+      })
+      .catch(() => { /* لو فشلت، هنكمل برقم المحادثة الحالي */ })
+  }, [])
+
+  useEffect(() => {
+    if (!activeChannelId) { setError('مفيش رقم واتساب متاح'); return }
+    setTemplates(null)
+    setSelected(null)
+    setParams([])
+    setError('')
+    fetch(`${API_URL}/channels/${activeChannelId}/templates`)
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error)
         setTemplates((d.templates || []).filter(t => t.status === 'APPROVED'))
       })
       .catch(err => setError(err.message))
-  }, [channelId])
+  }, [activeChannelId])
 
   const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
   const varCount = selected ? (bodyOf(selected).match(/\{\{\d+\}\}/g) || []).length : 0
@@ -1723,7 +1749,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         body: JSON.stringify({
           conversation_id: conversationId, template_name: selected.name,
           language: selected.language, parameters: params.slice(0, varCount),
-          agent_id: agentId, channel_id: channelId
+          agent_id: agentId, channel_id: activeChannelId
         })
       })
       const data = await res.json()
@@ -1750,6 +1776,21 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         </div>
 
         <div className="p-5 space-y-3">
+          {numbers.length > 1 && !selected && (
+            <div>
+              <label className="block text-xs font-semibold text-fg mb-1.5">ابعت من رقم</label>
+              <select value={activeChannelId || ''} onChange={e => setActiveChannelId(e.target.value)}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
+                {numbers.map(n => (
+                  <option key={n.id} value={n.id}>
+                    {n.custom_name || n.display_name || n.external_id}
+                  </option>
+                ))}
+              </select>
+              <p className="text-[11px] text-fg-subtle mt-1">كل رقم له قوالبه المعتمدة الخاصة بيه</p>
+            </div>
+          )}
+
           {error ? (
             <p className="text-xs text-danger bg-danger/5 rounded-lg px-3 py-2">{error}</p>
           ) : templates === null ? (
