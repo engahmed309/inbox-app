@@ -1682,8 +1682,12 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
         )}
       </div>
       {isOut && (
-        <span className={`text-xs mt-0.5 px-1 ${msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
+        // الفشل لازم يبان بوضوح — الموظف محتاج يعرف إن الرسالة موصلتش عشان يتصرف،
+        // مش يفتكرها وصلت لأن شكلها زي أي رسالة مبعوتة
+        <span className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${
+          msg.status === 'failed' ? 'text-danger' : msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
           {isTemp ? <span className="animate-pulse">...</span>
+            : msg.status === 'failed' ? <><Ban size={11} className="inline" /> فشل الإرسال</>
             : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
             : <Check size={12} className="inline" />}
         </span>
