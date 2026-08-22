@@ -567,6 +567,23 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
 }
 
 // ─── Channels Tab ──────────────────────────────────────────
+// حد الرسايل = كام عميل جديد نقدر نبدأ معاه محادثة في ٢٤ ساعة. بيزيد لوحده من ميتا مع الاستخدام
+// الكويس، وبيقل لو الجودة وقعت — عشان كده بنعرضه جنب تقييم الجودة
+const MESSAGING_TIER = {
+  TIER_50: '٥٠ عميل / ٢٤ ساعة',
+  TIER_250: '٢٥٠ عميل / ٢٤ ساعة',
+  TIER_1K: '١٠٠٠ عميل / ٢٤ ساعة',
+  TIER_10K: '١٠ آلاف / ٢٤ ساعة',
+  TIER_100K: '١٠٠ ألف / ٢٤ ساعة',
+  TIER_UNLIMITED: 'بدون حد',
+}
+
+const QUALITY_RATING = {
+  GREEN: { label: 'عالية', cls: 'bg-success/15 text-success' },
+  YELLOW: { label: 'متوسطة', cls: 'bg-follow/15 text-follow' },
+  RED: { label: 'منخفضة', cls: 'bg-danger/15 text-danger' },
+}
+
 const PLATFORM_META = {
   facebook: { label: 'فيسبوك', icon: Facebook, color: 'text-blue-400' },
   instagram: { label: 'إنستجرام', icon: Instagram, color: 'text-pink-400' },
@@ -726,8 +743,17 @@ function ConnectedChannelsList() {
                   </p>
                 )}
                 <p className="text-xs text-fg-muted truncate">{ch?.display_name || 'مش مربوطة'}</p>
-                {ch?.waba_id && (
-                  <p className="text-[11px] text-fg-subtle truncate mt-0.5">WABA ID: {ch.waba_id}</p>
+                {ch?.platform === 'whatsapp' && ch?.metadata?.messaging_limit_tier && (
+                  <div className="flex items-center gap-1.5 mt-1">
+                    <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-muted">
+                      {MESSAGING_TIER[ch.metadata.messaging_limit_tier] || ch.metadata.messaging_limit_tier}
+                    </span>
+                    {ch.metadata.quality_rating && QUALITY_RATING[ch.metadata.quality_rating] && (
+                      <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${QUALITY_RATING[ch.metadata.quality_rating].cls}`}>
+                        جودة {QUALITY_RATING[ch.metadata.quality_rating].label}
+                      </span>
+                    )}
+                  </div>
                 )}
               </div>
               {editingId !== ch?.id && (
@@ -1031,6 +1057,39 @@ const TEMPLATE_LANGS = [
   { code: 'en_US', label: 'إنجليزي (أمريكي)' },
 ]
 
+// معاينة شكل القالب في واتساب — بتتحدث مع الكتابة عشان الموظف يشوف الشكل النهائي قبل ما
+// يبعته لميتا للمراجعة (المتغيرات بتفضل ظاهرة زي ما هي لأن قيمتها بتتحدد وقت الإرسال)
+function TemplatePreview({ header, body, footer, buttons }) {
+  const empty = !body?.trim() && !header?.text?.trim() && !footer?.trim() && !buttons?.length
+  if (empty) {
+    return <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-xl px-3 py-3 text-center">اكتبي نص الرسالة عشان تشوفي المعاينة</p>
+  }
+  return (
+    <div className="bg-[#0b141a] rounded-xl p-3">
+      <div className="bg-[#005c4b] rounded-lg rounded-tl-none px-2.5 py-2 max-w-[85%] shadow">
+        {header?.enabled && header.format === 'TEXT' && header.text && (
+          <p className="text-[13px] font-bold text-white mb-1 whitespace-pre-wrap break-words">{header.text}</p>
+        )}
+        {header?.enabled && header.format === 'LOCATION' && (
+          <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 موقع</div>
+        )}
+        {body && <p className="text-[13px] text-white whitespace-pre-wrap break-words leading-relaxed">{body}</p>}
+        {footer && <p className="text-[11px] text-white/60 mt-1.5 whitespace-pre-wrap break-words">{footer}</p>}
+        <p className="text-[10px] text-white/50 text-left mt-1">١٢:٠٠ م ✓✓</p>
+      </div>
+      {buttons?.filter(b => b.text?.trim()).length > 0 && (
+        <div className="mt-1 space-y-1 max-w-[85%]">
+          {buttons.filter(b => b.text?.trim()).map((b, i) => (
+            <div key={i} className="bg-[#1f2c33] rounded-lg py-1.5 text-center text-[12px] text-[#53bdeb]">
+              {b.type === 'URL' ? '🔗 ' : b.type === 'PHONE_NUMBER' ? '📞 ' : ''}{b.text}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // نفس النموذج بيستخدم للإنشاء وللتعديل — لو اتبعتله قالب موجود بيشتغل في وضع التعديل
 // (الاسم واللغة بيتقفلوا لأن ميتا مابتسمحش بتغييرهم بعد الإنشاء)
 function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
@@ -1049,7 +1108,28 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
   const [examples, setExamples] = useState(
     existing?.components?.find(c => c.type === 'BODY')?.example?.body_text?.[0] || []
   )
+  const existingHeader = existing?.components?.find(c => c.type === 'HEADER')
+  const [header, setHeader] = useState({
+    enabled: Boolean(existingHeader),
+    format: existingHeader?.format || 'TEXT',
+    text: existingHeader?.text || '',
+    example: existingHeader?.example?.header_text?.[0] || ''
+  })
+  const [buttons, setButtons] = useState(
+    existing?.components?.find(c => c.type === 'BUTTONS')?.buttons?.map(b => ({
+      type: b.type, text: b.text, url: b.url || '', phone_number: b.phone_number || ''
+    })) || []
+  )
   const [saving, setSaving] = useState(false)
+
+  // ميتا مابتقبلش خلط الرد السريع مع أزرار الرابط/الاتصال في نفس القالب
+  const buttonKind = buttons[0]?.type === 'QUICK_REPLY' ? 'QUICK_REPLY' : buttons.length ? 'CTA' : null
+  const addButton = (type) => {
+    if (buttons.length >= 3) return
+    setButtons([...buttons, { type, text: '', url: '', phone_number: '' }])
+  }
+  const updateButton = (i, patch) => setButtons(buttons.map((b, idx) => idx === i ? { ...b, ...patch } : b))
+  const removeButton = (i) => setButtons(buttons.filter((_, idx) => idx !== i))
 
   // عدد المتغيرات {{1}} {{2}} في النص — ميتا بترفض القالب لو فيه متغيرات من غير أمثلة ليها
   const varCount = (form.body.match(/\{\{\d+\}\}/g) || []).length
@@ -1071,7 +1151,11 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
       const res = await fetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...form, name: form.name.trim(), examples })
+        body: JSON.stringify({
+          ...form, name: form.name.trim(), examples,
+          header: header.enabled ? { format: header.format, text: header.text, example: header.example } : null,
+          buttons
+        })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || (isEdit ? 'فشل تعديل القالب' : 'فشل إنشاء القالب'))
@@ -1161,11 +1245,103 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
             </div>
           )}
 
-          <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">تذييل (اختياري)</label>
-            <input value={form.footer} onChange={e => setForm({ ...form, footer: e.target.value })}
-              placeholder="صحة وعافية"
-              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+          <div className="pt-1 border-t border-surface-3">
+            <p className="text-xs font-semibold text-fg pt-3 mb-2.5">مكوّنات اختيارية</p>
+
+            <label className="flex items-center gap-2 cursor-pointer mb-2">
+              <input type="checkbox" checked={header.enabled}
+                onChange={e => setHeader({ ...header, enabled: e.target.checked })}
+                className="accent-brand w-3.5 h-3.5" />
+              <span className="text-xs text-fg">عنوان (Header)</span>
+            </label>
+            {header.enabled && (
+              <div className="mr-5 mb-3 space-y-2">
+                <div className="flex gap-1.5">
+                  {[['TEXT', 'نص'], ['LOCATION', 'موقع']].map(([val, label]) => (
+                    <button key={val} onClick={() => setHeader({ ...header, format: val })}
+                      className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${header.format === val ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                      {label}
+                    </button>
+                  ))}
+                  <span className="px-2.5 py-1 rounded-lg text-[11px] bg-surface-3/50 text-fg-subtle" title="محتاج رفع عيّنة لميتا — لسه مش متاح">
+                    صورة/فيديو/ملف (قريبًا)
+                  </span>
+                </div>
+                {header.format === 'TEXT' && (
+                  <>
+                    <input value={header.text} onChange={e => setHeader({ ...header, text: e.target.value })}
+                      placeholder="عنوان الرسالة"
+                      className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                    {/\{\{1\}\}/.test(header.text) && (
+                      <input value={header.example} onChange={e => setHeader({ ...header, example: e.target.value })}
+                        placeholder="مثال لمتغير العنوان"
+                        className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                    )}
+                  </>
+                )}
+              </div>
+            )}
+
+            <div className="mb-2">
+              <label className="block text-xs text-fg mb-1.5">تذييل (Footer)</label>
+              <input value={form.footer} onChange={e => setForm({ ...form, footer: e.target.value })}
+                placeholder="صحة وعافية"
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+            </div>
+
+            <div className="mt-3">
+              <div className="flex items-center justify-between mb-1.5">
+                <span className="text-xs text-fg">أزرار (لحد ٣)</span>
+                {buttons.length < 3 && (
+                  <div className="flex gap-1.5">
+                    {(!buttonKind || buttonKind === 'QUICK_REPLY') && (
+                      <button onClick={() => addButton('QUICK_REPLY')} className="text-[11px] text-brand hover:underline">+ رد سريع</button>
+                    )}
+                    {(!buttonKind || buttonKind === 'CTA') && (
+                      <>
+                        <button onClick={() => addButton('URL')} className="text-[11px] text-brand hover:underline">+ رابط</button>
+                        <button onClick={() => addButton('PHONE_NUMBER')} className="text-[11px] text-brand hover:underline">+ اتصال</button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+              {buttonKind && (
+                <p className="text-[11px] text-fg-subtle mb-1.5">
+                  {buttonKind === 'QUICK_REPLY'
+                    ? 'الرد السريع: العميل يدوس فيتبعت نص الزرار كرسالة منه'
+                    : 'ميتا مابتسمحش تخلطي الرد السريع مع الرابط/الاتصال في نفس القالب'}
+                </p>
+              )}
+              <div className="space-y-1.5">
+                {buttons.map((b, i) => (
+                  <div key={i} className="flex items-center gap-1.5">
+                    <input value={b.text} onChange={e => updateButton(i, { text: e.target.value })}
+                      placeholder={b.type === 'URL' ? 'نص الزرار' : b.type === 'PHONE_NUMBER' ? 'نص الزرار' : 'نص الرد'}
+                      className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                    {b.type === 'URL' && (
+                      <input value={b.url} onChange={e => updateButton(i, { url: e.target.value })}
+                        placeholder="https://..." dir="ltr"
+                        className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                    )}
+                    {b.type === 'PHONE_NUMBER' && (
+                      <input value={b.phone_number} onChange={e => updateButton(i, { phone_number: e.target.value })}
+                        placeholder="+9715..." dir="ltr"
+                        className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                    )}
+                    <button onClick={() => removeButton(i)}
+                      className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg flex-shrink-0">
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          </div>
+
+          <div className="pt-1 border-t border-surface-3">
+            <p className="text-xs font-semibold text-fg pt-3 mb-2">المعاينة</p>
+            <TemplatePreview header={header} body={form.body} footer={form.footer} buttons={buttons} />
           </div>
 
           <div className="flex gap-2 pt-1">
