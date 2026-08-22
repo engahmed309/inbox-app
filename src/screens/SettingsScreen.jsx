@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -1073,6 +1073,11 @@ function TemplatePreview({ header, body, footer, buttons }) {
         {header?.enabled && header.format === 'LOCATION' && (
           <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 موقع</div>
         )}
+        {header?.enabled && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) && (
+          <div className="bg-black/20 rounded-md px-2 py-5 mb-1 text-center text-[11px] text-white/70">
+            {header.format === 'IMAGE' ? '🖼️ صورة' : header.format === 'VIDEO' ? '🎥 فيديو' : '📎 ملف'}
+          </div>
+        )}
         {body && <p className="text-[13px] text-white whitespace-pre-wrap break-words leading-relaxed">{body}</p>}
         {footer && <p className="text-[11px] text-white/60 mt-1.5 whitespace-pre-wrap break-words">{footer}</p>}
         <p className="text-[10px] text-white/50 text-left mt-1">١٢:٠٠ م ✓✓</p>
@@ -1113,8 +1118,41 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
     enabled: Boolean(existingHeader),
     format: existingHeader?.format || 'TEXT',
     text: existingHeader?.text || '',
-    example: existingHeader?.example?.header_text?.[0] || ''
+    example: existingHeader?.example?.header_text?.[0] || '',
+    handle: existingHeader?.example?.header_handle?.[0] || '',
+    fileName: ''
   })
+  const [uploadingSample, setUploadingSample] = useState(false)
+  const sampleInputRef = useRef(null)
+
+  // عيّنة الميديا بترفع على التخزين بتاعنا الأول، وبعدين السيرفر بيرفعها لميتا ويرجّع الـ handle.
+  // ميتا محتاجة العيّنة عشان تراجع شكل القالب — مش هي دي الصورة اللي هتتبعت للعملاء بعدين
+  const pickSample = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setUploadingSample(true)
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+      const path = `template-samples/${channel.id}/${Date.now()}_${safeName}`
+      const { error: upErr } = await supabase.storage.from('inbox-media').upload(path, file)
+      if (upErr) throw new Error('فشل رفع الملف')
+      const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
+
+      const res = await fetch(`${API_URL}/channels/${channel.id}/templates/sample-handle`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ media_url: urlData.publicUrl, mime_type: file.type, format: header.format })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل رفع العيّنة لميتا')
+      setHeader(h => ({ ...h, handle: data.handle, fileName: file.name }))
+      toast.success('اترفعت العيّنة')
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setUploadingSample(false)
+    }
+  }
   const [buttons, setButtons] = useState(
     existing?.components?.find(c => c.type === 'BUTTONS')?.buttons?.map(b => ({
       type: b.type, text: b.text, url: b.url || '', phone_number: b.phone_number || ''
@@ -1153,7 +1191,9 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           ...form, name: form.name.trim(), examples,
-          header: header.enabled ? { format: header.format, text: header.text, example: header.example } : null,
+          header: header.enabled
+            ? { format: header.format, text: header.text, example: header.example, handle: header.handle }
+            : null,
           buttons
         })
       })
@@ -1256,17 +1296,36 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
             </label>
             {header.enabled && (
               <div className="mr-5 mb-3 space-y-2">
-                <div className="flex gap-1.5">
-                  {[['TEXT', 'نص'], ['LOCATION', 'موقع']].map(([val, label]) => (
-                    <button key={val} onClick={() => setHeader({ ...header, format: val })}
+                <div className="flex gap-1.5 flex-wrap">
+                  {[['TEXT', 'نص'], ['IMAGE', 'صورة'], ['VIDEO', 'فيديو'], ['DOCUMENT', 'ملف'], ['LOCATION', 'موقع']].map(([val, label]) => (
+                    <button key={val} onClick={() => setHeader({ ...header, format: val, handle: '', fileName: '' })}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${header.format === val ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
                       {label}
                     </button>
                   ))}
-                  <span className="px-2.5 py-1 rounded-lg text-[11px] bg-surface-3/50 text-fg-subtle" title="محتاج رفع عيّنة لميتا — لسه مش متاح">
-                    صورة/فيديو/ملف (قريبًا)
-                  </span>
                 </div>
+
+                {['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) && (
+                  <div className="space-y-1.5">
+                    <input type="file" ref={sampleInputRef} onChange={pickSample} className="hidden"
+                      accept={header.format === 'IMAGE' ? 'image/*' : header.format === 'VIDEO' ? 'video/*' : '.pdf,.doc,.docx'} />
+                    <button onClick={() => sampleInputRef.current?.click()} disabled={uploadingSample}
+                      className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                      {uploadingSample ? (
+                        <><div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> بيرفع...</>
+                      ) : header.handle ? (
+                        <><Check size={13} className="text-success" /> {header.fileName || 'العيّنة اترفعت'} — غيّرها</>
+                      ) : (
+                        <><Paperclip size={13} /> ارفعي عيّنة</>
+                      )}
+                    </button>
+                    <p className="text-[11px] text-fg-subtle leading-relaxed">
+                      ميتا محتاجة عيّنة عشان تراجع شكل القالب. الملف اللي هيتبعت للعميل بيتحدد وقت الإرسال —
+                      دي للمراجعة بس. (صورة لحد ٥ ميجا، فيديو ١٦، ملف ١٠٠)
+                    </p>
+                  </div>
+                )}
+
                 {header.format === 'TEXT' && (
                   <>
                     <input value={header.text} onChange={e => setHeader({ ...header, text: e.target.value })}
