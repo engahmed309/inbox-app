@@ -491,7 +491,10 @@ export default function ChatScreen() {
         channel_id: conv?.platform === 'whatsapp' ? (selectedChannelId || undefined) : undefined
       })
     })
-    if (!res.ok) throw new Error()
+    if (!res.ok) {
+      const data = await res.json().catch(() => null)
+      throw new Error(data?.error || 'فشل الإرسال')
+    }
   }
 
   const sendMessage = async () => {
@@ -534,17 +537,17 @@ export default function ChatScreen() {
       // اتردّ فعلاً، دلوقتي بس تتعلّم "مقروءة"
       await supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
       setConv(prev => prev ? { ...prev, unread_count: 0 } : prev)
-    } catch {
+    } catch (err) {
       setMessages(prev => prev.filter(m => m.id !== tempId))
       if (textSent) {
         // النص اتبعت فعلاً وسجّل في القاعدة — منرجعوش عشان مايتبعتش تاني، بس نرجّع الملف عشان يعيد المحاولة بيه بس
         await fetchMessages()
         setPendingFile(pf)
-        toast.error('اتبعتت الرسالة النصية، لكن فشل إرسال الملف — جرب تبعته تاني')
+        toast.error(`اتبعتت الرسالة النصية، لكن فشل إرسال الملف: ${err.message || 'خطأ غير معروف'}`)
       } else {
         setText(msgText)
         setPendingFile(pf)
-        toast.error('فشل الإرسال')
+        toast.error(`فشل الإرسال: ${err.message || 'خطأ غير معروف'}`)
       }
     } finally {
       setSending(false)
