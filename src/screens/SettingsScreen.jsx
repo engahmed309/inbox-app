@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import i18n from '../i18n'
 import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
@@ -12,25 +14,26 @@ import {
 } from 'lucide-react'
 
 const TABS = [
-  { key: 'agents', label: 'الموظفون', icon: Users },
-  { key: 'channels', label: 'القنوات', icon: Radio },
-  { key: 'lifecycle', label: 'Lifecycle', icon: Tag },
-  { key: 'tags', label: 'التاجات', icon: Tag },
-  { key: 'fields', label: 'الحقول', icon: List },
-  { key: 'quickreplies', label: 'الردود السريعة', icon: MessageSquareText },
-  { key: 'roundrobin', label: 'التوزيع', icon: Settings2 },
-  { key: 'ai', label: 'AI Agent', icon: Bot },
-  { key: 'danger', label: 'منطقة خطرة', icon: AlertTriangle },
+  { key: 'agents', labelKey: 'settings.tabs.agents', icon: Users },
+  { key: 'channels', labelKey: 'settings.tabs.channels', icon: Radio },
+  { key: 'lifecycle', labelKey: 'settings.tabs.lifecycle', icon: Tag },
+  { key: 'tags', labelKey: 'settings.tabs.tags', icon: Tag },
+  { key: 'fields', labelKey: 'settings.tabs.fields', icon: List },
+  { key: 'quickreplies', labelKey: 'settings.tabs.quickReplies', icon: MessageSquareText },
+  { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
+  { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
+  { key: 'danger', labelKey: 'settings.tabs.danger', icon: AlertTriangle },
 ]
 
 export default function SettingsScreen() {
+  const { t } = useTranslation()
   const [tab, setTab] = useState('agents')
   const { agent, signOut } = useAuth()
   const navigate = useNavigate()
 
   if (agent?.role !== 'admin') return (
     <div className="h-full flex items-center justify-center text-fg-muted">
-      <p>غير مصرح بالوصول</p>
+      <p>{t('settings.accessDenied')}</p>
     </div>
   )
 
@@ -41,7 +44,7 @@ export default function SettingsScreen() {
         <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg">
           <ArrowRight size={20} />
         </button>
-        <span className="font-bold text-fg">الإعدادات</span>
+        <span className="font-bold text-fg">{t('settings.header.title')}</span>
         <button onClick={async () => { await signOut(); navigate('/login') }}
           className="text-fg-muted hover:text-danger transition-colors">
           <LogOut size={18} />
@@ -50,11 +53,11 @@ export default function SettingsScreen() {
 
       {/* Tabs */}
       <div className="flex border-b border-surface-3 bg-surface-2 overflow-x-auto">
-        {TABS.map(t => (
-          <button key={t.key} onClick={() => setTab(t.key)}
-            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors ${tab === t.key ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
-            <t.icon size={14} />
-            {t.label}
+        {TABS.map(tb => (
+          <button key={tb.key} onClick={() => setTab(tb.key)}
+            className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors ${tab === tb.key ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
+            <tb.icon size={14} />
+            {t(tb.labelKey)}
           </button>
         ))}
       </div>
@@ -76,6 +79,7 @@ export default function SettingsScreen() {
 
 // ─── Agents Tab ───────────────────────────────────────────
 function AgentsTab() {
+  const { t } = useTranslation()
   const toast = useToast()
   const [agents, setAgents] = useState([])
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
@@ -151,9 +155,9 @@ function AgentsTab() {
       setAddMode('closed')
       setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
-      toast.success('اتضاف الموظف بنجاح')
+      toast.success(t('settings.agents.addedSuccess'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setLoading(false)
     }
@@ -171,9 +175,9 @@ function AgentsTab() {
       setAddMode('closed')
       setInviteForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
       loadAgents()
-      toast.success('اتبعتت دعوة على إيميل الموظف')
+      toast.success(t('settings.agents.inviteSentSuccess'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setLoading(false)
     }
@@ -192,7 +196,7 @@ function AgentsTab() {
     const res = await fetch(`${API_URL}/admin/agent/${id}`, { method: 'DELETE' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
-      throw new Error(data.error || 'فشل حذف الموظف')
+      throw new Error(data.error || t('settings.agents.deleteAgentFailed'))
     }
   }
 
@@ -201,12 +205,12 @@ function AgentsTab() {
       .from('conversations').select('id').eq('assigned_agent_id', ag.id).in('status', ['open', 'follow_up'])
     const convCount = convs?.length || 0
     if (convCount === 0) {
-      if (!confirm('حذف الموظف؟')) return
+      if (!confirm(t('settings.agents.deleteConfirm'))) return
       try {
         await deleteAgentFully(ag.id)
         loadAgents()
       } catch (err) {
-        toast.error('خطأ: ' + err.message)
+        toast.error(t('settings.common.errorWithMessage', { message: err.message }))
       }
       return
     }
@@ -225,11 +229,11 @@ function AgentsTab() {
 
       let assignments = [] // [{ convId, agentId }]
       if (reassignMode === 'specific') {
-        if (!reassignToId) { toast.error('اختار الموظف اللي هتحول له المحادثات'); setReassigning(false); return }
+        if (!reassignToId) { toast.error(t('settings.agents.selectReassignAgent')); setReassigning(false); return }
         assignments = convIds.map(id => ({ convId: id, agentId: reassignToId }))
       } else {
         const pool = agents.filter(a => a.id !== deleteTarget.agent.id && (reassignMode === 'all' || a.status === 'online'))
-        if (pool.length === 0) { toast.error('مفيش موظفين تانيين متاحين للتوزيع'); setReassigning(false); return }
+        if (pool.length === 0) { toast.error(t('settings.agents.noOtherAgentsAvailable')); setReassigning(false); return }
         assignments = convIds.map((id, i) => ({ convId: id, agentId: pool[i % pool.length].id }))
       }
 
@@ -239,12 +243,12 @@ function AgentsTab() {
       }
 
       await deleteAgentFully(deleteTarget.agent.id)
-      toast.success(`اتحذف الموظف واتوزعت محادثاته على ${new Set(assignments.map(a => a.agentId)).size} موظف`)
+      toast.success(t('settings.agents.deletedAndReassigned', { count: new Set(assignments.map(a => a.agentId)).size }))
       setDeleteTarget(null)
       loadAgents()
       loadCounts()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setReassigning(false)
     }
@@ -253,72 +257,72 @@ function AgentsTab() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg">الموظفون</h2>
+        <h2 className="font-semibold text-fg">{t('settings.tabs.agents')}</h2>
         <button onClick={() => setAddMode(addMode === 'closed' ? 'choice' : 'closed')}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
-          <Plus size={14} /> إضافة موظف
+          <Plus size={14} /> {t('settings.agents.addAgent')}
         </button>
       </div>
 
       {/* إجمالي المحادثات */}
       <div className="grid grid-cols-3 gap-2">
-        <TotalStat label="مفتوحة" value={totals.open} color="text-success" />
-        <TotalStat label="متابعة" value={totals.follow_up} color="text-follow" />
-        <TotalStat label="مغلقة" value={totals.closed} color="text-fg-muted" />
+        <TotalStat label={t('settings.common.status.open')} value={totals.open} color="text-success" />
+        <TotalStat label={t('settings.common.status.followUp')} value={totals.follow_up} color="text-follow" />
+        <TotalStat label={t('settings.common.status.closed')} value={totals.closed} color="text-fg-muted" />
       </div>
 
       {addMode === 'choice' && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-2 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg mb-1">إزاي عايز تضيف الموظف؟</h3>
+          <h3 className="text-sm font-semibold text-fg mb-1">{t('settings.agents.howToAdd')}</h3>
           <button onClick={() => setAddMode('manual')}
             className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3 hover:bg-surface-3/70 text-right transition-colors">
             <UserCog size={18} className="text-brand flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-fg">إضافة يدوي</p>
-              <p className="text-xs text-fg-subtle">تحدد الاسم والإيميل والباسورد بنفسك</p>
+              <p className="text-sm font-medium text-fg">{t('settings.agents.manualAdd')}</p>
+              <p className="text-xs text-fg-subtle">{t('settings.agents.manualAddDesc')}</p>
             </div>
           </button>
           <button onClick={() => setAddMode('invite')}
             className="w-full flex items-center gap-3 p-3 rounded-xl bg-surface-3 hover:bg-surface-3/70 text-right transition-colors">
             <MessageSquareText size={18} className="text-brand flex-shrink-0" />
             <div className="flex-1">
-              <p className="text-sm font-medium text-fg">دعوة عبر الإيميل</p>
-              <p className="text-xs text-fg-subtle">هيوصله إيميل يحط منه الباسورد بنفسه</p>
+              <p className="text-sm font-medium text-fg">{t('settings.agents.emailInvite')}</p>
+              <p className="text-xs text-fg-subtle">{t('settings.agents.emailInviteDesc')}</p>
             </div>
           </button>
-          <button onClick={() => setAddMode('closed')} className="w-full py-2 text-xs text-fg-muted">إلغاء</button>
+          <button onClick={() => setAddMode('closed')} className="w-full py-2 text-xs text-fg-muted">{t('settings.common.cancel')}</button>
         </div>
       )}
 
       {addMode === 'manual' && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg">إضافة موظف يدوي</h3>
-          <p className="text-xs text-fg-subtle -mt-2">حدد إيميل وباسورد للموظف، وهيقدر يدخل بيهم على طول.</p>
-          <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <InputField label="البريد الإلكتروني" value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" />
-          <InputField label="الباسورد" value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" />
+          <h3 className="text-sm font-semibold text-fg">{t('settings.agents.manualAddTitle')}</h3>
+          <p className="text-xs text-fg-subtle -mt-2">{t('settings.agents.manualAddIntro')}</p>
+          <InputField label={t('settings.common.name')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label={t('settings.common.email')} value={form.email} onChange={v => setForm({ ...form, email: v })} type="email" />
+          <InputField label={t('settings.common.password')} value={form.password} onChange={v => setForm({ ...form, password: v })} type="password" />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">الدور</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.common.role')}</label>
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-              <option value="agent">موظف</option>
-              <option value="admin">مدير</option>
+              <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
           <MaxConversationsField value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: v })} />
           <Toggle
-            label="يرى جميع المحادثات"
+            label={t('settings.agents.seeAllConversations')}
             value={form.can_see_all_conversations}
             onChange={v => setForm({ ...form, can_see_all_conversations: v })}
           />
           <div className="flex gap-2 pt-1">
             <button onClick={addAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
-              {loading ? 'جاري الإضافة...' : 'إضافة الموظف'}
+              {loading ? t('settings.common.addingEllipsis') : t('settings.agents.addAgent')}
             </button>
             <button onClick={() => setAddMode('closed')}
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
-              إلغاء
+              {t('settings.common.cancel')}
             </button>
           </div>
         </div>
@@ -326,32 +330,32 @@ function AgentsTab() {
 
       {addMode === 'invite' && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <h3 className="text-sm font-semibold text-fg">دعوة موظف عبر الإيميل</h3>
-          <p className="text-xs text-fg-subtle -mt-2">هيوصله إيميل فيه رابط، يدخل عليه ويحط باسورد لنفسه.</p>
-          <InputField label="الاسم" value={inviteForm.name} onChange={v => setInviteForm({ ...inviteForm, name: v })} />
-          <InputField label="البريد الإلكتروني" value={inviteForm.email} onChange={v => setInviteForm({ ...inviteForm, email: v })} type="email" />
+          <h3 className="text-sm font-semibold text-fg">{t('settings.agents.inviteTitle')}</h3>
+          <p className="text-xs text-fg-subtle -mt-2">{t('settings.agents.inviteDesc')}</p>
+          <InputField label={t('settings.common.name')} value={inviteForm.name} onChange={v => setInviteForm({ ...inviteForm, name: v })} />
+          <InputField label={t('settings.common.email')} value={inviteForm.email} onChange={v => setInviteForm({ ...inviteForm, email: v })} type="email" />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">الدور</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.common.role')}</label>
             <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-              <option value="agent">موظف</option>
-              <option value="admin">مدير</option>
+              <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
           <MaxConversationsField value={inviteForm.max_conversations} onChange={v => setInviteForm({ ...inviteForm, max_conversations: v })} />
           <Toggle
-            label="يرى جميع المحادثات"
+            label={t('settings.agents.seeAllConversations')}
             value={inviteForm.can_see_all_conversations}
             onChange={v => setInviteForm({ ...inviteForm, can_see_all_conversations: v })}
           />
           <div className="flex gap-2 pt-1">
             <button onClick={inviteAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
-              {loading ? 'جاري الإرسال...' : 'ابعت الدعوة'}
+              {loading ? t('settings.agents.sendingEllipsis') : t('settings.agents.sendInvite')}
             </button>
             <button onClick={() => setAddMode('closed')}
               className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">
-              إلغاء
+              {t('settings.common.cancel')}
             </button>
           </div>
         </div>
@@ -370,16 +374,16 @@ function AgentsTab() {
               <div className="flex items-center gap-1.5">
                 <p className="font-semibold text-sm text-fg">{aiAgentRow.name}</p>
                 <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full ${aiEnabled ? 'bg-success/15 text-success' : 'bg-surface-3 text-fg-subtle'}`}>
-                  {aiEnabled ? 'مفعّل' : 'متوقف'}
+                  {aiEnabled ? t('settings.common.enabled') : t('settings.common.disabled')}
                 </span>
               </div>
-              <p className="text-xs text-fg-muted">بيرد تلقائي على المحادثات الجديدة — تحكّم فيه من تاب "AI Agent"</p>
+              <p className="text-xs text-fg-muted">{t('settings.agents.aiAgentDesc')}</p>
             </div>
           </div>
           <div className="flex gap-3 mt-3 pt-3 border-t border-surface-3">
-            <span className="text-[11px] text-success">مفتوحة: {aiCounts.open}</span>
-            <span className="text-[11px] text-follow">متابعة: {aiCounts.follow_up}</span>
-            <span className="text-[11px] text-fg-subtle">مغلقة: {aiCounts.closed}</span>
+            <span className="text-[11px] text-success">{t('settings.common.status.open')}: {aiCounts.open}</span>
+            <span className="text-[11px] text-follow">{t('settings.common.status.followUp')}: {aiCounts.follow_up}</span>
+            <span className="text-[11px] text-fg-subtle">{t('settings.common.status.closed')}: {aiCounts.closed}</span>
           </div>
           {aiLifecycleBreakdown.length > 0 && (
             <div className="flex flex-wrap gap-1.5 mt-2.5 pt-2.5 border-t border-surface-3">
@@ -406,22 +410,22 @@ function AgentsTab() {
           onClick={() => !reassigning && setDeleteTarget(null)}>
           <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="px-4 py-3.5 border-b border-surface-3">
-              <span className="font-semibold text-fg text-sm">حذف {deleteTarget.agent.name}</span>
+              <span className="font-semibold text-fg text-sm">{t('settings.agents.deleteModal.title', { name: deleteTarget.agent.name })}</span>
             </div>
             <div className="p-4 space-y-3">
               <p className="text-sm text-fg-muted">
-                الموظف ده معاه <b className="text-fg">{deleteTarget.convCount}</b> محادثة مفتوحة/متابعة. اختار هتروح فين قبل الحذف:
+                {t('settings.agents.deleteModal.beforeCount')} <b className="text-fg">{deleteTarget.convCount}</b> {t('settings.agents.deleteModal.afterCount')}
               </p>
               <div className="space-y-2">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" checked={reassignMode === 'specific'} onChange={() => setReassignMode('specific')} />
-                  <span className="text-sm text-fg">حولهم كلهم لموظف معين</span>
+                  <span className="text-sm text-fg">{t('settings.agents.deleteModal.reassignSpecific')}</span>
                 </label>
                 {reassignMode === 'specific' && (
                   <div className="pr-6">
                     <select value={reassignToId} onChange={e => setReassignToId(e.target.value)}
                       className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-                      <option value="">— اختار موظف —</option>
+                      <option value="">{t('settings.agents.deleteModal.selectAgentPlaceholder')}</option>
                       {agents.filter(a => a.id !== deleteTarget.agent.id).map(a => (
                         <option key={a.id} value={a.id}>{a.name}</option>
                       ))}
@@ -430,22 +434,22 @@ function AgentsTab() {
                 )}
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" checked={reassignMode === 'all'} onChange={() => setReassignMode('all')} />
-                  <span className="text-sm text-fg">وزعهم بالتساوي على كل الموظفين (أونلاين أو أوفلاين)</span>
+                  <span className="text-sm text-fg">{t('settings.agents.deleteModal.reassignAll')}</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input type="radio" checked={reassignMode === 'online'} onChange={() => setReassignMode('online')} />
-                  <span className="text-sm text-fg">وزعهم على الموظفين الأونلاين بس</span>
+                  <span className="text-sm text-fg">{t('settings.agents.deleteModal.reassignOnline')}</span>
                 </label>
               </div>
             </div>
             <div className="flex items-center gap-2 p-4 border-t border-surface-3">
               <button onClick={() => setDeleteTarget(null)} disabled={reassigning}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                إلغاء
+                {t('settings.common.cancel')}
               </button>
               <button onClick={finalizeDeleteWithReassign} disabled={reassigning}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {reassigning ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'وزّع واحذف'}
+                {reassigning ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('settings.agents.deleteModal.confirmButton')}
               </button>
             </div>
           </div>
@@ -465,14 +469,15 @@ function TotalStat({ label, value, color }) {
 }
 
 function MaxConversationsField({ value, onChange }) {
+  const { t } = useTranslation()
   const unlimited = value == null
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <label className="block text-xs text-fg-muted">الحد الأقصى للمحادثات</label>
+        <label className="block text-xs text-fg-muted">{t('settings.common.maxConversationsLabel')}</label>
         <button type="button" onClick={() => onChange(unlimited ? 10 : null)}
           className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${unlimited ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-          {unlimited ? 'غير محدود' : 'محدود'}
+          {unlimited ? t('settings.common.unlimited') : t('settings.common.limited')}
         </button>
       </div>
       {!unlimited && (
@@ -484,13 +489,14 @@ function MaxConversationsField({ value, onChange }) {
 }
 
 function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
+  const { t } = useTranslation()
   const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
   const toast = useToast()
 
   // مؤقتاً: بديل لجوجل — عشان مراجع ميتا يقدر يدخل بإيميل وباسورد عادي
   const resetPassword = async () => {
-    const password = prompt(`باسورد جديد لـ ${agent.name} (٦ حروف على الأقل):`)
+    const password = prompt(t('settings.agents.resetPasswordPrompt', { name: agent.name }))
     if (!password) return
     try {
       const res = await fetch(`${API_URL}/admin/reset-password`, {
@@ -499,9 +505,9 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
         body: JSON.stringify({ agent_id: agent.id, password })
       })
       if (!res.ok) throw new Error(await res.text())
-      toast.success('اتغير الباسورد بنجاح')
+      toast.success(t('settings.agents.passwordChanged'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     }
   }
 
@@ -509,20 +515,20 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
     <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
       {editing ? (
         <div className="space-y-3">
-          <InputField label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label={t('settings.common.name')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <MaxConversationsField value={form.max_conversations} onChange={v => setForm({ ...form, max_conversations: v })} />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">الدور</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.common.role')}</label>
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-              <option value="agent">موظف</option>
-              <option value="admin">مدير</option>
+              <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
-          <Toggle label="يرى جميع المحادثات" value={form.can_see_all_conversations} onChange={v => setForm({ ...form, can_see_all_conversations: v })} />
+          <Toggle label={t('settings.agents.seeAllConversations')} value={form.can_see_all_conversations} onChange={v => setForm({ ...form, can_see_all_conversations: v })} />
           <div className="flex gap-2">
-            <button onClick={() => onUpdate(form)} className="flex-1 py-2 bg-brand rounded-xl text-sm text-white">حفظ</button>
-            <button onClick={onEdit} className="px-3 py-2 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+            <button onClick={() => onUpdate(form)} className="flex-1 py-2 bg-brand rounded-xl text-sm text-white">{t('settings.common.save')}</button>
+            <button onClick={onEdit} className="px-3 py-2 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
           </div>
         </div>
       ) : (
@@ -538,14 +544,14 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
               <div className="flex items-center gap-1.5">
                 <p className="font-semibold text-sm text-fg">{agent.name}</p>
                 {!agent.last_seen_at && (
-                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">لسه ما دخلش</span>
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">{t('settings.agents.neverLoggedIn')}</span>
                 )}
               </div>
-              <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? 'مدير' : 'موظف'}</p>
-              <p className="text-xs text-fg-subtle">الحد: {agent.max_conversations == null ? 'غير محدود' : `${agent.max_conversations} محادثة`}</p>
+              <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? t('settings.common.roleAdmin') : t('settings.common.roleAgent')}</p>
+              <p className="text-xs text-fg-subtle">{t('settings.agents.limitPrefix')} {agent.max_conversations == null ? t('settings.common.unlimited') : t('settings.common.conversationsCount', { count: agent.max_conversations })}</p>
             </div>
             <div className="flex gap-1.5">
-              <button onClick={resetPassword} title="تحديد باسورد للدخول المؤقت" className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+              <button onClick={resetPassword} title={t('settings.agents.resetPasswordTitle')} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <KeyRound size={14} />
               </button>
               <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
@@ -557,9 +563,9 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
             </div>
           </div>
           <div className="flex gap-3 mt-3 pt-3 border-t border-surface-3">
-            <span className="text-[11px] text-success">مفتوحة: {c.open}</span>
-            <span className="text-[11px] text-follow">متابعة: {c.follow_up}</span>
-            <span className="text-[11px] text-fg-subtle">مغلقة: {c.closed}</span>
+            <span className="text-[11px] text-success">{t('settings.common.status.open')}: {c.open}</span>
+            <span className="text-[11px] text-follow">{t('settings.common.status.followUp')}: {c.follow_up}</span>
+            <span className="text-[11px] text-fg-subtle">{t('settings.common.status.closed')}: {c.closed}</span>
           </div>
         </div>
       )}
@@ -570,44 +576,45 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
 // ─── Channels Tab ──────────────────────────────────────────
 // حد الرسايل = كام عميل جديد نقدر نبدأ معاه محادثة في ٢٤ ساعة. بيزيد لوحده من ميتا مع الاستخدام
 // الكويس، وبيقل لو الجودة وقعت — عشان كده بنعرضه جنب تقييم الجودة
-const MESSAGING_TIER = {
-  TIER_50: '٥٠ عميل / ٢٤ ساعة',
-  TIER_250: '٢٥٠ عميل / ٢٤ ساعة',
-  TIER_1K: '١٠٠٠ عميل / ٢٤ ساعة',
-  TIER_10K: '١٠ آلاف / ٢٤ ساعة',
-  TIER_100K: '١٠٠ ألف / ٢٤ ساعة',
-  TIER_UNLIMITED: 'بدون حد',
+const MESSAGING_TIER_KEYS = {
+  TIER_50: 'settings.channels.messagingTier.tier50',
+  TIER_250: 'settings.channels.messagingTier.tier250',
+  TIER_1K: 'settings.channels.messagingTier.tier1k',
+  TIER_10K: 'settings.channels.messagingTier.tier10k',
+  TIER_100K: 'settings.channels.messagingTier.tier100k',
+  TIER_UNLIMITED: 'settings.channels.messagingTier.unlimited',
 }
 
 const QUALITY_RATING = {
-  GREEN: { label: 'عالية', cls: 'bg-success/15 text-success' },
-  YELLOW: { label: 'متوسطة', cls: 'bg-follow/15 text-follow' },
-  RED: { label: 'منخفضة', cls: 'bg-danger/15 text-danger' },
+  GREEN: { labelKey: 'settings.channels.quality.high', cls: 'bg-success/15 text-success' },
+  YELLOW: { labelKey: 'settings.channels.quality.medium', cls: 'bg-follow/15 text-follow' },
+  RED: { labelKey: 'settings.channels.quality.low', cls: 'bg-danger/15 text-danger' },
 }
 
 const PLATFORM_META = {
-  facebook: { label: 'فيسبوك', icon: Facebook, color: 'text-blue-400' },
-  instagram: { label: 'إنستجرام', icon: Instagram, color: 'text-pink-400' },
-  whatsapp: { label: 'واتساب', icon: Phone, color: 'text-green-400' },
-  tiktok: { label: 'تيك توك', icon: Music2, color: 'text-fg' },
-  whatsapp_qr: { label: 'واتساب (ربط سريع)', icon: QrCode, color: 'text-emerald-400' },
+  facebook: { labelKey: 'settings.channels.platforms.facebook', icon: Facebook, color: 'text-blue-400' },
+  instagram: { labelKey: 'settings.channels.platforms.instagram', icon: Instagram, color: 'text-pink-400' },
+  whatsapp: { labelKey: 'settings.channels.platforms.whatsapp', icon: Phone, color: 'text-green-400' },
+  tiktok: { labelKey: 'settings.channels.platforms.tiktok', icon: Music2, color: 'text-fg' },
+  whatsapp_qr: { labelKey: 'settings.channels.platforms.whatsapp_qr', icon: QrCode, color: 'text-emerald-400' },
 }
 
 function ChannelsTab() {
+  const { t } = useTranslation()
   const [subTab, setSubTab] = useState('connected')
 
   return (
     <div className="p-4 space-y-3">
-      <h2 className="font-semibold text-fg">القنوات</h2>
+      <h2 className="font-semibold text-fg">{t('settings.tabs.channels')}</h2>
 
       <div className="flex gap-4 border-b border-surface-3">
         <button onClick={() => setSubTab('connected')}
           className={`px-1 pb-2.5 text-sm font-medium transition-colors ${subTab === 'connected' ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
-          القنوات المرتبطة
+          {t('settings.channels.connectedTab')}
         </button>
         <button onClick={() => setSubTab('connect')}
           className={`px-1 pb-2.5 text-sm font-medium transition-colors ${subTab === 'connect' ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
-          ربط قناة جديدة
+          {t('settings.channels.connectTab')}
         </button>
       </div>
 
@@ -617,6 +624,7 @@ function ChannelsTab() {
 }
 
 function ConnectedChannelsList() {
+  const { t } = useTranslation()
   const toast = useToast()
   const [channels, setChannels] = useState([])
   const [loading, setLoading] = useState(true)
@@ -634,7 +642,7 @@ function ConnectedChannelsList() {
     try {
       const res = await fetch(`${API_URL}/channels`)
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل تحميل القنوات')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.loadFailed'))
       setChannels(data.channels || [])
     } catch (err) {
       setError(err.message)
@@ -644,16 +652,16 @@ function ConnectedChannelsList() {
   }
 
   const disconnectChannel = async (ch) => {
-    if (!confirm(`فصل ${ch.custom_name || ch.display_name || PLATFORM_META[ch.platform].label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
+    if (!confirm(t('settings.channels.disconnectConfirm', { name: ch.custom_name || ch.display_name || t(PLATFORM_META[ch.platform].labelKey) }))) return
     setDeletingId(ch.id)
     try {
       const res = await fetch(`${API_URL}/channels/${ch.id}`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الفصل')
-      toast.success('اتفصلت القناة')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.disconnectFailed'))
+      toast.success(t('settings.channels.disconnected'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setDeletingId(null)
     }
@@ -673,12 +681,12 @@ function ConnectedChannelsList() {
         body: JSON.stringify({ custom_name: editValue.trim() })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل التسمية')
-      toast.success('اتسمّت القناة')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.renameFailed'))
+      toast.success(t('settings.channels.renamed'))
       setEditingId(null)
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSavingId(null)
     }
@@ -692,7 +700,7 @@ function ConnectedChannelsList() {
   if (error) return (
     <div className="pt-3 space-y-2">
       <p className="text-sm text-danger">{error}</p>
-      <button onClick={load} className="text-xs text-brand">إعادة المحاولة</button>
+      <button onClick={load} className="text-xs text-brand">{t('settings.common.retry')}</button>
     </div>
   )
 
@@ -700,6 +708,7 @@ function ConnectedChannelsList() {
     <div className="space-y-3 pt-1">
       {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
         const meta = PLATFORM_META[platform]
+        const metaLabel = t(meta.labelKey)
         const Icon = meta.icon
         // فيسبوك وانستجرام لسه رقم واحد بس، بس الواتساب ممكن يكون فيه أكتر من رقم مربوط
         const rows = channels.filter(c => c.platform === platform)
@@ -723,7 +732,7 @@ function ConnectedChannelsList() {
                       value={editValue}
                       onChange={e => setEditValue(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') saveEdit(ch); if (e.key === 'Escape') cancelEdit() }}
-                      placeholder={meta.label}
+                      placeholder={metaLabel}
                       className="min-w-0 flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
                     />
                     <button onClick={() => saveEdit(ch)} disabled={savingId === ch.id}
@@ -741,18 +750,18 @@ function ConnectedChannelsList() {
                   </div>
                 ) : (
                   <p className="text-sm text-fg font-semibold flex items-center gap-1.5">
-                    <Icon size={12} className={meta.color} /> {ch?.custom_name || meta.label}
+                    <Icon size={12} className={meta.color} /> {ch?.custom_name || metaLabel}
                   </p>
                 )}
-                <p className="text-xs text-fg-muted truncate">{ch?.display_name || 'مش مربوطة'}</p>
+                <p className="text-xs text-fg-muted truncate">{ch?.display_name || t('settings.channels.notLinked')}</p>
                 {ch?.platform === 'whatsapp' && ch?.metadata?.messaging_limit_tier && (
                   <div className="flex items-center gap-1.5 mt-1">
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-muted">
-                      {MESSAGING_TIER[ch.metadata.messaging_limit_tier] || ch.metadata.messaging_limit_tier}
+                      {MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier] ? t(MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier]) : ch.metadata.messaging_limit_tier}
                     </span>
                     {ch.metadata.quality_rating && QUALITY_RATING[ch.metadata.quality_rating] && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${QUALITY_RATING[ch.metadata.quality_rating].cls}`}>
-                        جودة {QUALITY_RATING[ch.metadata.quality_rating].label}
+                        {t('settings.channels.qualityPrefix')} {t(QUALITY_RATING[ch.metadata.quality_rating].labelKey)}
                       </span>
                     )}
                   </div>
@@ -762,23 +771,23 @@ function ConnectedChannelsList() {
                 <>
                   {ch?.status === 'active' ? (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-success/15 text-success flex items-center gap-1 flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-success" /> نشطة
+                      <span className="w-1.5 h-1.5 rounded-full bg-success" /> {t('settings.channels.status.active')}
                     </span>
                   ) : ch?.status === 'disconnected' ? (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-surface-3 text-fg-subtle flex items-center gap-1 flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle" /> مفصولة
+                      <span className="w-1.5 h-1.5 rounded-full bg-fg-subtle" /> {t('settings.channels.status.disconnected')}
                     </span>
                   ) : ch ? (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-danger/15 text-danger flex items-center gap-1 flex-shrink-0">
-                      <span className="w-1.5 h-1.5 rounded-full bg-danger" /> محتاجة إعادة ربط
+                      <span className="w-1.5 h-1.5 rounded-full bg-danger" /> {t('settings.channels.status.needsReconnect')}
                     </span>
                   ) : (
                     <span className="text-[11px] font-medium px-2 py-1 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">
-                      مش مربوطة
+                      {t('settings.channels.notLinked')}
                     </span>
                   )}
                   {ch?.id && (
-                    <button onClick={() => setSettingsChannel(ch)} title="إعدادات القناة"
+                    <button onClick={() => setSettingsChannel(ch)} title={t('settings.channels.settingsTitle')}
                       className="w-8 h-8 flex items-center justify-center text-fg-subtle hover:text-fg rounded-lg hover:bg-surface-3 flex-shrink-0">
                       <Settings2 size={15} />
                     </button>
@@ -807,13 +816,15 @@ function ConnectedChannelsList() {
 // لوحة إعدادات قناة واحدة — كل العمليات الخاصة بيها في مكان واحد بدل ما تكون أزرار متفرقة
 // على الكارت. بتتفتح من الترس، وبتتقفل بالضغط بره أو على X
 function ChannelSettingsPanel({ channel, onClose, onChanged }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const [name, setName] = useState(channel.custom_name || '')
   const [saving, setSaving] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
   const [deletingForever, setDeletingForever] = useState(false)
 
-  const meta = PLATFORM_META[channel.platform] || { label: channel.platform, icon: Radio, color: 'text-fg' }
+  const meta = PLATFORM_META[channel.platform] || { labelKey: null, icon: Radio, color: 'text-fg' }
+  const metaLabel = meta.labelKey ? t(meta.labelKey) : channel.platform
   const Icon = meta.icon
 
   const saveName = async () => {
@@ -824,27 +835,27 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
         body: JSON.stringify({ custom_name: name.trim() })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الحفظ')
-      toast.success('اتحفظ الاسم')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.saveFailed'))
+      toast.success(t('settings.channels.nameSaved'))
       onChanged()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSaving(false)
     }
   }
 
   const disconnect = async () => {
-    if (!confirm(`فصل ${channel.custom_name || channel.display_name || meta.label}؟ هتقدر تربطها تاني من تاب "ربط قناة جديدة".`)) return
+    if (!confirm(t('settings.channels.disconnectConfirm', { name: channel.custom_name || channel.display_name || metaLabel }))) return
     setDisconnecting(true)
     try {
       const res = await fetch(`${API_URL}/channels/${channel.id}`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الفصل')
-      toast.success('اتفصلت القناة')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.disconnectFailed'))
+      toast.success(t('settings.channels.disconnected'))
       onChanged()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
       setDisconnecting(false)
     }
   }
@@ -853,17 +864,17 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
   // خالص من السجل. المحادثات والرسايل القديمة مش بتتمسح (بيفضل تاريخها محفوظ)، بس هتبقى
   // "من غير قناة" لحد ما رقم جديد يترّبط
   const deleteForever = async () => {
-    if (!confirm(`حذف ${channel.custom_name || channel.display_name || meta.label} نهائيًا من السجل؟ مش هيرجع تاني إلا لو ربطتها من الأول. المحادثات القديمة هتفضل موجودة.`)) return
-    if (!confirm('تأكيد أخير: الحذف ده نهائي ومينفعش يتراجع فيه. متأكد؟')) return
+    if (!confirm(t('settings.channels.deleteForeverConfirm', { name: channel.custom_name || channel.display_name || metaLabel }))) return
+    if (!confirm(t('settings.channels.deleteForeverConfirm2'))) return
     setDeletingForever(true)
     try {
       const res = await fetch(`${API_URL}/channels/${channel.id}/permanent`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الحذف')
-      toast.success('اتحذفت القناة نهائيًا')
+      if (!res.ok) throw new Error(data.error || t('settings.common.deleteFailed'))
+      toast.success(t('settings.channels.deletedForever'))
       onChanged()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
       setDeletingForever(false)
     }
   }
@@ -877,7 +888,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             <Icon size={15} className={meta.color} />
           </div>
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-fg truncate">{channel.custom_name || meta.label}</p>
+            <p className="text-sm font-semibold text-fg truncate">{channel.custom_name || metaLabel}</p>
             <p className="text-xs text-fg-muted truncate">{channel.display_name}</p>
           </div>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
@@ -887,16 +898,16 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
 
         <div className="p-5 space-y-5">
           <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">الاسم المختصر</label>
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('settings.channels.shortNameLabel')}</label>
             <div className="flex items-center gap-2">
-              <input value={name} onChange={e => setName(e.target.value)} placeholder={meta.label}
+              <input value={name} onChange={e => setName(e.target.value)} placeholder={metaLabel}
                 className="flex-1 min-w-0 bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               <button onClick={saveName} disabled={saving}
                 className="px-3 py-2 rounded-xl text-xs font-semibold bg-brand text-white disabled:opacity-50 flex-shrink-0">
-                {saving ? '...' : 'حفظ'}
+                {saving ? t('settings.common.ellipsis') : t('settings.common.save')}
               </button>
             </div>
-            <p className="text-[11px] text-fg-subtle mt-1">اسم بيظهر لك في التطبيق بدل اسم الحساب الرسمي</p>
+            <p className="text-[11px] text-fg-subtle mt-1">{t('settings.channels.shortNameHint')}</p>
           </div>
 
           {channel.platform === 'whatsapp' && channel.status === 'active' && (
@@ -907,7 +918,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             {channel.waba_id && (
               <p className="text-[11px] text-fg-subtle">WABA ID: {channel.waba_id}</p>
             )}
-            <p className="text-[11px] text-fg-subtle">معرّف القناة: {channel.external_id}</p>
+            <p className="text-[11px] text-fg-subtle">{t('settings.channels.channelIdLabel')} {channel.external_id}</p>
           </div>
 
           <div className="pt-3 border-t border-surface-3 space-y-2">
@@ -916,7 +927,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
               {disconnecting ? (
                 <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" />
               ) : (
-                <><Trash2 size={14} /> فصل القناة</>
+                <><Trash2 size={14} /> {t('settings.channels.disconnectButton')}</>
               )}
             </button>
             <button onClick={deleteForever} disabled={disconnecting || deletingForever}
@@ -924,11 +935,11 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
               {deletingForever ? (
                 <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
               ) : (
-                <><Trash2 size={14} /> حذف القناة نهائيًا من السجل</>
+                <><Trash2 size={14} /> {t('settings.channels.deleteForeverButton')}</>
               )}
             </button>
             <p className="text-[11px] text-fg-subtle text-center">
-              "فصل" بيسيبها في السجل عشان ترجع تشتغل لوحدها لو اترّبطت تاني. "حذف نهائيًا" بيشيلها خالص.
+              {t('settings.channels.disconnectVsDeleteHint')}
             </p>
           </div>
         </div>
@@ -939,19 +950,20 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
 
 // حالة القالب عند ميتا — بتتغير لوحدها بعد المراجعة، فبنقراها منهم مباشرة كل مرة
 const TEMPLATE_STATUS = {
-  APPROVED: { label: 'معتمد', cls: 'bg-success/15 text-success' },
-  PENDING: { label: 'تحت المراجعة', cls: 'bg-follow/15 text-follow' },
-  IN_APPEAL: { label: 'تظلّم', cls: 'bg-follow/15 text-follow' },
-  REJECTED: { label: 'مرفوض', cls: 'bg-danger/15 text-danger' },
-  PAUSED: { label: 'موقوف', cls: 'bg-surface-3 text-fg-muted' },
-  DISABLED: { label: 'معطّل', cls: 'bg-surface-3 text-fg-muted' },
+  APPROVED: { labelKey: 'settings.templates.status.approved', cls: 'bg-success/15 text-success' },
+  PENDING: { labelKey: 'settings.templates.status.pending', cls: 'bg-follow/15 text-follow' },
+  IN_APPEAL: { labelKey: 'settings.templates.status.inAppeal', cls: 'bg-follow/15 text-follow' },
+  REJECTED: { labelKey: 'settings.templates.status.rejected', cls: 'bg-danger/15 text-danger' },
+  PAUSED: { labelKey: 'settings.templates.status.paused', cls: 'bg-surface-3 text-fg-muted' },
+  DISABLED: { labelKey: 'settings.templates.status.disabled', cls: 'bg-surface-3 text-fg-muted' },
 }
 
-const TEMPLATE_CATEGORY = { MARKETING: 'تسويقي', UTILITY: 'خدمي', AUTHENTICATION: 'تحقق' }
+const TEMPLATE_CATEGORY = { MARKETING: 'settings.templates.category.marketing', UTILITY: 'settings.templates.category.utility', AUTHENTICATION: 'settings.templates.category.authentication' }
 
 // قوالب واتساب المعتمدة — الطريقة الوحيدة للرد بعد ما تعدي نافذة الـ٢٤ ساعة.
 // بنحمّلها بس لما المستخدم يفتح القسم، عشان منضربش Graph API لكل رقم مع كل فتح للإعدادات
 function ChannelTemplates({ channel }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const [templates, setTemplates] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -968,7 +980,7 @@ function ChannelTemplates({ channel }) {
     try {
       const res = await fetch(`${API_URL}/channels/${channel.id}/templates`)
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل تحميل القوالب')
+      if (!res.ok) throw new Error(data.error || t('settings.templates.loadFailed'))
       setTemplates(data.templates || [])
     } catch (err) {
       setError(err.message)
@@ -978,16 +990,16 @@ function ChannelTemplates({ channel }) {
   }
 
   const removeTemplate = async (tpl) => {
-    if (!confirm(`حذف القالب "${tpl.name}"؟ مش هتقدر تبعته تاني، ولو عايزاه بعدين هتعمليه من الأول وتستني موافقة ميتا.`)) return
+    if (!confirm(t('settings.templates.deleteConfirm', { name: tpl.name }))) return
     setDeleting(tpl.name)
     try {
       const res = await fetch(`${API_URL}/channels/${channel.id}/templates/${encodeURIComponent(tpl.name)}`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الحذف')
-      toast.success('اتحذف القالب')
+      if (!res.ok) throw new Error(data.error || t('settings.common.deleteFailed'))
+      toast.success(t('settings.templates.deleted'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setDeleting(null)
     }
@@ -1000,17 +1012,16 @@ function ChannelTemplates({ channel }) {
     <div className="pt-4 border-t border-surface-3">
       <div className="flex items-center gap-2 mb-2.5">
         <FileText size={13} className="text-fg-muted" />
-        <span className="text-xs font-semibold text-fg flex-1">القوالب</span>
+        <span className="text-xs font-semibold text-fg flex-1">{t('settings.templates.title')}</span>
         {templates && <span className="text-[10px] text-fg-subtle">{templates.length}</span>}
         <button onClick={() => setShowCreate(true)}
           className="flex items-center gap-1 text-[11px] font-medium text-brand hover:underline">
-          <Plus size={12} /> قالب جديد
+          <Plus size={12} /> {t('settings.templates.newTemplate')}
         </button>
       </div>
 
       <p className="text-[11px] text-fg-subtle mb-2.5 leading-relaxed">
-        القوالب هي الطريقة الوحيدة للرد بعد ما تعدي ٢٤ ساعة من آخر رسالة للعميل. لازم ميتا توافق عليها الأول،
-        وبتتحاسبي عليها من واتساب.
+        {t('settings.templates.description')}
       </p>
 
       <div className="space-y-2">
@@ -1021,29 +1032,31 @@ function ChannelTemplates({ channel }) {
         ) : error ? (
           <div className="space-y-1.5">
             <p className="text-xs text-danger bg-danger/5 rounded-lg px-2.5 py-1.5">{error}</p>
-            <button onClick={load} className="text-[11px] text-brand">إعادة المحاولة</button>
+            <button onClick={load} className="text-[11px] text-brand">{t('settings.common.retry')}</button>
           </div>
         ) : templates?.length === 0 ? (
           <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-lg px-2.5 py-2">
-            مفيش قوالب على الرقم ده لسه.
+            {t('settings.templates.empty')}
           </p>
         ) : (
           templates?.map(tpl => {
-            const st = TEMPLATE_STATUS[tpl.status] || { label: tpl.status, cls: 'bg-surface-3 text-fg-muted' }
+            const st = TEMPLATE_STATUS[tpl.status]
+            const stLabel = st ? t(st.labelKey) : tpl.status
+            const stCls = st ? st.cls : 'bg-surface-3 text-fg-muted'
             return (
               <div key={tpl.id || tpl.name} className="bg-surface-3/50 rounded-lg px-2.5 py-2">
                 <div className="flex items-center gap-2">
                   <span className="text-xs text-fg font-medium truncate flex-1">{tpl.name}</span>
-                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${st.cls}`}>{st.label}</span>
+                  <span className={`text-[10px] font-medium px-1.5 py-0.5 rounded-full flex-shrink-0 ${stCls}`}>{stLabel}</span>
                   {/* ميتا بتسمح بالتعديل للمرفوض والمعتمد والموقوف بس — اللي تحت المراجعة مقفول */}
                   {['REJECTED', 'APPROVED', 'PAUSED'].includes(tpl.status) && (
-                    <button onClick={() => setEditing(tpl)} title="عدّل وابعت تاني"
+                    <button onClick={() => setEditing(tpl)} title={t('settings.templates.editTitle')}
                       className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-brand rounded-lg hover:bg-brand/10 flex-shrink-0">
                       <Edit2 size={12} />
                     </button>
                   )}
                   <button onClick={() => removeTemplate(tpl)} disabled={deleting === tpl.name}
-                    title="حذف القالب"
+                    title={t('settings.templates.deleteTitle')}
                     className="w-6 h-6 flex items-center justify-center text-fg-subtle hover:text-danger rounded-lg hover:bg-danger/10 flex-shrink-0 disabled:opacity-50">
                     {deleting === tpl.name ? (
                       <div className="w-3 h-3 border-2 border-danger border-t-transparent rounded-full animate-spin" />
@@ -1053,7 +1066,7 @@ function ChannelTemplates({ channel }) {
                   </button>
                 </div>
                 <div className="flex items-center gap-1.5 mt-1 text-[10px] text-fg-subtle">
-                  <span>{TEMPLATE_CATEGORY[tpl.category] || tpl.category}</span>
+                  <span>{TEMPLATE_CATEGORY[tpl.category] ? t(TEMPLATE_CATEGORY[tpl.category]) : tpl.category}</span>
                   <span>·</span>
                   <span>{tpl.language}</span>
                 </div>
@@ -1061,7 +1074,7 @@ function ChannelTemplates({ channel }) {
                   <p className="text-[11px] text-fg-muted mt-1.5 leading-relaxed">{bodyOf(tpl)}</p>
                 )}
                 {tpl.status === 'REJECTED' && tpl.rejected_reason && (
-                  <p className="text-[10px] text-danger mt-1">سبب الرفض: {tpl.rejected_reason}</p>
+                  <p className="text-[10px] text-danger mt-1">{t('settings.templates.rejectedReasonPrefix')} {tpl.rejected_reason}</p>
                 )}
               </div>
             )
@@ -1085,17 +1098,18 @@ function ChannelTemplates({ channel }) {
 }
 
 const TEMPLATE_LANGS = [
-  { code: 'ar', label: 'عربي' },
-  { code: 'en', label: 'إنجليزي' },
-  { code: 'en_US', label: 'إنجليزي (أمريكي)' },
+  { code: 'ar', labelKey: 'settings.templates.langs.ar' },
+  { code: 'en', labelKey: 'settings.templates.langs.en' },
+  { code: 'en_US', labelKey: 'settings.templates.langs.enUs' },
 ]
 
 // معاينة شكل القالب في واتساب — بتتحدث مع الكتابة عشان الموظف يشوف الشكل النهائي قبل ما
 // يبعته لميتا للمراجعة (المتغيرات بتفضل ظاهرة زي ما هي لأن قيمتها بتتحدد وقت الإرسال)
 function TemplatePreview({ header, body, footer, buttons }) {
+  const { t } = useTranslation()
   const empty = !body?.trim() && !header?.text?.trim() && !footer?.trim() && !buttons?.length
   if (empty) {
-    return <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-xl px-3 py-3 text-center">اكتبي نص الرسالة عشان تشوفي المعاينة</p>
+    return <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-xl px-3 py-3 text-center">{t('settings.templates.preview.emptyHint')}</p>
   }
   return (
     <div className="bg-[#0b141a] rounded-xl p-3">
@@ -1104,16 +1118,16 @@ function TemplatePreview({ header, body, footer, buttons }) {
           <p className="text-[13px] font-bold text-white mb-1 whitespace-pre-wrap break-words">{header.text}</p>
         )}
         {header?.enabled && header.format === 'LOCATION' && (
-          <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 موقع</div>
+          <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 {t('settings.templates.mediaType.location')}</div>
         )}
         {header?.enabled && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) && (
           <div className="bg-black/20 rounded-md px-2 py-5 mb-1 text-center text-[11px] text-white/70">
-            {header.format === 'IMAGE' ? '🖼️ صورة' : header.format === 'VIDEO' ? '🎥 فيديو' : '📎 ملف'}
+            {header.format === 'IMAGE' ? `🖼️ ${t('settings.templates.mediaType.image')}` : header.format === 'VIDEO' ? `🎥 ${t('settings.templates.mediaType.video')}` : `📎 ${t('settings.templates.mediaType.document')}`}
           </div>
         )}
         {body && <p className="text-[13px] text-white whitespace-pre-wrap break-words leading-relaxed">{body}</p>}
         {footer && <p className="text-[11px] text-white/60 mt-1.5 whitespace-pre-wrap break-words">{footer}</p>}
-        <p className="text-[10px] text-white/50 text-left mt-1">١٢:٠٠ م ✓✓</p>
+        <p className="text-[10px] text-white/50 text-left mt-1">{t('settings.templates.preview.mockTime')} ✓✓</p>
       </div>
       {buttons?.filter(b => b.text?.trim()).length > 0 && (
         <div className="mt-1 space-y-1 max-w-[85%]">
@@ -1131,6 +1145,7 @@ function TemplatePreview({ header, body, footer, buttons }) {
 // نفس النموذج بيستخدم للإنشاء وللتعديل — لو اتبعتله قالب موجود بيشتغل في وضع التعديل
 // (الاسم واللغة بيتقفلوا لأن ميتا مابتسمحش بتغييرهم بعد الإنشاء)
 function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const isEdit = Boolean(existing)
   const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
@@ -1169,7 +1184,7 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
       const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
       const path = `template-samples/${channel.id}/${Date.now()}_${safeName}`
       const { error: upErr } = await supabase.storage.from('inbox-media').upload(path, file)
-      if (upErr) throw new Error('فشل رفع الملف')
+      if (upErr) throw new Error(t('settings.templates.uploadFileFailed'))
       const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
 
       const res = await fetch(`${API_URL}/channels/${channel.id}/templates/sample-handle`, {
@@ -1177,11 +1192,11 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
         body: JSON.stringify({ media_url: urlData.publicUrl, mime_type: file.type, format: header.format })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل رفع العيّنة لميتا')
+      if (!res.ok) throw new Error(data.error || t('settings.templates.uploadSampleFailed'))
       setHeader(h => ({ ...h, handle: data.handle, fileName: file.name }))
-      toast.success('اترفعت العيّنة')
+      toast.success(t('settings.templates.sampleUploaded'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setUploadingSample(false)
     }
@@ -1211,7 +1226,7 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
 
   const submit = async () => {
     if (!form.name.trim() || !form.body.trim()) {
-      toast.error('الاسم والنص مطلوبين')
+      toast.error(t('settings.templates.nameAndBodyRequired'))
       return
     }
     setSaving(true)
@@ -1231,11 +1246,11 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
         })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || (isEdit ? 'فشل تعديل القالب' : 'فشل إنشاء القالب'))
-      toast.success(isEdit ? 'اتبعت التعديل لميتا للمراجعة' : 'اتبعت القالب لميتا للمراجعة')
+      if (!res.ok) throw new Error(data.error || (isEdit ? t('settings.templates.editFailed') : t('settings.templates.createFailed')))
+      toast.success(isEdit ? t('settings.templates.editSubmitted') : t('settings.templates.createSubmitted'))
       onCreated()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSaving(false)
     }
@@ -1246,7 +1261,7 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
       <div onClick={e => e.stopPropagation()}
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
-          <p className="text-sm font-semibold text-fg">{isEdit ? 'تعديل القالب' : 'قالب جديد'}</p>
+          <p className="text-sm font-semibold text-fg">{isEdit ? t('settings.templates.editTitleModal') : t('settings.templates.newTemplate')}</p>
           <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             <X size={16} />
           </button>
@@ -1255,82 +1270,82 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
         <div className="p-5 space-y-4">
           {isEdit && existing.status === 'REJECTED' && existing.rejected_reason && (
             <div className="bg-danger/10 rounded-xl px-3 py-2.5">
-              <p className="text-[11px] font-semibold text-danger mb-0.5">ميتا رفضت القالب ده</p>
+              <p className="text-[11px] font-semibold text-danger mb-0.5">{t('settings.templates.rejectedByMeta')}</p>
               <p className="text-[11px] text-danger leading-relaxed">{existing.rejected_reason}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">اسم القالب</label>
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('settings.templates.nameLabel')}</label>
             <input value={form.name} disabled={isEdit}
               onChange={e => setForm({ ...form, name: e.target.value.toLowerCase().replace(/[^a-z0-9_]/g, '_') })}
               placeholder="booking_reminder"
               className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand disabled:opacity-60" />
             <p className="text-[11px] text-fg-subtle mt-1">
-              {isEdit ? 'الاسم واللغة مالهمش تعديل بعد الإنشاء (شرط من ميتا)' : 'حروف إنجليزي صغيرة وأرقام و _ بس (شرط من ميتا)'}
+              {isEdit ? t('settings.templates.nameHintEdit') : t('settings.templates.nameHintNew')}
             </p>
           </div>
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1.5">اللغة</label>
+              <label className="block text-xs font-semibold text-fg mb-1.5">{t('settings.templates.languageLabel')}</label>
               <select value={form.language} disabled={isEdit} onChange={e => setForm({ ...form, language: e.target.value })}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none disabled:opacity-60">
-                {TEMPLATE_LANGS.map(l => <option key={l.code} value={l.code}>{l.label}</option>)}
+                {TEMPLATE_LANGS.map(l => <option key={l.code} value={l.code}>{t(l.labelKey)}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1.5">التصنيف</label>
+              <label className="block text-xs font-semibold text-fg mb-1.5">{t('settings.templates.categoryLabel')}</label>
               <select value={form.category} onChange={e => setForm({ ...form, category: e.target.value })}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
-                <option value="UTILITY">خدمي</option>
-                <option value="MARKETING">تسويقي</option>
+                <option value="UTILITY">{t('settings.templates.category.utility')}</option>
+                <option value="MARKETING">{t('settings.templates.category.marketing')}</option>
               </select>
             </div>
           </div>
           <p className="text-[11px] text-fg-subtle -mt-2">
-            الخدمي للتذكيرات والتأكيدات (أرخص). التسويقي للعروض (أغلى، وميتا أدق في مراجعته).
+            {t('settings.templates.categoryHint')}
           </p>
 
           <div>
             <div className="flex items-center justify-between mb-1.5">
-              <label className="text-xs font-semibold text-fg">نص الرسالة</label>
-              <button onClick={addVariable} className="text-[11px] text-brand hover:underline">+ متغيّر</button>
+              <label className="text-xs font-semibold text-fg">{t('settings.templates.bodyLabel')}</label>
+              <button onClick={addVariable} className="text-[11px] text-brand hover:underline">{t('settings.templates.addVariable')}</button>
             </div>
             <textarea value={form.body} onChange={e => setForm({ ...form, body: e.target.value })}
-              rows={4} placeholder="أهلاً {{1}}، حابين نفكرك بموعدك يوم {{2}}."
+              rows={4} placeholder={t('settings.templates.bodyPlaceholder', { interpolation: { prefix: '[[', suffix: ']]' } })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
             <p className="text-[11px] text-fg-subtle mt-1">
-              استخدمي {'{{1}}'} و{'{{2}}'} للأجزاء اللي هتتغير في كل رسالة (زي اسم العميل أو الميعاد)
+              {t('settings.templates.variableUsageHint', { interpolation: { prefix: '[[', suffix: ']]' } })}
             </p>
           </div>
 
           {varCount > 0 && (
             <div className="space-y-2 bg-surface-3/50 rounded-xl p-3">
-              <p className="text-[11px] font-semibold text-fg">أمثلة للمتغيرات</p>
-              <p className="text-[11px] text-fg-subtle -mt-1">ميتا بتطلبها عشان تفهم القالب وتوافق عليه — مش بتظهر للعميل</p>
+              <p className="text-[11px] font-semibold text-fg">{t('settings.templates.examplesHeading')}</p>
+              <p className="text-[11px] text-fg-subtle -mt-1">{t('settings.templates.examplesHint')}</p>
               {Array.from({ length: varCount }, (_, i) => (
                 <input key={i} value={examples[i] || ''}
                   onChange={e => { const next = [...examples]; next[i] = e.target.value; setExamples(next) }}
-                  placeholder={`مثال لـ {{${i + 1}}}`}
+                  placeholder={t('settings.templates.exampleForVariable', { n: i + 1, interpolation: { prefix: '[[', suffix: ']]' } })}
                   className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               ))}
             </div>
           )}
 
           <div className="pt-1 border-t border-surface-3">
-            <p className="text-xs font-semibold text-fg pt-3 mb-2.5">مكوّنات اختيارية</p>
+            <p className="text-xs font-semibold text-fg pt-3 mb-2.5">{t('settings.templates.optionalComponents')}</p>
 
             <label className="flex items-center gap-2 cursor-pointer mb-2">
               <input type="checkbox" checked={header.enabled}
                 onChange={e => setHeader({ ...header, enabled: e.target.checked })}
                 className="accent-brand w-3.5 h-3.5" />
-              <span className="text-xs text-fg">عنوان (Header)</span>
+              <span className="text-xs text-fg">{t('settings.templates.headerLabel')}</span>
             </label>
             {header.enabled && (
               <div className="mr-5 mb-3 space-y-2">
                 <div className="flex gap-1.5 flex-wrap">
-                  {[['TEXT', 'نص'], ['IMAGE', 'صورة'], ['VIDEO', 'فيديو'], ['DOCUMENT', 'ملف'], ['LOCATION', 'موقع']].map(([val, label]) => (
+                  {[['TEXT', t('settings.templates.mediaType.text')], ['IMAGE', t('settings.templates.mediaType.image')], ['VIDEO', t('settings.templates.mediaType.video')], ['DOCUMENT', t('settings.templates.mediaType.document')], ['LOCATION', t('settings.templates.mediaType.location')]].map(([val, label]) => (
                     <button key={val} onClick={() => setHeader({ ...header, format: val, handle: '', fileName: '' })}
                       className={`px-2.5 py-1 rounded-lg text-[11px] font-medium transition-colors ${header.format === val ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
                       {label}
@@ -1345,16 +1360,15 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
                     <button onClick={() => sampleInputRef.current?.click()} disabled={uploadingSample}
                       className="w-full flex items-center justify-center gap-2 py-2 rounded-xl text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
                       {uploadingSample ? (
-                        <><div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> بيرفع...</>
+                        <><div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> {t('settings.templates.uploading')}</>
                       ) : header.handle ? (
-                        <><Check size={13} className="text-success" /> {header.fileName || 'العيّنة اترفعت'} — غيّرها</>
+                        <><Check size={13} className="text-success" /> {header.fileName || t('settings.templates.sampleUploaded')} {t('settings.templates.changeSampleSuffix')}</>
                       ) : (
-                        <><Paperclip size={13} /> ارفعي عيّنة</>
+                        <><Paperclip size={13} /> {t('settings.templates.uploadSampleButton')}</>
                       )}
                     </button>
                     <p className="text-[11px] text-fg-subtle leading-relaxed">
-                      ميتا محتاجة عيّنة عشان تراجع شكل القالب. الملف اللي هيتبعت للعميل بيتحدد وقت الإرسال —
-                      دي للمراجعة بس. (صورة لحد ٥ ميجا، فيديو ١٦، ملف ١٠٠)
+                      {t('settings.templates.sampleHint')}
                     </p>
                   </div>
                 )}
@@ -1362,11 +1376,11 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
                 {header.format === 'TEXT' && (
                   <>
                     <input value={header.text} onChange={e => setHeader({ ...header, text: e.target.value })}
-                      placeholder="عنوان الرسالة"
+                      placeholder={t('settings.templates.headerTextPlaceholder')}
                       className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
                     {/\{\{1\}\}/.test(header.text) && (
                       <input value={header.example} onChange={e => setHeader({ ...header, example: e.target.value })}
-                        placeholder="مثال لمتغير العنوان"
+                        placeholder={t('settings.templates.headerExamplePlaceholder')}
                         className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
                     )}
                   </>
@@ -1375,24 +1389,24 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
             )}
 
             <div className="mb-2">
-              <label className="block text-xs text-fg mb-1.5">تذييل (Footer)</label>
+              <label className="block text-xs text-fg mb-1.5">{t('settings.templates.footerLabel')}</label>
               <input value={form.footer} onChange={e => setForm({ ...form, footer: e.target.value })}
-                placeholder="صحة وعافية"
+                placeholder={t('login.brand')}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
             </div>
 
             <div className="mt-3">
               <div className="flex items-center justify-between mb-1.5">
-                <span className="text-xs text-fg">أزرار (لحد ٣)</span>
+                <span className="text-xs text-fg">{t('settings.templates.buttonsLabel')}</span>
                 {buttons.length < 3 && (
                   <div className="flex gap-1.5">
                     {(!buttonKind || buttonKind === 'QUICK_REPLY') && (
-                      <button onClick={() => addButton('QUICK_REPLY')} className="text-[11px] text-brand hover:underline">+ رد سريع</button>
+                      <button onClick={() => addButton('QUICK_REPLY')} className="text-[11px] text-brand hover:underline">{t('settings.templates.addQuickReply')}</button>
                     )}
                     {(!buttonKind || buttonKind === 'CTA') && (
                       <>
-                        <button onClick={() => addButton('URL')} className="text-[11px] text-brand hover:underline">+ رابط</button>
-                        <button onClick={() => addButton('PHONE_NUMBER')} className="text-[11px] text-brand hover:underline">+ اتصال</button>
+                        <button onClick={() => addButton('URL')} className="text-[11px] text-brand hover:underline">{t('settings.templates.addUrlButton')}</button>
+                        <button onClick={() => addButton('PHONE_NUMBER')} className="text-[11px] text-brand hover:underline">{t('settings.templates.addPhoneButton')}</button>
                       </>
                     )}
                   </div>
@@ -1401,15 +1415,15 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
               {buttonKind && (
                 <p className="text-[11px] text-fg-subtle mb-1.5">
                   {buttonKind === 'QUICK_REPLY'
-                    ? 'الرد السريع: العميل يدوس فيتبعت نص الزرار كرسالة منه'
-                    : 'ميتا مابتسمحش تخلطي الرد السريع مع الرابط/الاتصال في نفس القالب'}
+                    ? t('settings.templates.quickReplyHint')
+                    : t('settings.templates.buttonMixHint')}
                 </p>
               )}
               <div className="space-y-1.5">
                 {buttons.map((b, i) => (
                   <div key={i} className="flex items-center gap-1.5">
                     <input value={b.text} onChange={e => updateButton(i, { text: e.target.value })}
-                      placeholder={b.type === 'URL' ? 'نص الزرار' : b.type === 'PHONE_NUMBER' ? 'نص الزرار' : 'نص الرد'}
+                      placeholder={b.type === 'URL' ? t('settings.templates.buttonTextPlaceholder') : b.type === 'PHONE_NUMBER' ? t('settings.templates.buttonTextPlaceholder') : t('settings.templates.replyTextPlaceholder')}
                       className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2.5 py-1.5 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
                     {b.type === 'URL' && (
                       <input value={b.url} onChange={e => updateButton(i, { url: e.target.value })}
@@ -1432,20 +1446,20 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
           </div>
 
           <div className="pt-1 border-t border-surface-3">
-            <p className="text-xs font-semibold text-fg pt-3 mb-2">المعاينة</p>
+            <p className="text-xs font-semibold text-fg pt-3 mb-2">{t('settings.templates.previewHeading')}</p>
             <TemplatePreview header={header} body={form.body} footer={form.footer} buttons={buttons} />
           </div>
 
           <div className="flex gap-2 pt-1">
             <button onClick={onClose} disabled={saving}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-50">
-              إلغاء
+              {t('settings.common.cancel')}
             </button>
             <button onClick={submit} disabled={saving || !form.name.trim() || !form.body.trim()}
               className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
               {saving
                 ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                : isEdit ? 'ابعت التعديل للمراجعة' : 'ابعت للمراجعة'}
+                : isEdit ? t('settings.templates.submitEdit') : t('settings.templates.submitNew')}
             </button>
           </div>
         </div>
@@ -1468,13 +1482,14 @@ function loadFacebookSDK() {
     script.src = 'https://connect.facebook.net/en_US/sdk.js'
     script.async = true
     script.defer = true
-    script.onerror = () => reject(new Error('فشل تحميل SDK بتاع فيسبوك'))
+    script.onerror = () => reject(new Error(i18n.t('settings.channels.fbSdkLoadFailed')))
     document.body.appendChild(script)
   })
   return fbSdkPromise
 }
 
 function ConnectNewChannel() {
+  const { t } = useTranslation()
   const toast = useToast()
   const { agent } = useAuth()
   const [connecting, setConnecting] = useState(null)
@@ -1482,7 +1497,7 @@ function ConnectNewChannel() {
 
   const connectWhatsApp = async () => {
     if (!WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID) {
-      toast.error('محتاجين نضيف WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID في إعدادات السيرفر الأول')
+      toast.error(t('settings.channels.missingWaConfig'))
       return
     }
     setConnecting('whatsapp')
@@ -1506,7 +1521,7 @@ function ConnectNewChannel() {
         if (response.authResponse?.code && sessionInfo?.phone_number_id && sessionInfo?.waba_id) {
           finishWhatsAppConnect(response.authResponse.code, sessionInfo)
         } else {
-          toast.error('اتلغى الربط أو حصل خطأ من فيسبوك')
+          toast.error(t('settings.channels.linkCancelledOrError'))
           setConnecting(null)
         }
       }, {
@@ -1524,7 +1539,7 @@ function ConnectNewChannel() {
 
   const connectFacebook = async () => {
     if (!FACEBOOK_LOGIN_CONFIG_ID) {
-      toast.error('محتاجين نضيف FACEBOOK_LOGIN_CONFIG_ID الأول')
+      toast.error(t('settings.channels.missingFbConfig'))
       return
     }
     setConnecting('facebook')
@@ -1536,7 +1551,7 @@ function ConnectNewChannel() {
         if (response.authResponse?.accessToken) {
           finishFacebookConnect(response.authResponse.accessToken)
         } else {
-          toast.error('اتلغى الربط أو حصل خطأ من فيسبوك')
+          toast.error(t('settings.channels.linkCancelledOrError'))
           setConnecting(null)
         }
       }, { config_id: FACEBOOK_LOGIN_CONFIG_ID })
@@ -1554,10 +1569,10 @@ function ConnectNewChannel() {
         body: JSON.stringify({ user_access_token: userAccessToken, agent_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل ربط الصفحة')
-      toast.success(`اترابطت ${data.channels?.length || 1} صفحة فيسبوك بنجاح`)
+      if (!res.ok) throw new Error(data.error || t('settings.channels.linkPageFailed'))
+      toast.success(t('settings.channels.fbPagesLinked', { count: data.channels?.length || 1 }))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setConnecting(null)
     }
@@ -1565,7 +1580,7 @@ function ConnectNewChannel() {
 
   const connectInstagram = () => {
     if (!INSTAGRAM_APP_ID) {
-      toast.error('محتاجين نضيف INSTAGRAM_APP_ID في إعدادات السيرفر الأول')
+      toast.error(t('settings.channels.missingIgConfig'))
       return
     }
     // ده فلو full-page redirect (مش نافذة منبثقة زي الواتساب)، فبنسجّل علامة في sessionStorage
@@ -1584,7 +1599,7 @@ function ConnectNewChannel() {
   // — ده الوحيد اللي بيطلب صلاحيات الرسايل (message.list.*)، والتاني بيرفض الربط أصلاً
   const connectTiktok = () => {
     if (!TIKTOK_APP_ID) {
-      toast.error('محتاجين نضيف TIKTOK_APP_ID الأول')
+      toast.error(t('settings.channels.missingTiktokConfig'))
       return
     }
     const redirectUri = `${API_URL}/tiktok/callback`
@@ -1608,10 +1623,10 @@ function ConnectNewChannel() {
         body: JSON.stringify({ agent_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل بدء الربط')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.startLinkFailed'))
       setQrModal({ channelId: data.channel_id, qr: null, status: 'pending' })
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setConnecting(null)
     }
@@ -1627,7 +1642,7 @@ function ConnectNewChannel() {
         if (cancelled) return
         if (data.status === 'active') {
           setQrModal(null)
-          toast.success('اترابط رقم الواتساب بنجاح')
+          toast.success(t('settings.channels.waNumberLinked'))
         } else {
           setQrModal(prev => prev && { ...prev, qr: data.qr, status: data.status })
         }
@@ -1647,10 +1662,10 @@ function ConnectNewChannel() {
         })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل ربط الرقم')
-      toast.success('اترابط رقم الواتساب بنجاح')
+      if (!res.ok) throw new Error(data.error || t('settings.channels.linkNumberFailed'))
+      toast.success(t('settings.channels.waNumberLinked'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setConnecting(null)
     }
@@ -1659,7 +1674,7 @@ function ConnectNewChannel() {
   return (
     <>
     <div className="space-y-3 pt-1">
-      <p className="text-xs text-fg-subtle -mt-1">اختار القناة اللي عايز تربطها. هتتحول لصفحة ميتا تختار منها الصفحة أو الحساب وتوافق على الصلاحيات.</p>
+      <p className="text-xs text-fg-subtle -mt-1">{t('settings.channels.connectDesc')}</p>
       {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
@@ -1674,11 +1689,11 @@ function ConnectNewChannel() {
             <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
               <Icon size={16} className={meta.color} />
             </div>
-            <span className="flex-1 text-right text-sm text-fg font-medium">ربط {meta.label}</span>
+            <span className="flex-1 text-right text-sm text-fg font-medium">{t('settings.channels.connectButton', { platform: t(meta.labelKey) })}</span>
             {isReady ? (
               isConnecting && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
             ) : (
-              <span className="text-[11px] text-fg-subtle flex-shrink-0">قريباً</span>
+              <span className="text-[11px] text-fg-subtle flex-shrink-0">{t('settings.common.comingSoon')}</span>
             )}
           </button>
         )
@@ -1693,7 +1708,7 @@ function ConnectNewChannel() {
             <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
               <QrCode size={15} className="text-emerald-400" />
             </div>
-            <p className="flex-1 text-sm font-semibold text-fg">اربط واتساب بمسح QR</p>
+            <p className="flex-1 text-sm font-semibold text-fg">{t('settings.channels.qrModalTitle')}</p>
             <button onClick={() => setQrModal(null)} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
               <X size={16} />
             </button>
@@ -1707,8 +1722,8 @@ function ConnectNewChannel() {
               </div>
             )}
             <p className="text-xs text-fg-subtle text-center">
-              افتح واتساب في تليفونك → الإعدادات → الأجهزة المرتبطة → ربط جهاز، وامسح الكود ده.
-              <br />الكود بيتجدد كل شوية تلقائي — سيب الصفحة مفتوحة لحد ما يتربط.
+              {t('settings.channels.qrInstructions1')}
+              <br />{t('settings.channels.qrInstructions2')}
             </p>
           </div>
         </div>
@@ -1720,6 +1735,7 @@ function ConnectNewChannel() {
 
 // ─── Lifecycle Tab ────────────────────────────────────────
 function LifecycleTab() {
+  const { t } = useTranslation()
   const [stages, setStages] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', color: '#3B82F6', icon: '' })
@@ -1741,7 +1757,7 @@ function LifecycleTab() {
   }
 
   const remove = async (id) => {
-    if (!confirm('حذف المرحلة؟')) return
+    if (!confirm(t('settings.lifecycle.deleteConfirm'))) return
     await supabase.from('lifecycle_stages').delete().eq('id', id)
     loadStages()
   }
@@ -1772,19 +1788,19 @@ function LifecycleTab() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg">مراحل Lifecycle</h2>
+        <h2 className="font-semibold text-fg">{t('settings.lifecycle.title')}</h2>
         <button onClick={() => setShowAdd(!showAdd)}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
-          <Plus size={14} /> إضافة
+          <Plus size={14} /> {t('settings.common.add')}
         </button>
       </div>
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <InputField label="اسم المرحلة" value={form.name} onChange={v => setForm({ ...form, name: v })} />
-          <InputField label="إيموجي (اختياري)" value={form.icon} onChange={v => setForm({ ...form, icon: v })} placeholder="🔥" />
+          <InputField label={t('settings.lifecycle.nameLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label={t('settings.lifecycle.emojiLabel')} value={form.icon} onChange={v => setForm({ ...form, icon: v })} placeholder="🔥" />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">اللون</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.common.colorLabel')}</label>
             <div className="flex items-center gap-2">
               <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
                 className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 cursor-pointer" />
@@ -1792,8 +1808,8 @@ function LifecycleTab() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">إضافة</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
           </div>
         </div>
       )}
@@ -1837,6 +1853,7 @@ function LifecycleTab() {
 // التاجات بتتحط من هنا بس (الأدمن)، وبتظهر بعد كده كقايمة اختيار جوا ملف العميل — الموظفين
 // يقدروا يحطوا أي تاج موجود بس، مش يعملوا تاجات جديدة
 function TagsTab() {
+  const { t } = useTranslation()
   const [tags, setTags] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', color: '#6366F1' })
@@ -1853,24 +1870,24 @@ function TagsTab() {
   const add = async () => {
     if (!form.name.trim()) return
     const { error } = await supabase.from('tags').insert({ name: form.name.trim(), color: form.color })
-    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    if (error) { toast.error(t('settings.tags.duplicateOrError')); return }
     setForm({ name: '', color: '#6366F1' })
     setShowAdd(false)
     loadTags()
   }
 
   const remove = async (id) => {
-    if (!confirm('حذف التاج ده؟ هيتشال من كل العملاء اللي حاططينه.')) return
+    if (!confirm(t('settings.tags.deleteConfirm'))) return
     await supabase.from('contact_tags').delete().eq('tag_id', id)
     await supabase.from('tags').delete().eq('id', id)
     loadTags()
   }
 
-  const startEdit = (t) => { setEditingId(t.id); setEditName(t.name) }
+  const startEdit = (tg) => { setEditingId(tg.id); setEditName(tg.name) }
   const saveEdit = async () => {
     if (!editName.trim()) return
     const { error } = await supabase.from('tags').update({ name: editName.trim() }).eq('id', editingId)
-    if (error) { toast.error('التاج ده موجود بالفعل أو حصل خطأ'); return }
+    if (error) { toast.error(t('settings.tags.duplicateOrError')); return }
     setEditingId(null)
     loadTags()
   }
@@ -1878,18 +1895,18 @@ function TagsTab() {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg">التاجات</h2>
+        <h2 className="font-semibold text-fg">{t('settings.tabs.tags')}</h2>
         <button onClick={() => setShowAdd(!showAdd)}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
-          <Plus size={14} /> إضافة
+          <Plus size={14} /> {t('settings.common.add')}
         </button>
       </div>
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <InputField label="اسم التاج" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label={t('settings.tags.nameLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">اللون</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.common.colorLabel')}</label>
             <div className="flex items-center gap-2">
               <input type="color" value={form.color} onChange={e => setForm({ ...form, color: e.target.value })}
                 className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 cursor-pointer" />
@@ -1897,16 +1914,16 @@ function TagsTab() {
             </div>
           </div>
           <div className="flex gap-2">
-            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">إضافة</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
           </div>
         </div>
       )}
 
-      {tags.map(t => (
-        <div key={t.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
-          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: t.color }} />
-          {editingId === t.id ? (
+      {tags.map(tg => (
+        <div key={tg.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
+          <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tg.color }} />
+          {editingId === tg.id ? (
             <>
               <input autoFocus value={editName} onChange={e => setEditName(e.target.value)}
                 onKeyDown={e => e.key === 'Enter' && saveEdit()}
@@ -1916,9 +1933,9 @@ function TagsTab() {
             </>
           ) : (
             <>
-              <span className="flex-1 text-sm text-fg">{t.name}</span>
-              <button onClick={() => startEdit(t)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
-              <button onClick={() => remove(t.id)} className="text-fg-muted hover:text-danger">
+              <span className="flex-1 text-sm text-fg">{tg.name}</span>
+              <button onClick={() => startEdit(tg)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+              <button onClick={() => remove(tg.id)} className="text-fg-muted hover:text-danger">
                 <Trash2 size={14} />
               </button>
             </>
@@ -1926,7 +1943,7 @@ function TagsTab() {
         </div>
       ))}
       {tags.length === 0 && !showAdd && (
-        <p className="text-center text-fg-subtle text-sm py-6">مفيش تاجات لسه، دوس "إضافة" عشان تعمل واحد</p>
+        <p className="text-center text-fg-subtle text-sm py-6">{t('settings.tags.empty')}</p>
       )}
     </div>
   )
@@ -1934,6 +1951,7 @@ function TagsTab() {
 
 // ─── Custom Fields Tab ────────────────────────────────────
 function FieldsTab() {
+  const { t } = useTranslation()
   const [fields, setFields] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', field_type: 'text', options: '' })
@@ -1962,7 +1980,7 @@ function FieldsTab() {
   }
 
   const remove = async (id) => {
-    if (!confirm('حذف الحقل؟')) return
+    if (!confirm(t('settings.fields.deleteConfirm'))) return
     await supabase.from('custom_field_definitions').delete().eq('id', id)
     loadFields()
   }
@@ -1975,34 +1993,39 @@ function FieldsTab() {
     loadFields()
   }
 
-  const TYPES = { text: 'نص', select: 'قائمة', date: 'تاريخ', number: 'رقم' }
+  const TYPES = {
+    text: t('settings.fields.types.text'),
+    select: t('settings.fields.types.select'),
+    date: t('settings.fields.types.date'),
+    number: t('settings.fields.types.number')
+  }
 
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg">الحقول الإضافية</h2>
+        <h2 className="font-semibold text-fg">{t('settings.fields.title')}</h2>
         <button onClick={() => setShowAdd(!showAdd)}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
-          <Plus size={14} /> إضافة
+          <Plus size={14} /> {t('settings.common.add')}
         </button>
       </div>
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <InputField label="اسم الحقل" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <InputField label={t('settings.fields.nameLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">النوع</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.fields.typeLabel')}</label>
             <select value={form.field_type} onChange={e => setForm({ ...form, field_type: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
               {Object.entries(TYPES).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
             </select>
           </div>
           {form.field_type === 'select' && (
-            <InputField label="الخيارات (مفصولة بفاصلة)" value={form.options} onChange={v => setForm({ ...form, options: v })} placeholder="خيار 1, خيار 2, خيار 3" />
+            <InputField label={t('settings.fields.optionsLabel')} value={form.options} onChange={v => setForm({ ...form, options: v })} placeholder={t('settings.fields.optionsPlaceholder')} />
           )}
           <div className="flex gap-2">
-            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">إضافة</button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+            <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
           </div>
         </div>
       )}
@@ -2038,6 +2061,7 @@ function FieldsTab() {
 
 // ─── Quick Replies Tab ────────────────────────────────────
 function QuickRepliesTab({ agent }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const [items, setItems] = useState([])
   const [search, setSearch] = useState('')
@@ -2058,7 +2082,7 @@ function QuickRepliesTab({ agent }) {
 
   const add = async () => {
     if (!form.name.trim() || (!form.text.trim() && !file)) {
-      toast.error('لازم اسم + نص أو ملف على الأقل')
+      toast.error(t('settings.quickReplies.nameAndContentRequired'))
       return
     }
     setSaving(true)
@@ -2085,14 +2109,14 @@ function QuickRepliesTab({ agent }) {
       load()
     } catch (err) {
       console.error(err)
-      toast.error('حصل خطأ أثناء الحفظ: ' + (err.message || 'غير معروف'))
+      toast.error(t('settings.quickReplies.saveErrorPrefix', { message: err.message || t('settings.quickReplies.unknownError') }))
     } finally {
       setSaving(false)
     }
   }
 
   const remove = async (qr) => {
-    if (!confirm('حذف الرد السريع؟')) return
+    if (!confirm(t('settings.quickReplies.deleteConfirm'))) return
     // لازم نمسح الملف من التخزين بنفسنا — مسح صف الرد السريع من الداتابيز مش بيمسح الملف
     // المرفوع تلقائي، وكان بيفضل ملف يتيم محتل مساحة تخزين للأبد من غير ما حد يلاحظ
     if (qr.file_url) {
@@ -2107,7 +2131,7 @@ function QuickRepliesTab({ agent }) {
   const saveEdit = async () => {
     if (!editName.trim()) return
     const { error } = await supabase.from('quick_replies').update({ name: editName.trim() }).eq('id', editingId)
-    if (error) { toast.error('الاسم ده مستخدم بالفعل أو حصل خطأ'); return }
+    if (error) { toast.error(t('settings.quickReplies.nameTakenOrError')); return }
     setEditingId(null)
     load()
   }
@@ -2117,32 +2141,32 @@ function QuickRepliesTab({ agent }) {
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg">الردود السريعة</h2>
+        <h2 className="font-semibold text-fg">{t('settings.tabs.quickReplies')}</h2>
         <button onClick={() => setShowAdd(!showAdd)}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
-          <Plus size={14} /> إضافة
+          <Plus size={14} /> {t('settings.common.add')}
         </button>
       </div>
 
       <div className="relative">
         <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-        <input value={search} onChange={e => setSearch(e.target.value)} placeholder="بحث في المكتبة..."
+        <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('settings.quickReplies.searchPlaceholder')}
           className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
       </div>
 
       {showAdd && (
         <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-          <InputField label="الاسم (يستخدم بعد / في المحادثة)" value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder="مثال: ترحيب" />
+          <InputField label={t('settings.quickReplies.nameFieldLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} placeholder={t('settings.quickReplies.namePlaceholder')} />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">النص (اختياري لو فيه ملف)</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.quickReplies.textLabel')}</label>
             <textarea value={form.text} onChange={e => setForm({ ...form, text: e.target.value })} rows={3}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
           </div>
           <div>
-            <label className="block text-xs text-fg-muted mb-1">ملف مرفق (اختياري: صورة / فيديو / صوت / PDF)</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.quickReplies.fileLabel')}</label>
             <label className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg-muted cursor-pointer hover:text-fg">
               <Paperclip size={14} />
-              {file ? file.name : 'اختر ملف...'}
+              {file ? file.name : t('settings.quickReplies.chooseFile')}
               <input type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
                 onChange={e => setFile(e.target.files[0] || null)} />
             </label>
@@ -2150,9 +2174,9 @@ function QuickRepliesTab({ agent }) {
           <div className="flex gap-2 pt-1">
             <button onClick={add} disabled={saving}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
-              {saving ? 'جاري الحفظ...' : 'حفظ'}
+              {saving ? t('settings.common.savingEllipsis') : t('settings.common.save')}
             </button>
-            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">إلغاء</button>
+            <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
           </div>
         </div>
       )}
@@ -2185,7 +2209,7 @@ function QuickRepliesTab({ agent }) {
         </div>
       ))}
       {filtered.length === 0 && (
-        <p className="text-center text-fg-subtle text-sm py-8">لا توجد ردود سريعة بعد</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('settings.quickReplies.empty')}</p>
       )}
     </div>
   )
@@ -2193,11 +2217,12 @@ function QuickRepliesTab({ agent }) {
 
 // ─── Round Robin Tab ──────────────────────────────────────
 const DISTRIBUTION_MODES = [
-  { key: 'least_busy', label: 'الأقل محادثات', desc: 'كل محادثة جديدة تروح للموظف اللي عنده أقل عدد محادثات مفتوحة حالياً.' },
-  { key: 'round_robin', label: 'بالتبادل (دوري)', desc: 'المحادثات بتتوزع بالدور على الموظفين المتاحين واحد واحد، وبعد ما يوصل لآخر واحد يرجع من الأول.' },
+  { key: 'least_busy', labelKey: 'settings.roundRobin.modes.leastBusy.label', descKey: 'settings.roundRobin.modes.leastBusy.desc' },
+  { key: 'round_robin', labelKey: 'settings.roundRobin.modes.roundRobin.label', descKey: 'settings.roundRobin.modes.roundRobin.desc' },
 ]
 
 function RoundRobinTab() {
+  const { t } = useTranslation()
   const [mode, setMode] = useState('least_busy')
   const [followupEnabled, setFollowupEnabled] = useState(false)
   const [followupMinutes, setFollowupMinutes] = useState(60)
@@ -2228,55 +2253,55 @@ function RoundRobinTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">إعدادات التوزيع التلقائي</h2>
+      <h2 className="font-semibold text-fg">{t('settings.roundRobin.title')}</h2>
 
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-        <label className="block text-xs text-fg-muted mb-1">طريقة التوزيع</label>
+        <label className="block text-xs text-fg-muted mb-1">{t('settings.roundRobin.modeLabel')}</label>
         {DISTRIBUTION_MODES.map(m => (
           <button key={m.key} onClick={() => setMode(m.key)}
             className={`w-full text-right p-3 rounded-xl border transition-colors ${mode === m.key ? 'border-brand bg-brand/10' : 'border-surface-3 bg-surface-3'}`}>
             <div className="flex items-center gap-2">
               <span className={`w-3.5 h-3.5 rounded-full border-2 flex-shrink-0 ${mode === m.key ? 'border-brand bg-brand' : 'border-fg-subtle'}`} />
-              <span className="text-sm text-fg font-medium">{m.label}</span>
+              <span className="text-sm text-fg font-medium">{t(m.labelKey)}</span>
             </div>
-            <p className="text-xs text-fg-subtle mt-1 mr-5.5">{m.desc}</p>
+            <p className="text-xs text-fg-subtle mt-1 mr-5.5">{t(m.descKey)}</p>
           </button>
         ))}
 
         <div className="bg-surface-3 rounded-xl p-3 space-y-1.5 text-xs text-fg-muted">
-          <p className="font-medium text-fg-muted mb-2">آلية التوزيع الكاملة:</p>
-          <p>١. عند وصول محادثة جديدة، يتم تحديد الموظفين المتصلين (Online) اللي حالتهم مش "مشغول".</p>
-          <p>٢. استبعاد اللي وصلوا للحد الأقصى (لو عندهم حد محدد).</p>
-          <p>٣. التعيين حسب الطريقة المختارة فوق.</p>
-          <p>٤. لو كل الموظفين ممتلئين، المحادثة تفضل غير معينة مؤقتاً.</p>
-          <p>٥. أول ما موظف يتاح (يفتح شات أو يرجع Online)، المحادثات المستنية بتتوزع عليه تلقائياً.</p>
+          <p className="font-medium text-fg-muted mb-2">{t('settings.roundRobin.mechanismHeading')}</p>
+          <p>{t('settings.roundRobin.step1')}</p>
+          <p>{t('settings.roundRobin.step2')}</p>
+          <p>{t('settings.roundRobin.step3')}</p>
+          <p>{t('settings.roundRobin.step4')}</p>
+          <p>{t('settings.roundRobin.step5')}</p>
         </div>
 
         <button onClick={save} disabled={saving}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
-          {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
+          {saved ? t('settings.common.savedCheck') : t('settings.common.saveSettings')}
         </button>
       </div>
 
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
         <Toggle
-          label="أقصى مدة انتظار رد بعد المتابعة"
-          sublabel="لما محادثة 'متابعة' يرجع يبعت فيها العميل، تفضل مع نفس الموظف زي العادة. لو مفعّل، وموظف معدّش رد خلال المدة دي، المحادثة تتحول لموظف تاني أونلاين — أو تتشال منه لحد ما حد يدخل لو محدش أونلاين"
+          label={t('settings.roundRobin.followupToggleLabel')}
+          sublabel={t('settings.roundRobin.followupToggleSublabel')}
           value={followupEnabled}
           onChange={setFollowupEnabled}
         />
         {followupEnabled && (
           <div>
-            <label className="block text-xs text-fg-muted mb-1">المدة بالدقايق</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('settings.roundRobin.minutesLabel')}</label>
             <input type="number" min={1} value={followupMinutes}
               onChange={e => setFollowupMinutes(parseInt(e.target.value) || 1)}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-            <p className="text-[11px] text-fg-subtle mt-1">مثلاً 60 = ساعة. الإعداد ده بيأثر بس على محادثات المتابعة اللي رجعت تتفتح، مش المحادثات المفتوحة العادية.</p>
+            <p className="text-[11px] text-fg-subtle mt-1">{t('settings.roundRobin.minutesHint')}</p>
           </div>
         )}
         <button onClick={save} disabled={saving}
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
-          {saved ? '✓ تم الحفظ' : 'حفظ الإعدادات'}
+          {saved ? t('settings.common.savedCheck') : t('settings.common.saveSettings')}
         </button>
       </div>
     </div>
@@ -2285,12 +2310,13 @@ function RoundRobinTab() {
 
 // ─── AI Agent Tab ─────────────────────────────────────────
 const AI_MODELS = [
-  { value: 'claude-haiku-4-5', label: 'Claude Haiku 4.5 — سريع ورخيص (موصى به)' },
-  { value: 'claude-sonnet-4-5', label: 'Claude Sonnet 4.5 — أقوى وأغلى' },
-  { value: 'gpt-4o-mini', label: 'GPT-4o mini' },
+  { value: 'claude-haiku-4-5', labelKey: 'settings.ai.models.claudeHaiku' },
+  { value: 'claude-sonnet-4-5', labelKey: 'settings.ai.models.claudeSonnet' },
+  { value: 'gpt-4o-mini', labelKey: 'settings.ai.models.gptMini' },
 ]
 
 function AiAgentTab() {
+  const { t } = useTranslation()
   const toast = useToast()
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -2369,9 +2395,9 @@ function AiAgentTab() {
       const { id, updated_at, ...updates } = settings
       const { error } = await supabase.from('ai_settings').update({ ...updates, updated_at: new Date().toISOString() }).eq('id', id)
       if (error) throw error
-      toast.success('اتحفظت الإعدادات')
+      toast.success(t('settings.ai.settingsSaved'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSaving(false)
     }
@@ -2383,9 +2409,9 @@ function AiAgentTab() {
   // مصادر النوع "رابط" بتتحمّل وتتحوّل لنص مرة واحدة هنا وقت الإضافة (على السيرفر)، وبعد كده
   // النص المخزّن ده هو اللي بيتحط في تعليمات الـ AI — مش بيعيد قراءة الصفحة في كل رسالة
   const addSource = async () => {
-    if (!sourceForm.title.trim()) { toast.error('لازم عنوان للمصدر'); return }
-    if (sourceForm.type === 'text' && !sourceForm.content.trim()) { toast.error('لازم تكتب المحتوى'); return }
-    if (sourceForm.type === 'link' && !sourceForm.url.trim()) { toast.error('لازم تحط الرابط'); return }
+    if (!sourceForm.title.trim()) { toast.error(t('settings.ai.sourceTitleRequired')); return }
+    if (sourceForm.type === 'text' && !sourceForm.content.trim()) { toast.error(t('settings.ai.contentRequired')); return }
+    if (sourceForm.type === 'link' && !sourceForm.url.trim()) { toast.error(t('settings.ai.urlRequired')); return }
     setSavingSource(true)
     try {
       const res = await fetch(`${API_URL}/ai/knowledge-sources`, {
@@ -2394,13 +2420,13 @@ function AiAgentTab() {
         body: JSON.stringify(sourceForm)
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إضافة المصدر')
+      if (!res.ok) throw new Error(data.error || t('settings.ai.addSourceFailed'))
       setSourceForm({ type: 'text', title: '', content: '', url: '' })
       setShowAddSource(false)
-      toast.success(sourceForm.type === 'link' ? 'اتحمّلت الصفحة واتحفظ محتواها' : 'اتضاف المصدر')
+      toast.success(sourceForm.type === 'link' ? t('settings.ai.pageLoadedAndSaved') : t('settings.ai.sourceAdded'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSavingSource(false)
     }
@@ -2411,18 +2437,18 @@ function AiAgentTab() {
     try {
       const res = await fetch(`${API_URL}/ai/knowledge-sources/${id}/refresh`, { method: 'POST' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل تحديث المصدر')
-      toast.success('اتحدّث محتوى الصفحة')
+      if (!res.ok) throw new Error(data.error || t('settings.ai.refreshSourceFailed'))
+      toast.success(t('settings.ai.pageRefreshed'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setRefreshingId(null)
     }
   }
 
   const removeSource = async (id) => {
-    if (!confirm('حذف المصدر ده؟')) return
+    if (!confirm(t('settings.ai.deleteSourceConfirm'))) return
     await supabase.from('ai_knowledge_sources').delete().eq('id', id)
     load()
   }
@@ -2436,49 +2462,49 @@ function AiAgentTab() {
   return (
     <div className="p-4 space-y-4">
       <div className="flex items-center justify-between">
-        <h2 className="font-semibold text-fg flex items-center gap-2"><Bot size={18} /> AI Agent</h2>
+        <h2 className="font-semibold text-fg flex items-center gap-2"><Bot size={18} /> {t('settings.tabs.ai')}</h2>
         <button onClick={save} disabled={saving}
           className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium disabled:opacity-60">
-          <Save size={14} /> {saving ? 'جاري الحفظ...' : 'حفظ'}
+          <Save size={14} /> {saving ? t('settings.common.savingEllipsis') : t('settings.common.save')}
         </button>
       </div>
 
       {/* تفعيل + الموديل */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
         <Toggle
-          label="تفعيل AI Agent"
-          sublabel="لو مفعّل، هيقدر يرد على العملاء تلقائي حسب الصلاحيات تحت"
+          label={t('settings.ai.enableToggleLabel')}
+          sublabel={t('settings.ai.enableToggleSublabel')}
           value={settings.enabled}
           onChange={v => setSettings({ ...settings, enabled: v })}
         />
         <div>
-          <label className="block text-xs text-fg-muted mb-1">الموديل</label>
+          <label className="block text-xs text-fg-muted mb-1">{t('settings.ai.modelLabel')}</label>
           <select value={settings.model} onChange={e => setSettings({ ...settings, model: e.target.value })}
             className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-            {AI_MODELS.map(m => <option key={m.value} value={m.value}>{m.label}</option>)}
+            {AI_MODELS.map(m => <option key={m.value} value={m.value}>{t(m.labelKey)}</option>)}
           </select>
         </div>
         <div>
-          <label className="block text-xs text-fg-muted mb-1">نطاق القنوات</label>
+          <label className="block text-xs text-fg-muted mb-1">{t('settings.ai.channelScopeLabel')}</label>
           <div className="flex gap-2">
             <button
               onClick={() => setSettings({ ...settings, channel_scope: 'all' })}
               className={`flex-1 rounded-xl px-3 py-2.5 text-sm border transition-colors ${(settings.channel_scope || 'all') === 'all' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
-              كل القنوات
+              {t('settings.ai.allChannels')}
             </button>
             <button
               onClick={() => setSettings({ ...settings, channel_scope: 'specific' })}
               className={`flex-1 rounded-xl px-3 py-2.5 text-sm border transition-colors ${settings.channel_scope === 'specific' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
-              قنوات محددة
+              {t('settings.ai.specificChannels')}
             </button>
           </div>
           {settings.channel_scope === 'specific' && (
             <div className="mt-2 space-y-1.5">
               {channels.length === 0 ? (
-                <p className="text-[11px] text-fg-subtle">مفيش قنوات متصلة</p>
+                <p className="text-[11px] text-fg-subtle">{t('settings.ai.noChannelsConnected')}</p>
               ) : channels.map(c => {
                 const checked = (settings.allowed_channel_ids || []).includes(c.id)
-                const label = `${PLATFORM_META[c.platform]?.label || c.platform} — ${c.custom_name || c.display_name || c.id}`
+                const label = `${PLATFORM_META[c.platform]?.labelKey ? t(PLATFORM_META[c.platform].labelKey) : c.platform} — ${c.custom_name || c.display_name || c.id}`
                 return (
                   <label key={c.id} className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-3 py-2 cursor-pointer">
                     <input type="checkbox" checked={checked} onChange={e => {
@@ -2491,7 +2517,7 @@ function AiAgentTab() {
                   </label>
                 )
               })}
-              <p className="text-[11px] text-fg-subtle">الـ AI هيرد بس على القنوات المحددة هنا — أي قناة تانية هتتعامل زي ما لو كان متوقف تمامًا.</p>
+              <p className="text-[11px] text-fg-subtle">{t('settings.ai.specificChannelsHint')}</p>
             </div>
           )}
         </div>
@@ -2500,8 +2526,8 @@ function AiAgentTab() {
       {/* وضع الاختبار */}
       <div className="bg-follow/5 rounded-2xl p-4 space-y-3 border border-follow/30">
         <Toggle
-          label="وضع الاختبار"
-          sublabel="لو مفعّل، الـ AI يرد بس على عملاء الاختبار المحددين تحت (تقدري تضيفي أكتر من واحد) — باقي العملاء يتعاملوا وكأن الـ AI متوقف تمامًا"
+          label={t('settings.ai.testModeLabel')}
+          sublabel={t('settings.ai.testModeSublabel')}
           value={settings.test_mode}
           onChange={v => setSettings({ ...settings, test_mode: v })}
         />
@@ -2510,7 +2536,7 @@ function AiAgentTab() {
             {testContacts.map(tc => (
               <div key={tc.id} className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5">
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm text-fg truncate">{tc.name || 'بدون اسم'}</p>
+                  <p className="text-sm text-fg truncate">{tc.name || t('settings.common.noName')}</p>
                   <p className="text-[11px] text-fg-subtle truncate">{tc.phone || tc.platform}</p>
                 </div>
                 <button onClick={() => removeTestContact(tc.id)} className="text-fg-muted hover:text-danger flex-shrink-0"><X size={16} /></button>
@@ -2518,18 +2544,18 @@ function AiAgentTab() {
             ))}
             <div className="relative">
               <input value={testContactQuery} onChange={e => searchTestContacts(e.target.value)}
-                placeholder="ابحث عن عميل بالاسم أو رقم الهاتف عشان تضيفه للاختبار..."
+                placeholder={t('settings.ai.testContactSearchPlaceholder')}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               {testContactQuery && (
                 <div className="absolute right-0 left-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 max-h-56 overflow-y-auto">
                   {searchingContact ? (
-                    <p className="text-xs text-fg-subtle text-center py-3">بيدور...</p>
+                    <p className="text-xs text-fg-subtle text-center py-3">{t('settings.ai.searching')}</p>
                   ) : testContactResults.length === 0 ? (
-                    <p className="text-xs text-fg-subtle text-center py-3">مفيش نتايج</p>
+                    <p className="text-xs text-fg-subtle text-center py-3">{t('settings.common.noResults')}</p>
                   ) : testContactResults.map(c => (
                     <button key={c.id} onClick={() => pickTestContact(c)}
                       className="flex flex-col w-full px-3 py-2.5 hover:bg-surface-3 text-right border-t border-surface-3 first:border-t-0">
-                      <span className="text-sm text-fg">{c.name || 'بدون اسم'}</span>
+                      <span className="text-sm text-fg">{c.name || t('settings.common.noName')}</span>
                       <span className="text-[11px] text-fg-subtle">{c.phone || c.platform}</span>
                     </button>
                   ))}
@@ -2537,7 +2563,7 @@ function AiAgentTab() {
               )}
             </div>
             <p className="text-[11px] text-fg-subtle leading-relaxed">
-              لو عميل من دول معاه محادثة مفتوحة بالفعل، افتحها ودوس زرار "AI" في أعلى الشات عشان تبدأ الاختبار عليها فورًا — أي عميل جديد منهم يبعت هيتفعل الاختبار تلقائي.
+              {t('settings.ai.testContactsHint')}
             </p>
           </div>
         )}
@@ -2545,23 +2571,23 @@ function AiAgentTab() {
 
       {/* التعليمات */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-2 border border-surface-3">
-        <label className="block text-xs text-fg-muted">التعليمات (System Prompt)</label>
+        <label className="block text-xs text-fg-muted">{t('settings.ai.systemPromptLabel')}</label>
         <textarea
           value={settings.system_prompt || ''}
           onChange={e => setSettings({ ...settings, system_prompt: e.target.value })}
           rows={8}
-          placeholder="اكتب هنا إزاي عايز الـ AI يتصرف، معلومات عن العيادة، الأسعار، السياسات، وأهم حاجة: يمنع تماماً إعطاء أي استشارة أو تشخيص طبي ويحوّل أي سؤال طبي لموظف بشري فوراً."
+          placeholder={t('settings.ai.systemPromptPlaceholder')}
           className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-y leading-relaxed"
         />
       </div>
 
       {/* الصلاحيات */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
-        <h3 className="text-sm font-semibold text-fg">الصلاحيات المسموحة للـ AI</h3>
-        <Toggle label="تعيين المحادثات لموظف (assign)" value={settings.can_assign} onChange={v => setSettings({ ...settings, can_assign: v })} />
-        <Toggle label="تعديل مرحلة الـ Lifecycle" value={settings.can_update_lifecycle} onChange={v => setSettings({ ...settings, can_update_lifecycle: v })} />
-        <Toggle label="تعديل بيانات العميل (اسم، رقم تليفون، إلخ)" value={settings.can_update_contact} onChange={v => setSettings({ ...settings, can_update_contact: v })} />
-        <Toggle label="إضافة/تعديل تاجات العميل" value={settings.can_update_tags} onChange={v => setSettings({ ...settings, can_update_tags: v })} />
+        <h3 className="text-sm font-semibold text-fg">{t('settings.ai.permissionsHeading')}</h3>
+        <Toggle label={t('settings.ai.permAssign')} value={settings.can_assign} onChange={v => setSettings({ ...settings, can_assign: v })} />
+        <Toggle label={t('settings.ai.permLifecycle')} value={settings.can_update_lifecycle} onChange={v => setSettings({ ...settings, can_update_lifecycle: v })} />
+        <Toggle label={t('settings.ai.permContact')} value={settings.can_update_contact} onChange={v => setSettings({ ...settings, can_update_contact: v })} />
+        <Toggle label={t('settings.ai.permTags')} value={settings.can_update_tags} onChange={v => setSettings({ ...settings, can_update_tags: v })} />
       </div>
 
       {/* سقف الاستهلاك الشهري */}
@@ -2570,16 +2596,16 @@ function AiAgentTab() {
           value={settings.monthly_token_budget}
           onChange={v => setSettings({ ...settings, monthly_token_budget: v })}
         />
-        <p className="text-[11px] text-fg-subtle -mt-2">لو حطيت سقف، الـ AI هيتوقف تلقائي لو الاستهلاك الشهري وصله (هتوصلك رسالة تنبيه).</p>
+        <p className="text-[11px] text-fg-subtle -mt-2">{t('settings.ai.budgetHint')}</p>
       </div>
 
       {/* سقف لكل محادثة */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
         <div className="flex items-center justify-between">
-          <label className="block text-xs text-fg-muted">سقف لكل محادثة لوحدها</label>
+          <label className="block text-xs text-fg-muted">{t('settings.ai.perConversationCapLabel')}</label>
           <button type="button" onClick={() => setSettings({ ...settings, conversation_limit_value: settings.conversation_limit_value == null ? 20000 : null })}
             className={`text-[11px] px-2 py-0.5 rounded-full font-medium ${settings.conversation_limit_value == null ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-            {settings.conversation_limit_value == null ? 'غير محدود' : 'محدود'}
+            {settings.conversation_limit_value == null ? t('settings.common.unlimited') : t('settings.common.limited')}
           </button>
         </div>
         {settings.conversation_limit_value != null && (
@@ -2587,11 +2613,11 @@ function AiAgentTab() {
             <div className="flex gap-2">
               <button onClick={() => setSettings({ ...settings, conversation_limit_type: 'tokens' })}
                 className={`flex-1 rounded-xl px-3 py-2 text-sm border transition-colors ${(settings.conversation_limit_type || 'tokens') === 'tokens' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
-                توكنز
+                {t('settings.ai.tokenUnit')}
               </button>
               <button onClick={() => setSettings({ ...settings, conversation_limit_type: 'cost' })}
                 className={`flex-1 rounded-xl px-3 py-2 text-sm border transition-colors ${settings.conversation_limit_type === 'cost' ? 'bg-brand/15 border-brand text-brand' : 'bg-surface-3 border-transparent text-fg-muted'}`}>
-                دولار ($)
+                {t('settings.ai.unitDollar')}
               </button>
             </div>
             <input type="number" step={settings.conversation_limit_type === 'cost' ? '0.01' : '1'} value={settings.conversation_limit_value ?? ''}
@@ -2599,40 +2625,40 @@ function AiAgentTab() {
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
           </>
         )}
-        <p className="text-[11px] text-fg-subtle">بمجرد ما محادثة واحدة توصل للسقف ده، الـ AI بيوقف عليها ويحوّلها لموظف بشري تلقائي — بغض النظر عن باقي المحادثات.</p>
+        <p className="text-[11px] text-fg-subtle">{t('settings.ai.perConversationCapHint')}</p>
       </div>
 
       {/* استهلاك الشهر الحالي */}
       <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-        <h3 className="text-sm font-semibold text-fg mb-2">استهلاك الشهر الحالي</h3>
+        <h3 className="text-sm font-semibold text-fg mb-2">{t('settings.ai.usageHeading')}</h3>
         {usage.tokens === 0 ? (
-          <p className="text-xs text-fg-subtle">لسه مفيش استهلاك مسجل — محرك الـ AI لسه في مرحلة الإعداد</p>
+          <p className="text-xs text-fg-subtle">{t('settings.ai.noUsageYet')}</p>
         ) : (
           <>
             <div className="flex gap-4">
               <div>
                 <p className="text-lg font-bold text-fg">{usage.tokens.toLocaleString()}</p>
-                <p className="text-[11px] text-fg-subtle">توكن</p>
+                <p className="text-[11px] text-fg-subtle">{t('settings.ai.tokenUnit')}</p>
               </div>
               <div>
                 <p className="text-lg font-bold text-fg">${usage.cost.toFixed(2)}</p>
-                <p className="text-[11px] text-fg-subtle">تكلفة تقريبية</p>
+                <p className="text-[11px] text-fg-subtle">{t('settings.ai.approxCost')}</p>
               </div>
               {settings.monthly_token_budget ? (
                 <div>
                   <p className="text-lg font-bold text-fg">{Math.max(0, settings.monthly_token_budget - usage.tokens).toLocaleString()}</p>
-                  <p className="text-[11px] text-fg-subtle">متبقي من السقف الشهري</p>
+                  <p className="text-[11px] text-fg-subtle">{t('settings.ai.remainingBudget')}</p>
                 </div>
               ) : null}
             </div>
             <div className="mt-3 pt-3 border-t border-surface-3 flex gap-6">
               <div>
-                <p className="text-[11px] text-fg-subtle mb-0.5">AI Agent (ردود العملاء)</p>
-                <p className="text-sm font-semibold text-fg">{usage.agent.tokens.toLocaleString()} توكن — ${usage.agent.cost.toFixed(2)}</p>
+                <p className="text-[11px] text-fg-subtle mb-0.5">{t('settings.ai.usageAgentLabel')}</p>
+                <p className="text-sm font-semibold text-fg">{usage.agent.tokens.toLocaleString()} {t('settings.ai.tokenUnit')} — ${usage.agent.cost.toFixed(2)}</p>
               </div>
               <div>
-                <p className="text-[11px] text-fg-subtle mb-0.5">تقارير AI</p>
-                <p className="text-sm font-semibold text-fg">{usage.reports.tokens.toLocaleString()} توكن — ${usage.reports.cost.toFixed(2)}</p>
+                <p className="text-[11px] text-fg-subtle mb-0.5">{t('settings.ai.usageReportsLabel')}</p>
+                <p className="text-sm font-semibold text-fg">{usage.reports.tokens.toLocaleString()} {t('settings.ai.tokenUnit')} — ${usage.reports.cost.toFixed(2)}</p>
               </div>
             </div>
           </>
@@ -2642,42 +2668,42 @@ function AiAgentTab() {
       {/* Knowledge Base */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
         <div className="flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-fg flex items-center gap-2"><BookOpen size={15} /> مصادر المعرفة</h3>
+          <h3 className="text-sm font-semibold text-fg flex items-center gap-2"><BookOpen size={15} /> {t('settings.ai.knowledgeSourcesHeading')}</h3>
           <button onClick={() => setShowAddSource(!showAddSource)}
             className="flex items-center gap-1.5 px-2.5 py-1.5 bg-brand rounded-lg text-[11px] text-white font-medium">
-            <Plus size={12} /> إضافة
+            <Plus size={12} /> {t('settings.common.add')}
           </button>
         </div>
-        <p className="text-[11px] text-fg-subtle -mt-2">نصوص أو روابط (زي landing page) هيتعلم منها الـ AI معلومات عن العيادة</p>
+        <p className="text-[11px] text-fg-subtle -mt-2">{t('settings.ai.knowledgeSourcesHint')}</p>
 
         {showAddSource && (
           <div className="bg-surface-3 rounded-xl p-3 space-y-2.5">
             <div className="flex gap-2">
               <button onClick={() => setSourceForm({ ...sourceForm, type: 'text' })}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium ${sourceForm.type === 'text' ? 'bg-brand text-white' : 'bg-surface text-fg-muted'}`}>
-                <FileText size={13} /> نص
+                <FileText size={13} /> {t('settings.ai.sourceType.text')}
               </button>
               <button onClick={() => setSourceForm({ ...sourceForm, type: 'link' })}
                 className={`flex-1 flex items-center justify-center gap-1.5 py-2 rounded-lg text-xs font-medium ${sourceForm.type === 'link' ? 'bg-brand text-white' : 'bg-surface text-fg-muted'}`}>
-                <Link2 size={13} /> رابط
+                <Link2 size={13} /> {t('settings.ai.sourceType.link')}
               </button>
             </div>
-            <InputField label="العنوان" value={sourceForm.title} onChange={v => setSourceForm({ ...sourceForm, title: v })} placeholder="مثلاً: خدمات العيادة" />
+            <InputField label={t('settings.ai.sourceTitleLabel')} value={sourceForm.title} onChange={v => setSourceForm({ ...sourceForm, title: v })} placeholder={t('settings.ai.sourceTitlePlaceholder')} />
             {sourceForm.type === 'text' ? (
               <div>
-                <label className="block text-xs text-fg-muted mb-1">المحتوى</label>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.ai.contentLabel')}</label>
                 <textarea value={sourceForm.content} onChange={e => setSourceForm({ ...sourceForm, content: e.target.value })}
                   rows={5} className="w-full bg-surface rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-y" />
               </div>
             ) : (
-              <InputField label="الرابط" value={sourceForm.url} onChange={v => setSourceForm({ ...sourceForm, url: v })} placeholder="https://..." />
+              <InputField label={t('settings.ai.urlLabel')} value={sourceForm.url} onChange={v => setSourceForm({ ...sourceForm, url: v })} placeholder="https://..." />
             )}
             <div className="flex gap-2">
               <button onClick={addSource} disabled={savingSource}
                 className="flex-1 py-2 bg-brand rounded-lg text-xs text-white font-medium disabled:opacity-60">
-                {savingSource ? (sourceForm.type === 'link' ? 'بيحمّل الصفحة...' : 'جاري الإضافة...') : 'إضافة'}
+                {savingSource ? (sourceForm.type === 'link' ? t('settings.ai.loadingPage') : t('settings.common.addingEllipsis')) : t('settings.common.add')}
               </button>
-              <button onClick={() => setShowAddSource(false)} disabled={savingSource} className="px-3 py-2 bg-surface rounded-lg text-xs text-fg-muted">إلغاء</button>
+              <button onClick={() => setShowAddSource(false)} disabled={savingSource} className="px-3 py-2 bg-surface rounded-lg text-xs text-fg-muted">{t('settings.common.cancel')}</button>
             </div>
           </div>
         )}
@@ -2691,7 +2717,7 @@ function AiAgentTab() {
             </div>
             {s.type === 'link' && (
               <button onClick={() => refreshSource(s.id)} disabled={refreshingId === s.id}
-                title="أعد تحميل محتوى الصفحة" className="text-fg-muted hover:text-brand flex-shrink-0 disabled:opacity-50">
+                title={t('settings.ai.refreshPageTitle')} className="text-fg-muted hover:text-brand flex-shrink-0 disabled:opacity-50">
                 <RefreshCw size={13} className={refreshingId === s.id ? 'animate-spin' : ''} />
               </button>
             )}
@@ -2699,7 +2725,7 @@ function AiAgentTab() {
           </div>
         ))}
         {sources.length === 0 && !showAddSource && (
-          <p className="text-center text-fg-subtle text-xs py-3">مفيش مصادر معرفة لسه</p>
+          <p className="text-center text-fg-subtle text-xs py-3">{t('settings.ai.noSourcesYet')}</p>
         )}
       </div>
     </div>
@@ -2707,9 +2733,9 @@ function AiAgentTab() {
 }
 
 // ─── Danger Zone ────────────────────────────────────────────
-const WIPE_CONFIRM_PHRASE = 'امسح كل شيء'
-
 function DangerZoneTab() {
+  const { t } = useTranslation()
+  const WIPE_CONFIRM_PHRASE = t('settings.danger.wipeConfirmPhrase')
   const toast = useToast()
   const [confirmText, setConfirmText] = useState('')
   const [wiping, setWiping] = useState(false)
@@ -2730,9 +2756,9 @@ function DangerZoneTab() {
       await supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000')
       setDone(true)
       setConfirmText('')
-      toast.success('اتمسحت كل بيانات المحادثات والعملاء')
+      toast.success(t('settings.danger.wiped'))
     } catch (err) {
-      toast.error('حصل خطأ أثناء المسح: ' + err.message)
+      toast.error(t('settings.danger.wipeErrorPrefix', { message: err.message }))
     } finally {
       setWiping(false)
     }
@@ -2740,24 +2766,22 @@ function DangerZoneTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">منطقة خطرة</h2>
+      <h2 className="font-semibold text-fg">{t('settings.tabs.danger')}</h2>
 
       <div className="bg-danger/10 border border-danger/30 rounded-2xl p-4 space-y-3">
         <div className="flex items-start gap-2">
           <AlertTriangle size={18} className="text-danger flex-shrink-0 mt-0.5" />
           <div>
-            <p className="text-sm font-semibold text-danger">مسح كل بيانات المحادثات والعملاء</p>
+            <p className="text-sm font-semibold text-danger">{t('settings.danger.wipeTitle')}</p>
             <p className="text-xs text-fg-muted mt-1 leading-relaxed">
-              الإجراء ده هيمسح نهائياً كل المحادثات والرسايل والعملاء والتاجات المرتبطة بيهم — من غير رجوع.
-              الموظفين وإعدادات النظام (التوزيع، الـ Lifecycle، الحقول، الردود السريعة) مش هتتأثر.
-              استخدمه بس لو عايز تبدأ تتبّع المحادثات من الصفر.
+              {t('settings.danger.wipeDescription')}
             </p>
           </div>
         </div>
 
         <div>
           <label className="block text-xs text-fg-muted mb-1">
-            اكتب "<b>{WIPE_CONFIRM_PHRASE}</b>" عشان تفعّل الزرار
+            {t('settings.danger.typeToEnablePrefix')} "<b>{WIPE_CONFIRM_PHRASE}</b>" {t('settings.danger.typeToEnableSuffix')}
           </label>
           <input value={confirmText} onChange={e => { setConfirmText(e.target.value); setDone(false) }}
             placeholder={WIPE_CONFIRM_PHRASE}
@@ -2768,8 +2792,8 @@ function DangerZoneTab() {
           className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
           {wiping ? (
             <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : done ? '✓ اتمسحت البيانات' : (
-            <><Trash2 size={15} /> امسح كل بيانات المحادثات والعملاء نهائياً</>
+          ) : done ? t('settings.danger.wipedButton') : (
+            <><Trash2 size={15} /> {t('settings.danger.wipeButton')}</>
           )}
         </button>
       </div>
