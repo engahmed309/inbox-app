@@ -1,5 +1,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
+import i18n from '../i18n'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -11,15 +13,15 @@ import {
 } from 'recharts'
 
 const SECTIONS = [
-  { key: 'ai', label: 'تقارير AI', icon: Sparkles },
-  { key: 'overview', label: 'نظرة عامة', icon: BarChart3 },
-  { key: 'customers', label: 'العملاء', icon: Users2 },
-  { key: 'countries', label: 'الدول', icon: Globe },
-  { key: 'attendance', label: 'حضور الموظفين', icon: Users2 },
-  { key: 'performance', label: 'أداء الموظفين', icon: Zap },
-  { key: 'volume', label: 'رسايل القنوات', icon: Radio },
-  { key: 'tags', label: 'التاجات', icon: Tag },
-  { key: 'export', label: 'تصدير البيانات', icon: Download },
+  { key: 'ai', labelKey: 'reports.sections.ai', icon: Sparkles },
+  { key: 'overview', labelKey: 'reports.sections.overview', icon: BarChart3 },
+  { key: 'customers', labelKey: 'reports.sections.customers', icon: Users2 },
+  { key: 'countries', labelKey: 'reports.sections.countries', icon: Globe },
+  { key: 'attendance', labelKey: 'reports.sections.attendance', icon: Users2 },
+  { key: 'performance', labelKey: 'reports.sections.performance', icon: Zap },
+  { key: 'volume', labelKey: 'reports.sections.volume', icon: Radio },
+  { key: 'tags', labelKey: 'reports.sections.tags', icon: Tag },
+  { key: 'export', labelKey: 'reports.sections.export', icon: Download },
 ]
 
 // بتجيب كل صفوف كويري معينة من غير ما تقف عند حد الـ 1000 صف الافتراضي بتاع سوبابيز — بتلف
@@ -40,13 +42,14 @@ async function fetchAllRows(buildQuery) {
 }
 
 export default function ReportsScreen() {
+  const { t } = useTranslation()
   const [section, setSection] = useState('overview')
   const { agent } = useAuth()
   const navigate = useNavigate()
 
   if (agent?.role !== 'admin') return (
     <div className="h-full flex items-center justify-center text-fg-muted">
-      <p>غير مصرح بالوصول</p>
+      <p>{t('reports.unauthorized')}</p>
     </div>
   )
 
@@ -57,7 +60,7 @@ export default function ReportsScreen() {
         <button onClick={() => navigate('/')} className="text-fg-muted hover:text-fg">
           <ArrowRight size={20} />
         </button>
-        <span className="font-bold text-fg">التقارير</span>
+        <span className="font-bold text-fg">{t('reports.title')}</span>
       </div>
 
       {/* Sections */}
@@ -66,7 +69,7 @@ export default function ReportsScreen() {
           <button key={s.key} onClick={() => setSection(s.key)}
             className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors ${section === s.key ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
             <s.icon size={14} />
-            {s.label}
+            {t(s.labelKey)}
           </button>
         ))}
       </div>
@@ -88,13 +91,14 @@ export default function ReportsScreen() {
 
 // ─── تقارير بالذكاء الاصطناعي — سؤال بالعربي، رد نصي مباشر من الأدوات المضبوطة نفس التقارير ────
 const SUGGESTED_QUESTIONS = [
-  'كام عميل جديد الأسبوع ده؟',
-  'مين أكتر موظف بعت رسايل الشهر ده؟',
-  'كام محادثة مفتوحة دلوقتي؟',
-  'عدد الرسايل الواردة لكل قناة النهاردة',
+  'reports.ai.suggestedQuestions.newCustomersThisWeek',
+  'reports.ai.suggestedQuestions.topAgentThisMonth',
+  'reports.ai.suggestedQuestions.openConversationsNow',
+  'reports.ai.suggestedQuestions.inboundMessagesTodayByChannel',
 ]
 
 function AiReportsTab() {
+  const { t } = useTranslation()
   const [question, setQuestion] = useState('')
   const [history, setHistory] = useState([]) // [{ question, answer, loading, error }]
   const [asking, setAsking] = useState(false)
@@ -116,7 +120,7 @@ function AiReportsTab() {
         body: JSON.stringify({ question: text, history: priorHistory })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الحصول على إجابة')
+      if (!res.ok) throw new Error(data.error || t('reports.ai.answerFailed'))
       setHistory(prev => prev.map((h, i) => i === idx ? { ...h, answer: data.answer, loading: false } : h))
     } catch (err) {
       setHistory(prev => prev.map((h, i) => i === idx ? { ...h, error: err.message, loading: false } : h))
@@ -127,15 +131,15 @@ function AiReportsTab() {
 
   return (
     <div className="p-4 space-y-4 flex flex-col h-full">
-      <h2 className="font-semibold text-fg flex items-center gap-2"><Sparkles size={18} className="text-brand" /> تقارير بالـ AI</h2>
-      <p className="text-xs text-fg-subtle -mt-2">اكتب سؤالك عن التقارير بالعربي العادي (تاريخ، موظف، قناة، دولة...) وهيرد عليك مباشرة.</p>
+      <h2 className="font-semibold text-fg flex items-center gap-2"><Sparkles size={18} className="text-brand" /> {t('reports.ai.heading')}</h2>
+      <p className="text-xs text-fg-subtle -mt-2">{t('reports.ai.subtitle')}</p>
 
       {history.length === 0 && (
         <div className="flex flex-wrap gap-2">
-          {SUGGESTED_QUESTIONS.map(q => (
-            <button key={q} onClick={() => ask(q)}
+          {SUGGESTED_QUESTIONS.map(qKey => (
+            <button key={qKey} onClick={() => ask(t(qKey))}
               className="px-3 py-1.5 bg-surface-3 hover:bg-surface-2 rounded-full text-xs text-fg-muted">
-              {q}
+              {t(qKey)}
             </button>
           ))}
         </div>
@@ -151,10 +155,10 @@ function AiReportsTab() {
               <div className="bg-surface-2 border border-surface-3 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-fg max-w-[85%]">
                 {h.loading ? (
                   <div className="flex items-center gap-2 text-fg-subtle">
-                    <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> بيدوّر في التقارير...
+                    <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> {t('reports.ai.thinking')}
                   </div>
                 ) : h.error ? (
-                  <span className="text-danger">خطأ: {h.error}</span>
+                  <span className="text-danger">{t('reports.common.errorPrefix', { error: h.error })}</span>
                 ) : (
                   <span className="whitespace-pre-wrap">{h.answer}</span>
                 )}
@@ -167,7 +171,7 @@ function AiReportsTab() {
       <div className="flex items-center gap-2 flex-shrink-0">
         <input value={question} onChange={e => setQuestion(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); ask() } }}
-          placeholder="اسأل عن أي حاجة في التقارير..."
+          placeholder={t('reports.ai.inputPlaceholder')}
           className="flex-1 bg-surface-2 border border-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
         <button onClick={() => ask()} disabled={asking || !question.trim()}
           className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-brand hover:bg-brand-dark text-white rounded-xl transition-colors disabled:opacity-40">
@@ -182,18 +186,18 @@ function AiReportsTab() {
 // ألوان الأقنية موحّدة مع باقي الشاشات (نفس الألوان اللي بتتلون بيها الأيقونات في المحادثات).
 // واتساب في الوضع الداكن بلون أغمق شوية عن الفاتح عشان يفضل واضح على خلفية غامقة (تباين كافي).
 const PLATFORMS = [
-  { key: 'facebook', label: 'فيسبوك', icon: Facebook, color: { light: '#3B82F6', dark: '#3B82F6' } },
-  { key: 'instagram', label: 'إنستجرام', icon: Instagram, color: { light: '#EC4899', dark: '#EC4899' } },
-  { key: 'whatsapp', label: 'واتساب', icon: Phone, color: { light: '#22C55E', dark: '#16A34A' } },
-  { key: 'tiktok', label: 'تيك توك', icon: Music2, color: { light: '#0F172A', dark: '#E2E8F0' } },
+  { key: 'facebook', labelKey: 'reports.platforms.facebook', icon: Facebook, color: { light: '#3B82F6', dark: '#3B82F6' } },
+  { key: 'instagram', labelKey: 'reports.platforms.instagram', icon: Instagram, color: { light: '#EC4899', dark: '#EC4899' } },
+  { key: 'whatsapp', labelKey: 'reports.platforms.whatsapp', icon: Phone, color: { light: '#22C55E', dark: '#16A34A' } },
+  { key: 'tiktok', labelKey: 'reports.platforms.tiktok', icon: Music2, color: { light: '#0F172A', dark: '#E2E8F0' } },
 ]
 
 const RANGE_OPTS = [
-  { key: 'today', label: 'اليوم' },
-  { key: 'week', label: 'آخر ٧ أيام' },
-  { key: 'month', label: 'الشهر' },
-  { key: 'all', label: 'الكل' },
-  { key: 'custom', label: 'فترة مخصصة' },
+  { key: 'today', labelKey: 'reports.filters.range.today' },
+  { key: 'week', labelKey: 'reports.filters.range.week' },
+  { key: 'month', labelKey: 'reports.filters.range.month' },
+  { key: 'all', labelKey: 'reports.filters.range.all' },
+  { key: 'custom', labelKey: 'reports.filters.range.custom' },
 ]
 
 // لوحة ألوان تصنيفية بنوزّعها على القنوات بالترتيب — لازمة عشان لو فيه أكتر من قناة لنفس المنصة
@@ -207,9 +211,10 @@ function getChannelLabel(ch) {
   if (ch.custom_name) return ch.custom_name
   if (ch.platform === 'whatsapp') {
     const last2 = String(ch.external_id || '').slice(-2)
-    return `${ch.display_name || 'واتساب'} #${last2}`
+    return `${ch.display_name || i18n.t('reports.platforms.whatsapp')} #${last2}`
   }
-  return ch.display_name || PLATFORMS.find(p => p.key === ch.platform)?.label || ch.platform
+  const platformDef = PLATFORMS.find(p => p.key === ch.platform)
+  return ch.display_name || (platformDef ? i18n.t(platformDef.labelKey) : ch.platform)
 }
 
 function dayKey(d) {
@@ -246,25 +251,26 @@ function computeDateBounds(range, customFrom, customTo) {
 
 // شريط اختيار الفترة (اليوم/أسبوع/شهر/الكل/فترة مخصصة) — قابل لإعادة الاستخدام في أي تقرير
 function DateRangeFilter({ range, setRange, customFrom, setCustomFrom, customTo, setCustomTo }) {
+  const { t } = useTranslation()
   return (
     <>
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {RANGE_OPTS.map(r => (
           <button key={r.key} onClick={() => setRange(r.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${range === r.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-white'}`}>
-            {r.label}
+            {t(r.labelKey)}
           </button>
         ))}
       </div>
       {range === 'custom' && (
         <div className="flex items-center gap-2 bg-surface-2 rounded-xl p-3 border border-surface-3">
           <div className="flex-1">
-            <label className="block text-xs text-fg-muted mb-1">من</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('reports.filters.from')}</label>
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
               className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <div className="flex-1">
-            <label className="block text-xs text-fg-muted mb-1">إلى</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('reports.filters.to')}</label>
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
               className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
@@ -315,6 +321,7 @@ async function getFilteredContactIds({ lifecycle, tag, channel, campaign }, camp
 // فلتر العملاء الإضافي — لايف سايكل، تاج، قناة، وحملة/إعلان ممول. بيتحط جنب فلتر المدة الزمنية
 // وينفع يتجمّع أكتر من فلتر مع بعض. قايمة الحملات جاية من حساب الإعلانات على ميتا نفسه
 function CustomerFiltersPanel({ filters, setFilters, campaigns }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [lifecycles, setLifecycles] = useState([])
   const [tags, setTags] = useState([])
@@ -334,56 +341,59 @@ function CustomerFiltersPanel({ filters, setFilters, campaigns }) {
       <button onClick={() => setOpen(o => !o)} className="w-full flex items-center justify-between px-4 py-3 text-sm text-fg">
         <span className="flex items-center gap-2">
           <Zap size={14} className="text-fg-muted" />
-          فلاتر إضافية {activeCount > 0 && <span className="text-[10px] bg-brand text-white px-1.5 py-0.5 rounded-full">{activeCount}</span>}
+          {t('reports.filters.additionalFilters')} {activeCount > 0 && <span className="text-[10px] bg-brand text-white px-1.5 py-0.5 rounded-full">{activeCount}</span>}
         </span>
         <ChevronDown size={16} className={`text-fg-muted transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
       {open && (
         <div className="px-4 pb-4 space-y-2.5">
           <div>
-            <label className="block text-[11px] text-fg-muted mb-1">مرحلة الـ Lifecycle</label>
+            <label className="block text-[11px] text-fg-muted mb-1">{t('reports.filters.lifecycleStage')}</label>
             <select value={filters.lifecycle} onChange={e => setFilters({ ...filters, lifecycle: e.target.value })}
               className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
-              <option value="">الكل</option>
+              <option value="">{t('reports.common.all')}</option>
               {lifecycles.map(l => <option key={l.id} value={l.id}>{l.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-fg-muted mb-1">التاج</label>
+            <label className="block text-[11px] text-fg-muted mb-1">{t('reports.filters.tag')}</label>
             <select value={filters.tag} onChange={e => setFilters({ ...filters, tag: e.target.value })}
               className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
-              <option value="">الكل</option>
-              {tags.map(t => <option key={t.id} value={t.id}>{t.name}</option>)}
+              <option value="">{t('reports.common.all')}</option>
+              {tags.map(tg => <option key={tg.id} value={tg.id}>{tg.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-fg-muted mb-1">القناة</label>
+            <label className="block text-[11px] text-fg-muted mb-1">{t('reports.filters.channel')}</label>
             <select value={filters.channel} onChange={e => setFilters({ ...filters, channel: e.target.value })}
               className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
-              <option value="">الكل</option>
-              {channels.map(c => (
-                <option key={c.id} value={c.id}>
-                  {(PLATFORMS.find(p => p.key === c.platform)?.label || c.platform) + ' — ' + (c.custom_name || c.display_name || c.id)}
-                </option>
-              ))}
+              <option value="">{t('reports.common.all')}</option>
+              {channels.map(c => {
+                const platformDef = PLATFORMS.find(p => p.key === c.platform)
+                return (
+                  <option key={c.id} value={c.id}>
+                    {t('reports.filters.channelOptionLabel', { platform: platformDef ? t(platformDef.labelKey) : c.platform, name: c.custom_name || c.display_name || c.id })}
+                  </option>
+                )
+              })}
             </select>
           </div>
           <div>
-            <label className="block text-[11px] text-fg-muted mb-1">الإعلانات الممولة / الحملات</label>
+            <label className="block text-[11px] text-fg-muted mb-1">{t('reports.filters.campaigns')}</label>
             <select value={filters.campaign} onChange={e => setFilters({ ...filters, campaign: e.target.value })}
               className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg focus:outline-none">
-              <option value="">الكل</option>
-              {campaigns.length === 0 && <option value="" disabled>مفيش حملات متاحة (اتأكدي إن حساب الإعلانات متظبط)</option>}
+              <option value="">{t('reports.common.all')}</option>
+              {campaigns.length === 0 && <option value="" disabled>{t('reports.filters.noCampaigns')}</option>}
               {campaigns.map(c => (
                 <optgroup key={c.id} label={c.name}>
-                  <option value={`campaign:${c.id}`}>كل إعلانات الحملة دي</option>
+                  <option value={`campaign:${c.id}`}>{t('reports.filters.wholeCampaign')}</option>
                   {c.ads.map(a => <option key={a.id} value={`ad:${a.id}`}>↳ {a.name}</option>)}
                 </optgroup>
               ))}
             </select>
           </div>
           {activeCount > 0 && (
-            <button onClick={clear} className="text-xs text-danger hover:underline">مسح كل الفلاتر</button>
+            <button onClick={clear} className="text-xs text-danger hover:underline">{t('reports.filters.clearAll')}</button>
           )}
         </div>
       )}
@@ -392,6 +402,7 @@ function CustomerFiltersPanel({ filters, setFilters, campaigns }) {
 }
 
 function CustomersTab() {
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [metric, setMetric] = useState('new') // 'new' | 'active'
@@ -494,7 +505,7 @@ function CustomersTab() {
       const last = mondayOf(endDate)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: `أسبوع ${formatShort(cur)}`, count: 0 }
+        const entry = { key, label: t('reports.customers.weekLabel', { date: formatShort(cur) }), count: 0 }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 7)
       }
@@ -514,29 +525,27 @@ function CustomersTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">العملاء</h2>
+      <h2 className="font-semibold text-fg">{t('reports.customers.title')}</h2>
 
       <div className="flex bg-surface-3 rounded-xl p-0.5">
         <button onClick={() => setMetric('new')}
           className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${metric === 'new' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-          عملاء جدد (أول مرة)
+          {t('reports.customers.metricNew')}
         </button>
         <button onClick={() => setMetric('active')}
           className={`flex-1 py-2 rounded-lg text-xs font-medium transition-colors ${metric === 'active' ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-          عملاء نشطين (شهريًا)
+          {t('reports.customers.metricActive')}
         </button>
       </div>
       <p className="text-xs text-fg-subtle -mt-2">
-        {metric === 'new'
-          ? 'كام عميل جديد اتكلم مع العيادة لأول مرة في كل يوم.'
-          : 'كام عميل كلّمك في كل يوم — بغض النظر لو قديم أو جديد أو كلّمك قبل كده امتى. العميل بيتعدّ مرة واحدة بس في الشهر (يوم أول رسالة منه في الشهر ده)، ولو استمر يكلّمك باقي الشهر مايتعدّش تاني؛ الشهر اللي بعده بيتعدّ من جديد.'}
+        {metric === 'new' ? t('reports.customers.descNew') : t('reports.customers.descActive')}
       </p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
       <CustomerFiltersPanel filters={filters} setFilters={setFilters} campaigns={campaigns} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -544,12 +553,12 @@ function CustomersTab() {
       ) : (
         <>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
-            <p className="text-xs text-fg-muted mb-1">{metric === 'new' ? 'إجمالي العملاء الجدد' : 'إجمالي العملاء النشطين (شهريًا)'}</p>
+            <p className="text-xs text-fg-muted mb-1">{metric === 'new' ? t('reports.customers.totalNew') : t('reports.customers.totalActive')}</p>
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
             {total === 0 ? (
-              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+              <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noData')}</p>
             ) : (
               <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer>
@@ -574,6 +583,7 @@ function CustomersTab() {
 // كام عميل جديد دخل من كل دولة، حسب حقل contacts.country — العملاء اللي الحقل ده فاضي عندهم
 // بيتحسبوا تحت عمود "بدون" بدل ما يختفوا من التقرير
 function CountriesTab() {
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [range, setRange] = useState('month')
@@ -599,7 +609,7 @@ function CountriesTab() {
     const entries = await fetchAllRows(buildQ)
     const map = {}
     entries.forEach(r => {
-      const key = r.country?.trim() || 'بدون'
+      const key = r.country?.trim() || t('reports.countries.none')
       map[key] = (map[key] || 0) + 1
     })
     setRows(Object.entries(map).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count))
@@ -610,13 +620,13 @@ function CountriesTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">العملاء حسب الدولة</h2>
-      <p className="text-xs text-fg-subtle -mt-2">كام عميل جديد دخل من كل دولة في الفترة المختارة. "بدون" يعني حقل الدولة فاضي عند العميل.</p>
+      <h2 className="font-semibold text-fg">{t('reports.countries.title')}</h2>
+      <p className="text-xs text-fg-subtle -mt-2">{t('reports.countries.description')}</p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -624,11 +634,11 @@ function CountriesTab() {
       ) : (
         <>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
-            <p className="text-xs text-fg-muted mb-1">إجمالي العملاء</p>
+            <p className="text-xs text-fg-muted mb-1">{t('reports.countries.total')}</p>
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
           {rows.length === 0 ? (
-            <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+            <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noData')}</p>
           ) : (
             <>
               <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
@@ -666,6 +676,7 @@ function CountriesTab() {
 }
 
 function OverviewTab() {
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [range, setRange] = useState('month')
@@ -759,7 +770,7 @@ function OverviewTab() {
       const last = mondayOf(endDate)
       while (cur <= last) {
         const key = dayKey(cur)
-        const entry = { key, label: `أسبوع ${formatShort(cur)}`, ...emptyChannelCounts() }
+        const entry = { key, label: t('reports.customers.weekLabel', { date: formatShort(cur) }), ...emptyChannelCounts() }
         buckets.push(entry); bucketMap[key] = entry
         cur.setDate(cur.getDate() + 7)
       }
@@ -773,7 +784,7 @@ function OverviewTab() {
 
       const stage = r.contacts?.lifecycle_stages
       const stageKey = r.contacts?.lifecycle_stage_id || 'none'
-      if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: stage?.name || 'بدون مرحلة', color: stage?.color || '#78716C', count: 0 }
+      if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: stage?.name || t('reports.overview.noStage'), color: stage?.color || '#78716C', count: 0 }
       lifecycleMap[stageKey].count++
     })
 
@@ -819,13 +830,13 @@ function OverviewTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">تقارير العملاء</h2>
+      <h2 className="font-semibold text-fg">{t('reports.overview.title')}</h2>
 
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         {RANGE_OPTS.map(r => (
           <button key={r.key} onClick={() => setRange(r.key)}
             className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${range === r.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-white'}`}>
-            {r.label}
+            {t(r.labelKey)}
           </button>
         ))}
       </div>
@@ -835,7 +846,7 @@ function OverviewTab() {
       <div className="flex gap-2 overflow-x-auto scrollbar-hide">
         <button onClick={() => setChannel('all')}
           className={`px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 border ${channel === 'all' ? 'bg-fg text-surface border-fg' : 'bg-transparent text-fg-muted border-surface-3 hover:text-fg'}`}>
-          كل القنوات
+          {t('reports.overview.allChannels')}
         </button>
         {channelsList.map(c => (
           <button key={c.id} onClick={() => setChannel(c.id)}
@@ -848,12 +859,12 @@ function OverviewTab() {
       {range === 'custom' && (
         <div className="flex items-center gap-2 bg-surface-2 rounded-xl p-3 border border-surface-3">
           <div className="flex-1">
-            <label className="block text-xs text-fg-muted mb-1">من</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('reports.filters.from')}</label>
             <input type="date" value={customFrom} onChange={e => setCustomFrom(e.target.value)}
               className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <div className="flex-1">
-            <label className="block text-xs text-fg-muted mb-1">إلى</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('reports.filters.to')}</label>
             <input type="date" value={customTo} onChange={e => setCustomTo(e.target.value)}
               className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
@@ -861,7 +872,7 @@ function OverviewTab() {
       )}
 
       {range === 'custom' && !(customFrom && customTo) ? (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -869,15 +880,15 @@ function OverviewTab() {
       ) : (
         <>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
-            <p className="text-xs text-fg-muted mb-1">إجمالي العملاء الجدد</p>
+            <p className="text-xs text-fg-muted mb-1">{t('reports.customers.totalNew')}</p>
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
 
           {/* Column Chart — عدد العملاء الجدد لكل يوم (أو أسبوع لو الفترة طويلة) */}
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-            <p className="text-sm font-medium text-fg mb-3">العملاء الجدد — تفصيل يومي</p>
+            <p className="text-sm font-medium text-fg mb-3">{t('reports.overview.dailyBreakdown')}</p>
             {total === 0 ? (
-              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+              <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noData')}</p>
             ) : (
               <div style={{ width: '100%', height: 280 }}>
                 <ResponsiveContainer>
@@ -898,9 +909,9 @@ function OverviewTab() {
 
           {/* Pie Chart — توزيع مراحل الـ Lifecycle */}
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
-            <p className="text-sm font-medium text-fg mb-3">توزيع مراحل الـ Lifecycle</p>
+            <p className="text-sm font-medium text-fg mb-3">{t('reports.overview.lifecycleDistribution')}</p>
             {lifecycleData.length === 0 ? (
-              <p className="text-center text-fg-subtle text-sm py-10">مفيش بيانات في الفترة دي</p>
+              <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noData')}</p>
             ) : (
               <div className="flex flex-col sm:flex-row items-center gap-4">
                 <div style={{ width: '100%', maxWidth: 220, height: 220 }} className="flex-shrink-0">
@@ -942,9 +953,9 @@ function OverviewTab() {
 // agent_heartbeats — نبضة بتتسجل كل ~٩٠ ثانية طول ما التاب فاتح وظاهر قدامه (AuthContext)،
 // وده بيدينا "كان فاتح التطبيق فعلياً من كذا لحد كذا" بغض النظر عن الحالة اللي هو حاططها
 const ATTENDANCE_STATUS_OPTS = [
-  { key: 'online', label: 'متصل', dot: 'bg-success', text: 'text-success' },
-  { key: 'busy', label: 'مشغول', dot: 'bg-follow', text: 'text-follow' },
-  { key: 'offline', label: 'غير متصل', dot: 'bg-slate-500', text: 'text-fg-subtle' },
+  { key: 'online', labelKey: 'reports.attendance.status.online', dot: 'bg-success', text: 'text-success' },
+  { key: 'busy', labelKey: 'reports.attendance.status.busy', dot: 'bg-follow', text: 'text-follow' },
+  { key: 'offline', labelKey: 'reports.attendance.status.offline', dot: 'bg-slate-500', text: 'text-fg-subtle' },
 ]
 
 function todayStr() {
@@ -953,14 +964,14 @@ function todayStr() {
 }
 
 function relTime(dateStr) {
-  if (!dateStr) return '—'
+  if (!dateStr) return i18n.t('reports.time.none')
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'الآن'
-  if (mins < 60) return `منذ ${mins} د`
+  if (mins < 1) return i18n.t('reports.time.now')
+  if (mins < 60) return i18n.t('reports.time.minutesAgo', { count: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `منذ ${hours} س`
-  return `منذ ${Math.floor(hours / 24)} يوم`
+  if (hours < 24) return i18n.t('reports.time.hoursAgo', { count: hours })
+  return i18n.t('reports.time.daysAgo', { count: Math.floor(hours / 24) })
 }
 
 function formatClock(d) {
@@ -971,8 +982,8 @@ function formatDuration(ms) {
   const totalMins = Math.round(ms / 60000)
   const h = Math.floor(totalMins / 60)
   const m = totalMins % 60
-  if (h === 0) return `${m}د`
-  return `${h}س ${m}د`
+  if (h === 0) return i18n.t('reports.duration.minutes', { count: m })
+  return i18n.t('reports.duration.hoursMinutes', { hours: h, minutes: m })
 }
 
 // بيحسب من agent_status_log تايم لاين الحالة (أونلاين/مشغول/أوفلاين) لموظف معين في يوم معين —
@@ -1029,6 +1040,7 @@ async function computeDayPresenceMs(agentId, dateStr) {
 }
 
 function AttendanceTab() {
+  const { t } = useTranslation()
   const [agents, setAgents] = useState([])
   const [selectedAgentIds, setSelectedAgentIds] = useState(null) // null لحد ما الموظفين يتحملوا، وقتها بنختارهم كلهم افتراضياً
   const [showAgentDropdown, setShowAgentDropdown] = useState(false)
@@ -1082,17 +1094,16 @@ function AttendanceTab() {
   const expandedAgent = agents.find(a => a.id === expandedAgentId)
 
   const dropdownLabel = !selectedAgentIds || selectedAgentIds.length === agents.length
-    ? 'كل الموظفين'
+    ? t('reports.attendance.allAgents')
     : selectedAgentIds.length === 1
-      ? agents.find(a => a.id === selectedAgentIds[0])?.name || 'موظف واحد'
-      : `${selectedAgentIds.length} موظفين محددين`
+      ? agents.find(a => a.id === selectedAgentIds[0])?.name || t('reports.attendance.oneAgent')
+      : t('reports.attendance.multipleAgents', { count: selectedAgentIds.length })
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">حضور الموظفين</h2>
+      <h2 className="font-semibold text-fg">{t('reports.attendance.title')}</h2>
       <p className="text-xs text-fg-subtle -mt-2">
-        "فعلياً" = وقت حقيقي متحسوب من إن التطبيق كان فاتح قدام الموظف، مش من حالته اللي هو حاططها بنفسه (ممكن ينسى يغيّرها).
-        اضغط على أي موظف تشوف تفاصيل حالاته (متصل/مشغول/غير متصل) على مدار اليوم.
+        {t('reports.attendance.description')}
       </p>
 
       {/* اختيار الموظفين + التاريخ */}
@@ -1108,7 +1119,7 @@ function AttendanceTab() {
               <button onClick={toggleAll}
                 className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right border-b border-surface-3">
                 <input type="checkbox" readOnly checked={selectedAgentIds?.length === agents.length} />
-                <span className="font-medium text-fg">تحديد الكل</span>
+                <span className="font-medium text-fg">{t('reports.attendance.selectAll')}</span>
               </button>
               {agents.map(a => {
                 const st = ATTENDANCE_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || ATTENDANCE_STATUS_OPTS[2]
@@ -1119,7 +1130,7 @@ function AttendanceTab() {
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
                     <span className="flex-1 text-fg truncate">{a.name}</span>
                     <span className={`text-[11px] flex-shrink-0 ${st.text}`}>
-                      {st.label} · {relTime(a.last_seen_at)}
+                      {t(st.labelKey)} · {relTime(a.last_seen_at)}
                     </span>
                   </button>
                 )
@@ -1145,23 +1156,23 @@ function AttendanceTab() {
               <button key={s.agentId} onClick={() => setExpandedAgentId(expandedAgentId === s.agentId ? null : s.agentId)}
                 className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/60 transition-colors ${expandedAgentId === s.agentId ? 'bg-surface-3/60' : ''}`}>
                 <span className="flex-1 text-sm font-medium text-fg truncate">{a.name}</span>
-                <span className="text-xs text-fg-subtle hidden sm:inline">حالته: {formatDuration((s.totals.online || 0) + (s.totals.busy || 0))}</span>
-                <span className="text-xs text-fg font-semibold w-28 text-left">فعلياً: {formatDuration(s.presenceMs || 0)}</span>
+                <span className="text-xs text-fg-subtle hidden sm:inline">{t('reports.attendance.statusDuration', { duration: formatDuration((s.totals.online || 0) + (s.totals.busy || 0)) })}</span>
+                <span className="text-xs text-fg font-semibold w-28 text-left">{t('reports.attendance.actualDuration', { duration: formatDuration(s.presenceMs || 0) })}</span>
               </button>
             )
           })}
         </div>
       ) : (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار موظف واحد على الأقل</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.attendance.selectAtLeastOne')}</p>
       )}
 
       {/* تفاصيل يوم الموظف اللي اتفتح */}
       {expandedAgent && expandedSummary && (
         <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 space-y-3">
-          <p className="text-sm font-medium text-fg">تفاصيل يوم — {expandedAgent.name}</p>
+          <p className="text-sm font-medium text-fg">{t('reports.attendance.dayDetailsTitle', { name: expandedAgent.name })}</p>
 
           {!expandedSummary.segments?.length ? (
-            <p className="text-center text-fg-subtle text-sm py-8">مفيش بيانات ليوم {selectedDate}</p>
+            <p className="text-center text-fg-subtle text-sm py-8">{t('reports.attendance.noDataForDay', { date: selectedDate })}</p>
           ) : (
             <>
               {/* شريط اليوم الأفقي — 24 ساعة */}
@@ -1174,7 +1185,7 @@ function AttendanceTab() {
               <div className="flex items-center gap-4 text-xs text-fg-muted">
                 {ATTENDANCE_STATUS_OPTS.map(o => (
                   <span key={o.key} className="flex items-center gap-1.5">
-                    <span className={`w-2 h-2 rounded-full ${o.dot}`} /> {o.label}: <b className="text-fg">{formatDuration(expandedSummary.totals[o.key] || 0)}</b>
+                    <span className={`w-2 h-2 rounded-full ${o.dot}`} /> {t(o.labelKey)}: <b className="text-fg">{formatDuration(expandedSummary.totals[o.key] || 0)}</b>
                   </span>
                 ))}
               </div>
@@ -1186,13 +1197,13 @@ function AttendanceTab() {
                   return (
                     <div key={i} className="flex items-center gap-2 text-sm">
                       <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
-                      <span className="text-fg-muted flex-1">{st.label} من {formatClock(s.start)} لـ {formatClock(s.end)}</span>
+                      <span className="text-fg-muted flex-1">{t(st.labelKey)} {t('reports.filters.from')} {formatClock(s.start)} {t('reports.filters.to')} {formatClock(s.end)}</span>
                       <span className="text-fg font-medium">{formatDuration(s.ms)}</span>
                     </div>
                   )
                 })}
                 {expandedSummary.segments.every(s => s.status === 'offline') && (
-                  <p className="text-center text-fg-subtle text-xs py-2">الموظف كان غير متصل طول اليوم ده</p>
+                  <p className="text-center text-fg-subtle text-xs py-2">{t('reports.attendance.allDayOffline')}</p>
                 )}
               </div>
             </>
@@ -1207,6 +1218,7 @@ function AttendanceTab() {
 // لكل تاج: عدد العملاء الكلي، وعدد اللي شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة (دول بس اللي ينفع
 // نبعتلهم رسالة جماعية دلوقتي، احترامًا لقيود المنصات على الرسايل خارج نافذة الـ٢٤ ساعة)
 function TagsReportTab() {
+  const { t } = useTranslation()
   const { agent } = useAuth()
   const toast = useToast()
   const [tags, setTags] = useState([])
@@ -1224,12 +1236,12 @@ function TagsReportTab() {
       const data = await res.json()
       setTags(data.tags || [])
     } catch {
-      toast.error('فشل تحميل تقرير التاجات')
+      toast.error(t('reports.tags.loadError'))
     }
     setLoading(false)
   }
 
-  const bulkTag = tags.find(t => t.id === bulkTagId)
+  const bulkTag = tags.find(tg => tg.id === bulkTagId)
 
   const sendBulk = async () => {
     if (!bulkText.trim() || !bulkTagId) return
@@ -1241,12 +1253,12 @@ function TagsReportTab() {
         body: JSON.stringify({ text: bulkText.trim(), agent_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الإرسال')
-      toast.success(`اتبعتت لـ ${data.sent} عميل${data.failed ? ` — فشلت ${data.failed}` : ''}`)
+      if (!res.ok) throw new Error(data.error || t('reports.tags.sendFailed'))
+      toast.success(t('reports.tags.sendSuccess', { sent: data.sent }) + (data.failed ? t('reports.tags.sendSuccessFailedSuffix', { failed: data.failed }) : ''))
       setBulkTagId(null)
       setBulkText('')
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('reports.common.errorPrefix', { error: err.message }))
     }
     setSendingBulk(false)
   }
@@ -1262,11 +1274,11 @@ function TagsReportTab() {
   return (
     <div className="p-4 space-y-3">
       <p className="text-xs text-fg-subtle">
-        عدد العملاء لكل تاج، وإمكانية بعت رسالة جماعية للي شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة (قيود المنصات بتمنع الرد بعد كده).
+        {t('reports.tags.description')}
       </p>
 
       {tags.length === 0 && (
-        <p className="text-center text-fg-subtle text-sm py-8">مفيش تاجات لسه — ضيفها من الإعدادات → التاجات</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.tags.noTags')}</p>
       )}
 
       {tags.map(tag => (
@@ -1275,10 +1287,10 @@ function TagsReportTab() {
             className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/40 transition-colors">
             <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tag.color }} />
             <span className="flex-1 text-sm font-medium text-fg">{tag.name}</span>
-            <span className="text-xs text-fg-subtle">{tag.count} عميل</span>
+            <span className="text-xs text-fg-subtle">{t('reports.tags.contactsCount', { count: tag.count })}</span>
             {tag.eligibleCount > 0 && (
               <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-success/15 text-success">
-                {tag.eligibleCount} متاح للرسالة الجماعية
+                {t('reports.tags.eligibleCount', { count: tag.eligibleCount })}
               </span>
             )}
             <ChevronDown size={14} className={`text-fg-subtle transition-transform ${expandedTagId === tag.id ? 'rotate-180' : ''}`} />
@@ -1287,16 +1299,16 @@ function TagsReportTab() {
           {expandedTagId === tag.id && (
             <div className="border-t border-surface-3 p-3 space-y-2">
               {tag.contacts.length === 0 ? (
-                <p className="text-center text-fg-subtle text-xs py-3">مفيش عملاء على التاج ده</p>
+                <p className="text-center text-fg-subtle text-xs py-3">{t('reports.tags.noContactsOnTag')}</p>
               ) : (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
                   {tag.contacts.map(c => (
                     <div key={c.id} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-surface-3/40">
-                      <span className="flex-1 text-fg truncate">{c.name || c.platform_id || 'بدون اسم'}</span>
+                      <span className="flex-1 text-fg truncate">{c.name || c.platform_id || t('reports.tags.noName')}</span>
                       {c.canBulkMessage ? (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">شات مفتوح</span>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-success/15 text-success flex-shrink-0">{t('reports.tags.openChat')}</span>
                       ) : (
-                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">مش متاح</span>
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">{t('reports.tags.notAvailable')}</span>
                       )}
                     </div>
                   ))}
@@ -1304,7 +1316,7 @@ function TagsReportTab() {
               )}
               <button onClick={() => { setBulkTagId(tag.id); setBulkText('') }} disabled={tag.eligibleCount === 0}
                 className="w-full flex items-center justify-center gap-1.5 py-2.5 rounded-xl text-sm font-medium bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 disabled:cursor-not-allowed">
-                <Send size={14} /> رسالة جماعية ({tag.eligibleCount})
+                <Send size={14} /> {t('reports.tags.bulkMessageButton', { count: tag.eligibleCount })}
               </button>
             </div>
           )}
@@ -1316,23 +1328,23 @@ function TagsReportTab() {
           onClick={() => !sendingBulk && setBulkTagId(null)}>
           <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-3">
-              <span className="font-semibold text-fg text-sm">رسالة جماعية — {bulkTag?.name}</span>
+              <span className="font-semibold text-fg text-sm">{t('reports.tags.bulkModalTitle', { name: bulkTag?.name })}</span>
               <button onClick={() => setBulkTagId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
             </div>
             <div className="p-4 space-y-2">
-              <p className="text-xs text-fg-subtle">هتتبعت لـ {bulkTag?.eligibleCount} عميل شاتهم لسه مفتوح ومعداش عليه ٢٤ ساعة.</p>
+              <p className="text-xs text-fg-subtle">{t('reports.tags.bulkModalSubtitle', { count: bulkTag?.eligibleCount })}</p>
               <textarea value={bulkText} onChange={e => setBulkText(e.target.value)} rows={4} autoFocus
-                placeholder="اكتب الرسالة اللي هتتبعت..."
+                placeholder={t('reports.tags.bulkPlaceholder')}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
             </div>
             <div className="flex items-center gap-2 p-4 border-t border-surface-3">
               <button onClick={() => setBulkTagId(null)} disabled={sendingBulk}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                إلغاء
+                {t('reports.tags.cancel')}
               </button>
               <button onClick={sendBulk} disabled={sendingBulk || !bulkText.trim()}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {sendingBulk ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'إرسال'}
+                {sendingBulk ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('reports.tags.send')}
               </button>
             </div>
           </div>
@@ -1347,6 +1359,7 @@ function TagsReportTab() {
 // في الفترة المختارة)، مستقبلة من عدد رسائل العملاء في المحادثات اللي الموظف رد فيها، ومبعوتة
 // من كل رسايله هو نفسه (من غير الملاحظات الداخلية اللي مش بتتبعت للعميل)
 function PerformanceTab() {
+  const { t } = useTranslation()
   const [range, setRange] = useState('week')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -1419,21 +1432,21 @@ function PerformanceTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">أداء الموظفين</h2>
+      <h2 className="font-semibold text-fg">{t('reports.performance.title')}</h2>
       <p className="text-xs text-fg-subtle -mt-2">
-        سرعة الرد (متوسط الوقت من رسالة العميل لحد رد الموظف)، وعدد الرسايل المستقبلة والمبعوتة، وعدد العملاء المختلفين اللي رد عليهم — في الفترة المختارة.
+        {t('reports.performance.description')}
       </p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
       ) : stats.every(s => s.sent === 0 && s.received === 0) ? (
-        <p className="text-center text-fg-subtle text-sm py-10">مفيش رسايل في الفترة دي</p>
+        <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noMessages')}</p>
       ) : (
         <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
           {stats.map(s => (
@@ -1442,13 +1455,13 @@ function PerformanceTab() {
                 <AgentAvatar agent={s.agent} size={22} />
                 <span className="text-sm font-semibold text-fg flex-1 truncate">{s.agent.name}</span>
                 <span className="text-xs text-fg-subtle">
-                  {s.avgReplyMs != null ? `متوسط الرد: ${formatDuration(s.avgReplyMs)}` : 'مفيش ردود متتبعة'}
+                  {s.avgReplyMs != null ? t('reports.performance.avgReply', { duration: formatDuration(s.avgReplyMs) }) : t('reports.performance.noTrackedReplies')}
                 </span>
               </div>
               <div className="flex items-center gap-4 text-xs">
-                <span className="text-fg-muted">استقبل: <b className="text-fg">{s.received}</b></span>
-                <span className="text-fg-muted">بعت: <b className="text-fg">{s.sent}</b></span>
-                <span className="text-fg-muted">عملاء اتردّ عليهم: <b className="text-fg">{s.customers}</b></span>
+                <span className="text-fg-muted">{t('reports.performance.received')} <b className="text-fg">{s.received}</b></span>
+                <span className="text-fg-muted">{t('reports.performance.sent')} <b className="text-fg">{s.sent}</b></span>
+                <span className="text-fg-muted">{t('reports.performance.respondedCustomers')} <b className="text-fg">{s.customers}</b></span>
               </div>
             </div>
           ))}
@@ -1474,6 +1487,7 @@ function AgentAvatar({ agent, size = 22 }) {
 // ─── تقرير حجم رسايل القنوات ──────────────────────────────────
 // كام رسالة واردة (من العميل) دخلت من كل قناة بعينها في فترة معينة
 function ChannelVolumeTab() {
+  const { t } = useTranslation()
   const { theme } = useTheme()
   const isDark = theme === 'dark'
   const [range, setRange] = useState('week')
@@ -1530,21 +1544,21 @@ function ChannelVolumeTab() {
   const rows = useMemo(() => {
     if (!counts) return []
     const list = channelsList.map(c => ({ id: c.id, label: getChannelLabel(c), count: counts[c.id] || 0 }))
-    if (counts.none) list.push({ id: 'none', label: 'قنوات قديمة (من غير رقم قناة محدد)', count: counts.none })
+    if (counts.none) list.push({ id: 'none', label: t('reports.volume.legacyChannels'), count: counts.none })
     return list.sort((a, b) => b.count - a.count)
-  }, [counts, channelsList])
+  }, [counts, channelsList, t])
 
   const total = rows.reduce((s, r) => s + r.count, 0)
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">رسايل القنوات</h2>
-      <p className="text-xs text-fg-subtle -mt-2">عدد الرسايل الواردة من العملاء لكل قناة بعينها، في الفترة المختارة.</p>
+      <h2 className="font-semibold text-fg">{t('reports.volume.title')}</h2>
+      <p className="text-xs text-fg-subtle -mt-2">{t('reports.volume.description')}</p>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
-        <p className="text-center text-fg-subtle text-sm py-8">اختار تاريخ "من" و"إلى" لعرض التقرير</p>
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -1552,11 +1566,11 @@ function ChannelVolumeTab() {
       ) : (
         <>
           <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 text-center">
-            <p className="text-xs text-fg-muted mb-1">إجمالي الرسايل الواردة</p>
+            <p className="text-xs text-fg-muted mb-1">{t('reports.volume.totalInbound')}</p>
             <p className="text-3xl font-bold text-fg">{total}</p>
           </div>
           {rows.length === 0 ? (
-            <p className="text-center text-fg-subtle text-sm py-10">مفيش رسايل في الفترة دي</p>
+            <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noMessages')}</p>
           ) : (
             <>
               <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
@@ -1602,6 +1616,7 @@ function csvCell(value) {
 }
 
 function ExportTab() {
+  const { t } = useTranslation()
   const [exporting, setExporting] = useState(false)
   const [progress, setProgress] = useState('')
   const toast = useToast()
@@ -1609,19 +1624,19 @@ function ExportTab() {
   const exportBackup = async () => {
     setExporting(true)
     try {
-      setProgress('بيجيب العملاء...')
+      setProgress(t('reports.export.fetchingContacts'))
       const contacts = await fetchAllRows(() => supabase.from('contacts').select('*').order('created_at', { ascending: true }))
 
-      setProgress('بيجيب المراحل والتاجات والحقول المخصصة...')
+      setProgress(t('reports.export.fetchingMeta'))
       const [{ data: stages }, { data: tags }, { data: fieldDefs }] = await Promise.all([
         supabase.from('lifecycle_stages').select('id, name'),
         supabase.from('tags').select('id, name'),
         supabase.from('custom_field_definitions').select('id, name').order('name')
       ])
       const stageMap = Object.fromEntries((stages || []).map(s => [s.id, s.name]))
-      const tagMap = Object.fromEntries((tags || []).map(t => [t.id, t.name]))
+      const tagMap = Object.fromEntries((tags || []).map(tg => [tg.id, tg.name]))
 
-      setProgress('بيجيب تاجات وحقول كل عميل...')
+      setProgress(t('reports.export.fetchingContactExtras'))
       const [contactTags, customValues] = await Promise.all([
         fetchAllRows(() => supabase.from('contact_tags').select('contact_id, tag_id')),
         fetchAllRows(() => supabase.from('contact_custom_fields').select('contact_id, field_definition_id, value'))
@@ -1637,9 +1652,13 @@ function ExportTab() {
         customByContact[r.contact_id][r.field_definition_id] = r.value
       })
 
-      setProgress('بيبني الملف...')
-      const PLATFORM_LABEL = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'انستجرام', tiktok: 'تيك توك' }
-      const baseHeaders = ['الاسم', 'رقم الهاتف', 'الدولة', 'المنصة', 'تاريخ أول تواصل', 'مرحلة الـ Lifecycle', 'التاجات', 'ملاحظات', 'محظور؟']
+      setProgress(t('reports.export.buildingFile'))
+      const PLATFORM_LABEL = { whatsapp: t('reports.platforms.whatsapp'), facebook: t('reports.platforms.facebook'), instagram: t('reports.platforms.instagram'), tiktok: t('reports.platforms.tiktok') }
+      const baseHeaders = [
+        t('reports.export.headers.name'), t('reports.export.headers.phone'), t('reports.export.headers.country'),
+        t('reports.export.headers.platform'), t('reports.export.headers.firstContactDate'), t('reports.export.headers.lifecycleStage'),
+        t('reports.export.headers.tags'), t('reports.export.headers.notes'), t('reports.export.headers.blocked')
+      ]
       const fieldHeaders = (fieldDefs || []).map(f => f.name)
       const headers = [...baseHeaders, ...fieldHeaders]
 
@@ -1653,7 +1672,7 @@ function ExportTab() {
           stageMap[c.lifecycle_stage_id] || '',
           (tagsByContact[c.id] || []).join(' / '),
           c.notes || '',
-          c.is_blocked ? 'نعم' : 'لا'
+          c.is_blocked ? t('reports.export.yes') : t('reports.export.no')
         ]
         const fields = (fieldDefs || []).map(f => customByContact[c.id]?.[f.id] ?? '')
         return [...base, ...fields]
@@ -1664,14 +1683,14 @@ function ExportTab() {
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
-      a.download = `عملاء-نسخة-احتياطية-${new Date().toISOString().slice(0, 10)}.csv`
+      a.download = `${t('reports.export.filenamePrefix')}-${new Date().toISOString().slice(0, 10)}.csv`
       document.body.appendChild(a)
       a.click()
       a.remove()
       URL.revokeObjectURL(url)
-      toast.success(`اتحمّل ملف فيه ${contacts.length} عميل`)
+      toast.success(t('reports.export.success', { count: contacts.length }))
     } catch (err) {
-      toast.error('خطأ في التصدير: ' + err.message)
+      toast.error(t('reports.export.exportErrorPrefix', { error: err.message }))
     } finally {
       setExporting(false)
       setProgress('')
@@ -1680,22 +1699,22 @@ function ExportTab() {
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">تصدير بيانات العملاء (Backup)</h2>
+      <h2 className="font-semibold text-fg">{t('reports.export.title')}</h2>
       <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3 space-y-3">
         <p className="text-sm text-fg-muted leading-relaxed">
-          بتحمّل ملف Excel/CSV فيه كل عميل كلّم العيادة من أي قناة، بكل البيانات المتاحة عنه: الاسم، رقم الهاتف، الدولة، المنصة، مرحلة الـ Lifecycle، التاجات، الملاحظات، وكل الحقول المخصصة اللي عرّفتها.
+          {t('reports.export.description')}
         </p>
         <button onClick={exportBackup} disabled={exporting}
           className="flex items-center justify-center gap-2 w-full py-3 rounded-xl text-sm font-semibold bg-brand hover:bg-brand-dark text-white transition-colors disabled:opacity-60">
           {exporting ? (
             <>
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              {progress || 'جاري التحميل...'}
+              {progress || t('reports.export.downloading')}
             </>
           ) : (
             <>
               <Download size={16} />
-              تحميل نسخة احتياطية (CSV)
+              {t('reports.export.downloadButton')}
             </>
           )}
         </button>

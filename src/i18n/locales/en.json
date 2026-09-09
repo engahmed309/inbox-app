@@ -13,7 +13,9 @@
     "accessNotice": "Access is limited to staff invited by the admin. If you need an account, please contact clinic management."
   },
   "settings": {
-    "header": { "title": "Settings" },
+    "header": {
+      "title": "Settings"
+    },
     "accessDenied": "You are not authorized to access this page",
     "tabs": {
       "agents": "Staff",
@@ -54,7 +56,11 @@
       "saveSettings": "Save settings",
       "savedCheck": "✓ Saved",
       "ellipsis": "...",
-      "status": { "open": "Open", "followUp": "Follow-up", "closed": "Closed" }
+      "status": {
+        "open": "Open",
+        "followUp": "Follow-up",
+        "closed": "Closed"
+      }
     },
     "agents": {
       "addAgent": "Add Agent",
@@ -105,7 +111,11 @@
       "renamed": "Channel renamed",
       "notLinked": "Not linked",
       "qualityPrefix": "Quality",
-      "status": { "active": "Active", "disconnected": "Disconnected", "needsReconnect": "Needs reconnecting" },
+      "status": {
+        "active": "Active",
+        "disconnected": "Disconnected",
+        "needsReconnect": "Needs reconnecting"
+      },
       "settingsTitle": "Channel settings",
       "saveFailed": "Failed to save",
       "nameSaved": "Name saved",
@@ -142,7 +152,11 @@
         "tier100k": "100K customers / 24 hours",
         "unlimited": "Unlimited"
       },
-      "quality": { "high": "High", "medium": "Medium", "low": "Low" },
+      "quality": {
+        "high": "High",
+        "medium": "Medium",
+        "low": "Low"
+      },
       "platforms": {
         "facebook": "Facebook",
         "instagram": "Instagram",
@@ -162,11 +176,35 @@
       "rejectedReasonPrefix": "Rejection reason:",
       "deleteConfirm": "Delete the template \"{{name}}\"? You won't be able to send it again, and if you need it later you'll have to recreate it and wait for Meta's approval.",
       "deleted": "Template deleted",
-      "status": { "approved": "Approved", "pending": "Under review", "inAppeal": "Appealed", "rejected": "Rejected", "paused": "Paused", "disabled": "Disabled" },
-      "category": { "marketing": "Marketing", "utility": "Utility", "authentication": "Authentication" },
-      "langs": { "ar": "Arabic", "en": "English", "enUs": "English (US)" },
-      "preview": { "emptyHint": "Type the message text to see the preview", "mockTime": "12:00 PM" },
-      "mediaType": { "text": "Text", "image": "Image", "video": "Video", "document": "Document", "location": "Location" },
+      "status": {
+        "approved": "Approved",
+        "pending": "Under review",
+        "inAppeal": "Appealed",
+        "rejected": "Rejected",
+        "paused": "Paused",
+        "disabled": "Disabled"
+      },
+      "category": {
+        "marketing": "Marketing",
+        "utility": "Utility",
+        "authentication": "Authentication"
+      },
+      "langs": {
+        "ar": "Arabic",
+        "en": "English",
+        "enUs": "English (US)"
+      },
+      "preview": {
+        "emptyHint": "Type the message text to see the preview",
+        "mockTime": "12:00 PM"
+      },
+      "mediaType": {
+        "text": "Text",
+        "image": "Image",
+        "video": "Video",
+        "document": "Document",
+        "location": "Location"
+      },
       "nameAndBodyRequired": "Name and body are required",
       "editFailed": "Failed to edit template",
       "createFailed": "Failed to create template",
@@ -227,7 +265,12 @@
       "title": "Custom Fields",
       "nameLabel": "Field name",
       "typeLabel": "Type",
-      "types": { "text": "Text", "select": "List", "date": "Date", "number": "Number" },
+      "types": {
+        "text": "Text",
+        "select": "List",
+        "date": "Date",
+        "number": "Number"
+      },
       "optionsLabel": "Options (comma-separated)",
       "optionsPlaceholder": "Option 1, Option 2, Option 3",
       "deleteConfirm": "Delete this field?"
@@ -250,8 +293,14 @@
       "title": "Automatic Distribution Settings",
       "modeLabel": "Distribution method",
       "modes": {
-        "leastBusy": { "label": "Least busy", "desc": "Every new conversation goes to the agent with the fewest currently open conversations." },
-        "roundRobin": { "label": "Round robin", "desc": "Conversations are distributed in turn to available agents one by one, restarting from the first once it reaches the last." }
+        "leastBusy": {
+          "label": "Least busy",
+          "desc": "Every new conversation goes to the agent with the fewest currently open conversations."
+        },
+        "roundRobin": {
+          "label": "Round robin",
+          "desc": "Conversations are distributed in turn to available agents one by one, restarting from the first once it reaches the last."
+        }
       },
       "mechanismHeading": "How the full distribution mechanism works:",
       "step1": "1. When a new conversation arrives, online agents whose status isn't \"Busy\" are identified.",
@@ -313,7 +362,10 @@
       "usageReportsLabel": "AI Reports",
       "knowledgeSourcesHeading": "Knowledge Sources",
       "knowledgeSourcesHint": "Text or links (like a landing page) the AI will learn clinic information from",
-      "sourceType": { "text": "Text", "link": "Link" },
+      "sourceType": {
+        "text": "Text",
+        "link": "Link"
+      },
       "sourceTitleLabel": "Title",
       "sourceTitlePlaceholder": "e.g. Clinic services",
       "contentLabel": "Content",
@@ -332,6 +384,181 @@
       "typeToEnableSuffix": "to enable the button",
       "wipedButton": "✓ Data wiped",
       "wipeButton": "Permanently wipe all conversation and customer data"
+    }
+  },
+  "reports": {
+    "unauthorized": "You are not authorized to access this page",
+    "title": "Reports",
+    "sections": {
+      "ai": "AI Reports",
+      "overview": "Overview",
+      "customers": "Customers",
+      "countries": "Countries",
+      "attendance": "Staff Attendance",
+      "performance": "Agent Performance",
+      "volume": "Channel Volume",
+      "tags": "Tags",
+      "export": "Export Data"
+    },
+    "ai": {
+      "suggestedQuestions": {
+        "newCustomersThisWeek": "How many new customers joined this week?",
+        "topAgentThisMonth": "Which agent sent the most messages this month?",
+        "openConversationsNow": "How many conversations are currently open?",
+        "inboundMessagesTodayByChannel": "How many inbound messages did each channel get today?"
+      },
+      "heading": "AI Reports",
+      "subtitle": "Write your question about the reports in plain language (date, agent, channel, country...) and you'll get a direct answer.",
+      "thinking": "Searching the reports...",
+      "answerFailed": "Failed to get an answer",
+      "inputPlaceholder": "Ask anything about the reports..."
+    },
+    "platforms": {
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "whatsapp": "WhatsApp",
+      "tiktok": "TikTok"
+    },
+    "filters": {
+      "range": {
+        "today": "Today",
+        "week": "Last 7 days",
+        "month": "This month",
+        "all": "All",
+        "custom": "Custom range"
+      },
+      "from": "From",
+      "to": "To",
+      "selectDatesPrompt": "Please select \"From\" and \"To\" dates to view the report",
+      "additionalFilters": "Additional Filters",
+      "lifecycleStage": "Lifecycle stage",
+      "tag": "Tag",
+      "channel": "Channel",
+      "campaigns": "Paid Ads / Campaigns",
+      "noCampaigns": "No campaigns available (make sure the ads account is set up correctly)",
+      "wholeCampaign": "All ads in this campaign",
+      "clearAll": "Clear all filters",
+      "channelOptionLabel": "{{platform}} — {{name}}"
+    },
+    "common": {
+      "all": "All",
+      "noData": "No data for this period",
+      "noMessages": "No messages in this period",
+      "errorPrefix": "Error: {{error}}"
+    },
+    "customers": {
+      "title": "Customers",
+      "metricNew": "New customers (first time)",
+      "metricActive": "Active customers (monthly)",
+      "descNew": "The number of new customers who contacted the clinic for the first time each day.",
+      "descActive": "The number of customers who contacted you each day — regardless of whether they're new or returning, or when they last contacted you. A customer is counted only once per month (the day of their first message that month); if they keep messaging for the rest of the month they won't be counted again, and the count resets the following month.",
+      "totalNew": "Total new customers",
+      "totalActive": "Total active customers (monthly)",
+      "weekLabel": "Week of {{date}}"
+    },
+    "countries": {
+      "title": "Customers by Country",
+      "description": "The number of new customers who joined from each country during the selected period. \"None\" means the customer's country field is empty.",
+      "none": "None",
+      "total": "Total customers"
+    },
+    "overview": {
+      "title": "Customer Reports",
+      "allChannels": "All channels",
+      "dailyBreakdown": "New customers — daily breakdown",
+      "lifecycleDistribution": "Lifecycle stage distribution",
+      "noStage": "No stage"
+    },
+    "attendance": {
+      "status": {
+        "online": "Online",
+        "busy": "Busy",
+        "offline": "Offline"
+      },
+      "allAgents": "All agents",
+      "oneAgent": "One agent",
+      "multipleAgents": "{{count}} selected agents",
+      "title": "Staff Attendance",
+      "description": "\"Actual\" is real time calculated from the app being open in front of the agent, not from the status they set themselves (which they might forget to update). Click any agent to see a breakdown of their statuses (online/busy/offline) throughout the day.",
+      "selectAll": "Select all",
+      "statusDuration": "Status: {{duration}}",
+      "actualDuration": "Actual: {{duration}}",
+      "selectAtLeastOne": "Select at least one agent",
+      "dayDetailsTitle": "Day details — {{name}}",
+      "noDataForDay": "No data for {{date}}",
+      "allDayOffline": "The agent was offline all day"
+    },
+    "time": {
+      "now": "Now",
+      "minutesAgo": "{{count}}m ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago",
+      "none": "—"
+    },
+    "duration": {
+      "minutes": "{{count}}m",
+      "hoursMinutes": "{{hours}}h {{minutes}}m"
+    },
+    "tags": {
+      "loadError": "Failed to load the tags report",
+      "description": "The number of customers per tag, with the option to send a bulk message to those whose chats are still open and under 24 hours old (platform restrictions prevent replying after that).",
+      "noTags": "No tags yet — add them from Settings → Tags",
+      "noContactsOnTag": "No customers under this tag",
+      "noName": "No name",
+      "openChat": "Open chat",
+      "notAvailable": "Not available",
+      "contactsCount": "{{count}} customers",
+      "eligibleCount": "{{count}} eligible for bulk message",
+      "bulkMessageButton": "Bulk message ({{count}})",
+      "bulkModalTitle": "Bulk message — {{name}}",
+      "bulkModalSubtitle": "This will be sent to {{count}} customers whose chats are still open and under 24 hours old.",
+      "bulkPlaceholder": "Write the message to send...",
+      "cancel": "Cancel",
+      "send": "Send",
+      "sendFailed": "Failed to send",
+      "sendSuccess": "Sent to {{sent}} customers",
+      "sendSuccessFailedSuffix": " — {{failed}} failed"
+    },
+    "performance": {
+      "title": "Agent Performance",
+      "description": "Reply speed (average time from a customer's message to the agent's reply), the number of messages received and sent, and the number of distinct customers replied to — for the selected period.",
+      "avgReply": "Avg. reply: {{duration}}",
+      "noTrackedReplies": "No tracked replies",
+      "received": "Received:",
+      "sent": "Sent:",
+      "respondedCustomers": "Customers replied to:"
+    },
+    "volume": {
+      "title": "Channel Message Volume",
+      "description": "The number of inbound messages from customers per channel, during the selected period.",
+      "totalInbound": "Total inbound messages",
+      "legacyChannels": "Legacy channels (no specific channel assigned)"
+    },
+    "export": {
+      "title": "Export Customer Data (Backup)",
+      "description": "Downloads an Excel/CSV file containing every customer who has contacted the clinic on any channel, with all available data about them: name, phone number, country, platform, Lifecycle stage, tags, notes, and every custom field you've defined.",
+      "downloadButton": "Download Backup (CSV)",
+      "downloading": "Downloading...",
+      "fetchingContacts": "Fetching customers...",
+      "fetchingMeta": "Fetching stages, tags, and custom fields...",
+      "fetchingContactExtras": "Fetching each customer's tags and fields...",
+      "buildingFile": "Building the file...",
+      "success": "Downloaded a file with {{count}} customers",
+      "exportErrorPrefix": "Export error: {{error}}",
+      "filenamePrefix": "customers-backup",
+      "headers": {
+        "name": "Name",
+        "phone": "Phone Number",
+        "country": "Country",
+        "platform": "Platform",
+        "firstContactDate": "First Contact Date",
+        "lifecycleStage": "Lifecycle Stage",
+        "tags": "Tags",
+        "notes": "Notes",
+        "blocked": "Blocked?"
+      },
+      "yes": "Yes",
+      "no": "No"
     }
   }
 }
