@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from '../contexts/AuthContext'
 import { MessageSquare } from 'lucide-react'
 
@@ -18,6 +19,7 @@ function GoogleIcon(props) {
 }
 
 export default function LoginScreen() {
+  const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [email, setEmail] = useState('')
@@ -38,7 +40,7 @@ export default function LoginScreen() {
       await signInWithGoogle()
       // المتصفح هيتحول لصفحة جوجل، فمش محتاجين نعمل حاجة تانية هنا
     } catch (err) {
-      setError('حصل خطأ أثناء تسجيل الدخول، حاول تاني')
+      setError(t('login.genericError'))
       setLoading(false)
     }
   }
@@ -50,7 +52,7 @@ export default function LoginScreen() {
     try {
       await signInWithPassword(email, password)
     } catch (err) {
-      setError('الإيميل أو الباسورد غلط')
+      setError(t('login.invalidCredentials'))
     } finally {
       setLoading(false)
     }
@@ -64,8 +66,8 @@ export default function LoginScreen() {
           <div className="w-14 h-14 bg-brand rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand/30">
             <MessageSquare size={28} className="text-white" />
           </div>
-          <h1 className="text-2xl font-bold text-fg">صحة وعافية</h1>
-          <p className="text-fg-muted text-sm mt-1">منصة خدمة العملاء</p>
+          <h1 className="text-2xl font-bold text-fg">{t('login.brand')}</h1>
+          <p className="text-fg-muted text-sm mt-1">{t('login.tagline')}</p>
         </div>
 
         <div className="bg-surface-2 rounded-2xl p-6 space-y-4">
@@ -81,7 +83,7 @@ export default function LoginScreen() {
                 type="email"
                 value={email}
                 onChange={e => setEmail(e.target.value)}
-                placeholder="الإيميل"
+                placeholder={t('login.emailPlaceholder')}
                 required
                 className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
               />
@@ -89,7 +91,7 @@ export default function LoginScreen() {
                 type="password"
                 value={password}
                 onChange={e => setPassword(e.target.value)}
-                placeholder="الباسورد"
+                placeholder={t('login.passwordPlaceholder')}
                 required
                 className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand"
               />
@@ -98,7 +100,7 @@ export default function LoginScreen() {
                 disabled={loading}
                 className="w-full bg-brand hover:bg-brand/90 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60"
               >
-                {loading ? 'جاري الدخول...' : 'دخول'}
+                {loading ? t('login.signingIn') : t('login.signIn')}
               </button>
             </form>
           )}
@@ -106,7 +108,7 @@ export default function LoginScreen() {
           {SHOW_PASSWORD_LOGIN && (
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-surface-3" />
-              <span className="text-xs text-fg-subtle whitespace-nowrap">أو</span>
+              <span className="text-xs text-fg-subtle whitespace-nowrap">{t('login.or')}</span>
               <div className="flex-1 h-px bg-surface-3" />
             </div>
           )}
@@ -119,12 +121,12 @@ export default function LoginScreen() {
             {loading ? (
               <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
             ) : (
-              <><GoogleIcon /> تسجيل الدخول بجوجل</>
+              <><GoogleIcon /> {t('login.signInWithGoogle')}</>
             )}
           </button>
 
           <p className="text-xs text-fg-subtle text-center leading-relaxed">
-            الدخول متاح بس للموظفين المدعوين من الأدمن. لو محتاج حساب، تواصل مع إدارة العيادة.
+            {t('login.accessNotice')}
           </p>
         </div>
       </div>

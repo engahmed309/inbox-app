@@ -1,0 +1,15 @@
+{
+  "login": {
+    "brand": "Seha Wa Afeya",
+    "tagline": "Customer Service Platform",
+    "genericError": "An error occurred while signing in. Please try again.",
+    "invalidCredentials": "Incorrect email or password",
+    "emailPlaceholder": "Email",
+    "passwordPlaceholder": "Password",
+    "signingIn": "Signing in...",
+    "signIn": "Sign In",
+    "or": "Or",
+    "signInWithGoogle": "Sign in with Google",
+    "accessNotice": "Access is limited to staff invited by the admin. If you need an account, please contact clinic management."
+  }
+}

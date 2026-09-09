@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { ToastProvider } from './contexts/ToastContext'
 import './index.css'
+import './i18n'
 
 // أي تحديث جديد بنرفعه لايف كان محتاج مسح كاش/تابات يدوي عشان يظهر — مش لأن الريلود مش شغال، لكن
 // لأن حد مايتفحصش نسخة السيرفر أصلاً طول ما التطبيق (PWA متثبتة) فاتح في الخلفية من غير ما يتقفل
