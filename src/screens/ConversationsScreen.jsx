@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
@@ -7,29 +8,28 @@ import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
-
-const STATUS_LABELS = { open: 'مفتوحة', follow_up: 'متابعة', closed: 'مغلقة' }
+import i18n from '../i18n'
 
 const AGENT_STATUS_OPTS = [
-  { key: 'online', label: 'نشط', dot: 'bg-success' },
-  { key: 'busy', label: 'مشغول', dot: 'bg-follow' },
-  { key: 'offline', label: 'غير متصل', dot: 'bg-slate-500' },
+  { key: 'online', labelKey: 'conversations.agentStatus.online', dot: 'bg-success' },
+  { key: 'busy', labelKey: 'conversations.agentStatus.busy', dot: 'bg-follow' },
+  { key: 'offline', labelKey: 'conversations.agentStatus.offline', dot: 'bg-slate-500' },
 ]
 
 const STATUS_TABS = [
-  { key: 'all', label: 'الكل', active: 'text-brand border-b-2 border-brand', dot: 'bg-brand' },
-  { key: 'open', label: 'مفتوحة', active: 'text-success border-b-2 border-success', dot: 'bg-success' },
-  { key: 'follow_up', label: 'متابعة', active: 'text-follow border-b-2 border-follow', dot: 'bg-follow' },
-  { key: 'closed', label: 'مغلقة', active: 'text-fg-muted border-b-2 border-fg-muted', dot: 'bg-slate-500' },
+  { key: 'all', labelKey: 'conversations.statusTabs.all', active: 'text-brand border-b-2 border-brand', dot: 'bg-brand' },
+  { key: 'open', labelKey: 'chat.status.open', active: 'text-success border-b-2 border-success', dot: 'bg-success' },
+  { key: 'follow_up', labelKey: 'chat.status.followUp', active: 'text-follow border-b-2 border-follow', dot: 'bg-follow' },
+  { key: 'closed', labelKey: 'chat.status.closed', active: 'text-fg-muted border-b-2 border-fg-muted', dot: 'bg-slate-500' },
 ]
 
 const CHANNELS = [
-  { key: 'all', label: 'الكل' },
-  { key: 'facebook', label: 'فيسبوك', icon: <Facebook size={12} className="text-blue-400" /> },
-  { key: 'instagram', label: 'إنستجرام', icon: <Instagram size={12} className="text-pink-400" /> },
-  { key: 'whatsapp', label: 'واتساب', icon: <Phone size={12} className="text-green-400" /> },
-  { key: 'tiktok', label: 'تيك توك', icon: <Music2 size={12} className="text-fg" /> },
-  { key: 'whatsapp_qr', label: 'واتساب (ربط سريع)', icon: <QrCode size={12} className="text-emerald-400" /> },
+  { key: 'all', labelKey: 'conversations.channels.all' },
+  { key: 'facebook', labelKey: 'settings.channels.platforms.facebook', icon: <Facebook size={12} className="text-blue-400" /> },
+  { key: 'instagram', labelKey: 'settings.channels.platforms.instagram', icon: <Instagram size={12} className="text-pink-400" /> },
+  { key: 'whatsapp', labelKey: 'settings.channels.platforms.whatsapp', icon: <Phone size={12} className="text-green-400" /> },
+  { key: 'tiktok', labelKey: 'settings.channels.platforms.tiktok', icon: <Music2 size={12} className="text-fg" /> },
+  { key: 'whatsapp_qr', labelKey: 'settings.channels.platforms.whatsapp_qr', icon: <QrCode size={12} className="text-emerald-400" /> },
 ]
 
 const PLATFORM_ICONS = {
@@ -57,24 +57,25 @@ function getChannelLabel(ch) {
   if (ch.custom_name) return ch.custom_name
   if (ch.platform === 'whatsapp') {
     const last2 = String(ch.external_id || '').slice(-2)
-    return `${ch.display_name || 'واتساب'} #${last2}`
+    return `${ch.display_name || i18n.t('chat.channelLabel.whatsappFallback')} #${last2}`
   }
   return ch.display_name || null
 }
 
 const SEARCH_TYPES = [
-  { key: 'contact', label: 'عميل', icon: <User size={11} /> },
-  { key: 'message', label: 'رسالة', icon: <MessageSquare size={11} /> },
-  { key: 'comment', label: 'تعليق', icon: <StickyNote size={11} /> },
+  { key: 'contact', labelKey: 'conversations.search.types.contact', icon: <User size={11} /> },
+  { key: 'message', labelKey: 'conversations.search.types.message', icon: <MessageSquare size={11} /> },
+  { key: 'comment', labelKey: 'conversations.search.types.comment', icon: <StickyNote size={11} /> },
 ]
 
 function SearchTypeChips({ searchType, setSearchType }) {
+  const { t } = useTranslation()
   return (
     <div className="flex items-center gap-1.5 mt-1.5">
-      {SEARCH_TYPES.map(t => (
-        <button key={t.key} onClick={() => setSearchType(t.key)}
-          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${searchType === t.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-          {t.icon} {t.label}
+      {SEARCH_TYPES.map(opt => (
+        <button key={opt.key} onClick={() => setSearchType(opt.key)}
+          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] font-medium transition-colors ${searchType === opt.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+          {opt.icon} {t(opt.labelKey)}
         </button>
       ))}
     </div>
@@ -110,22 +111,23 @@ function AgentAvatar({ agent, size = 22 }) {
 // بيغيّر الـ state بيخلي React يقفل الـ DOM القديم ويعمل واحد جديد كل شوية، فالسكرول جوه القايمة
 // بيرجع لفوق لوحده لو الموظف بيحاول يسكرول أثناء ده
 function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFilter, aiEnabled, aiOpenCount, agentsList, agentOpenCounts, unassignedOpenCount }) {
+  const { t } = useTranslation()
   return (
     <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
       <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
         className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
         <Users size={14} className="text-fg-muted flex-shrink-0" />
-        <span className="flex-1">كل الموظفين</span>
+        <span className="flex-1">{t('conversations.agentFilter.allAgents')}</span>
       </button>
       <button onClick={() => { setAgentFilter('ai'); setShowAgentFilter(false) }}
-        title={aiEnabled ? 'الـ AI Agent مفعّل' : 'الـ AI Agent متوقف'}
+        title={aiEnabled ? t('conversations.agentFilter.aiEnabledTitle') : t('conversations.agentFilter.aiDisabledTitle')}
         className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
         <span className="relative flex-shrink-0">
           <span className="w-[22px] h-[22px] rounded-full bg-brand/15 flex items-center justify-center text-brand"><Bot size={13} /></span>
           <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
         </span>
-        <span className="flex-1 truncate">AI Agent</span>
-        <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة بيرد عليها الـ AI">{aiOpenCount}</span>
+        <span className="flex-1 truncate">{t('conversations.agentFilter.aiAgentLabel')}</span>
+        <span className="text-[11px] text-fg-subtle flex-shrink-0" title={t('conversations.agentFilter.aiOpenCountTitle')}>{aiOpenCount}</span>
       </button>
       {agentsList.map(a => {
         const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
@@ -137,7 +139,7 @@ function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFi
               <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
             </span>
             <span className="flex-1 truncate">{a.name}</span>
-            <span className="text-[11px] text-fg-subtle flex-shrink-0" title="محادثات مفتوحة معينة له">{agentOpenCounts[a.id] || 0}</span>
+            <span className="text-[11px] text-fg-subtle flex-shrink-0" title={t('conversations.agentFilter.agentOpenCountTitle')}>{agentOpenCounts[a.id] || 0}</span>
           </button>
         )
       })}
@@ -146,7 +148,7 @@ function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFi
         <span className="w-[22px] h-[22px] rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 text-fg-subtle">
           <UserX size={12} />
         </span>
-        <span className="flex-1 truncate text-fg-muted">غير معينة</span>
+        <span className="flex-1 truncate text-fg-muted">{t('chat.common.unassigned')}</span>
         <span className="text-[11px] text-fg-subtle flex-shrink-0">{unassignedOpenCount}</span>
       </button>
     </div>
@@ -159,44 +161,45 @@ function AdvancedFilterPanel({
   tagsList, campaigns, selectedTagIds, toggleTagId, selectedAdIds, toggleAdId, toggleCampaign,
   dateFrom, setDateFrom, dateTo, setDateTo, onClose, onClear, activeCount
 }) {
+  const { t } = useTranslation()
   return (
     <div className="absolute left-4 right-4 lg:right-auto lg:left-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 w-auto lg:w-80 max-h-[70vh] overflow-y-auto">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-surface-3 sticky top-0 bg-surface-2">
-        <span className="text-sm font-semibold text-fg">فلتر متقدّم</span>
+        <span className="text-sm font-semibold text-fg">{t('conversations.filters.title')}</span>
         <div className="flex items-center gap-2">
-          {activeCount > 0 && <button onClick={onClear} className="text-xs text-danger hover:underline">مسح الكل</button>}
+          {activeCount > 0 && <button onClick={onClear} className="text-xs text-danger hover:underline">{t('conversations.filters.clearAll')}</button>}
           <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={15} /></button>
         </div>
       </div>
 
       <div className="p-3 border-b border-surface-3">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
-          <Calendar size={12} /> التاريخ
+          <Calendar size={12} /> {t('conversations.filters.date.label')}
         </p>
         <div className="flex items-center gap-2">
           <input type="date" value={dateFrom} onChange={e => setDateFrom(e.target.value)}
             className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-          <span className="text-fg-subtle text-xs flex-shrink-0">إلى</span>
+          <span className="text-fg-subtle text-xs flex-shrink-0">{t('conversations.filters.date.to')}</span>
           <input type="date" value={dateTo} onChange={e => setDateTo(e.target.value)}
             className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
         </div>
-        <p className="text-[10px] text-fg-subtle mt-1">لفلترة يوم واحد بس، اختاري نفس التاريخ في الخانتين</p>
+        <p className="text-[10px] text-fg-subtle mt-1">{t('conversations.filters.date.singleDayHint')}</p>
       </div>
 
       <div className="p-3 border-b border-surface-3">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
-          <TagIcon size={12} /> التاجات {selectedTagIds.length > 0 && <span className="text-brand">({selectedTagIds.length})</span>}
+          <TagIcon size={12} /> {t('conversations.filters.tags.label')} {selectedTagIds.length > 0 && <span className="text-brand">({selectedTagIds.length})</span>}
         </p>
         {tagsList.length === 0 ? (
-          <p className="text-xs text-fg-subtle">مفيش تاجات متاحة</p>
+          <p className="text-xs text-fg-subtle">{t('conversations.filters.tags.empty')}</p>
         ) : (
           <div className="space-y-1">
-            {tagsList.map(t => (
-              <label key={t.id} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-sm">
-                <input type="checkbox" checked={selectedTagIds.includes(t.id)} onChange={() => toggleTagId(t.id)}
+            {tagsList.map(tg => (
+              <label key={tg.id} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-sm">
+                <input type="checkbox" checked={selectedTagIds.includes(tg.id)} onChange={() => toggleTagId(tg.id)}
                   className="accent-brand w-3.5 h-3.5" />
-                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: t.color }} />
-                <span className="text-fg truncate">{t.name}</span>
+                <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tg.color }} />
+                <span className="text-fg truncate">{tg.name}</span>
               </label>
             ))}
           </div>
@@ -205,10 +208,10 @@ function AdvancedFilterPanel({
 
       <div className="p-3">
         <p className="flex items-center gap-1.5 text-[11px] font-semibold text-fg-subtle mb-2">
-          <Megaphone size={12} /> الإعلانات / الحملات {selectedAdIds.length > 0 && <span className="text-brand">({selectedAdIds.length})</span>}
+          <Megaphone size={12} /> {t('conversations.filters.campaigns.label')} {selectedAdIds.length > 0 && <span className="text-brand">({selectedAdIds.length})</span>}
         </p>
         {campaigns.length === 0 ? (
-          <p className="text-xs text-fg-subtle">مفيش حملات متاحة (اتأكدي إن حساب الإعلانات متظبط)</p>
+          <p className="text-xs text-fg-subtle">{t('conversations.filters.campaigns.empty')}</p>
         ) : (
           <div className="space-y-2.5">
             {campaigns.map(c => {
@@ -242,18 +245,18 @@ function timeAgo(dateStr) {
   if (!dateStr) return ''
   const diff = Date.now() - new Date(dateStr).getTime()
   const mins = Math.floor(diff / 60000)
-  if (mins < 1) return 'الآن'
-  if (mins < 60) return `${mins}د`
+  if (mins < 1) return i18n.t('conversations.time.now')
+  if (mins < 60) return i18n.t('conversations.time.minutesShort', { count: mins })
   const hours = Math.floor(mins / 60)
-  if (hours < 24) return `${hours}س`
-  return `${Math.floor(hours / 24)}ي`
+  if (hours < 24) return i18n.t('conversations.time.hoursShort', { count: hours })
+  return i18n.t('conversations.time.daysShort', { count: Math.floor(hours / 24) })
 }
 
 // اسم مؤقت مميّز لحد ما يتسجل اسم حقيقي (فيسبوك بيمنع جلب الاسم/الصورة لأغلب الحسابات)
 function displayName(contact) {
   if (contact?.name) return contact.name
-  if (contact?.platform_id) return `زائر ${contact.platform_id.slice(-4)}`
-  return 'مجهول'
+  if (contact?.platform_id) return i18n.t('chat.displayName.visitor', { id: contact.platform_id.slice(-4) })
+  return i18n.t('chat.displayName.unknown')
 }
 
 // كروم بيطلق حدث beforeinstallprompt مرة واحدة بس لكل تحميل صفحة، مش في كل مرة. المشكلة إن شاشة
@@ -365,6 +368,7 @@ export default function ConversationsScreen() {
   const toast = useToast()
   const { theme, toggleTheme } = useTheme()
   const navigate = useNavigate()
+  const { t } = useTranslation()
   const realtimeRef = useRef(null)
   const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
@@ -376,18 +380,18 @@ export default function ConversationsScreen() {
   const channelTabs = useMemo(() => {
     const tabs = []
     for (const c of CHANNELS) {
-      if (c.key === 'all') { tabs.push(c); continue }
+      if (c.key === 'all') { tabs.push({ ...c, label: t(c.labelKey) }); continue }
       const chsForPlatform = allChannels.filter(ch => ch.platform === c.key)
       if (chsForPlatform.length > 1) {
         chsForPlatform.forEach(ch => tabs.push({
           key: `${c.key}:${ch.id}`, label: getChannelLabel(ch), icon: PLATFORM_ICONS[c.key]
         }))
       } else {
-        tabs.push(c)
+        tabs.push({ ...c, label: t(c.labelKey) })
       }
     }
     return tabs
-  }, [allChannels])
+  }, [allChannels, t])
 
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
@@ -580,7 +584,7 @@ export default function ConversationsScreen() {
     if (unrepliedOnly) query = query.gt('unread_count', 0)
 
     const { data, error } = await query
-    if (error) { console.error(error); toast.error('فشل تحميل المحادثات، حاول تاني'); setLoading(false); return }
+    if (error) { console.error(error); toast.error(t('conversations.list.loadError')); setLoading(false); return }
 
     const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
     setConversations(convs); screenCache.conversations = convs
@@ -666,7 +670,7 @@ export default function ConversationsScreen() {
       else if (viewMode === 'mine') query = query.eq('assigned_agent_id', agent?.id)
 
       const { data, error } = await query
-      if (error) { console.error(error); toast.error('فشل البحث، حاول تاني'); setLoading(false); return }
+      if (error) { console.error(error); toast.error(t('conversations.search.error')); setLoading(false); return }
 
       const convs = (data || []).map(c => ({ ...c, myUnread: false }))
       setConversations(convs); screenCache.conversations = convs
@@ -700,7 +704,7 @@ export default function ConversationsScreen() {
       }
     } catch (err) {
       console.error(err)
-      toast.error('فشل البحث، حاول تاني')
+      toast.error(t('conversations.search.error'))
       setLoading(false)
     }
   }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll])
@@ -715,10 +719,10 @@ export default function ConversationsScreen() {
         body: JSON.stringify({ conversation_id: conv.id, from_agent_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إرسال الطلب')
-      toast.success('اتبعت طلب النقل، مستنيين رد الموظف')
+      if (!res.ok) throw new Error(data.error || t('conversations.transfer.requestError'))
+      toast.success(t('conversations.transfer.requestSent'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     }
   }
 
@@ -845,13 +849,14 @@ export default function ConversationsScreen() {
     const ids = [...selectedIds]
     if (!ids.length) return
     setBulkBusy(true)
+    const statusLabel = t(STATUS_TABS.find(s => s.key === newStatus)?.labelKey)
     const { error } = await supabase.from('conversations').update({ status: newStatus }).in('id', ids)
-    if (error) { toast.error('فشل تغيير الحالة'); setBulkBusy(false); return }
+    if (error) { toast.error(t('conversations.bulkActions.statusChangeError')); setBulkBusy(false); return }
     await supabase.from('conversation_activity_log').insert(
-      ids.map(id => ({ conversation_id: id, agent_id: agent?.id, description: `غيّر حالة المحادثة إلى "${STATUS_LABELS[newStatus]}" (تعديل جماعي)` }))
+      ids.map(id => ({ conversation_id: id, agent_id: agent?.id, description: t('conversations.bulkActions.statusChangeLogDescription', { status: statusLabel }) }))
     )
     setBulkBusy(false)
-    toast.success(`اتغيرت حالة ${ids.length} محادثة إلى "${STATUS_LABELS[newStatus]}"`)
+    toast.success(t('conversations.bulkActions.statusChangeSuccess', { count: ids.length, status: statusLabel }))
     exitSelectionMode()
     fetchConversations()
   }
@@ -862,12 +867,12 @@ export default function ConversationsScreen() {
     if (!ids.length) return
     setBulkBusy(true)
     const { error } = await supabase.from('conversations').update({ assigned_agent_id: agentId }).in('id', ids)
-    if (error) { toast.error('فشل التعيين'); setBulkBusy(false); return }
+    if (error) { toast.error(t('conversations.bulkActions.assignError')); setBulkBusy(false); return }
     await supabase.from('conversation_assignment_log').insert(
       ids.map(id => ({ conversation_id: id, assigned_to: agentId, assigned_by: agent?.id }))
     )
     setBulkBusy(false)
-    toast.success(`اتعينت ${ids.length} محادثة لـ ${agentsMap[agentId]?.name || 'الموظف'}`)
+    toast.success(t('conversations.bulkActions.assignSuccess', { count: ids.length, agent: agentsMap[agentId]?.name || t('chat.common.agentFallback') }))
     exitSelectionMode()
     fetchConversations()
   }
@@ -903,9 +908,9 @@ export default function ConversationsScreen() {
     setBulkMessageOpen(false)
     setBulkMessageText('')
     const failedCount = eligible.length - successCount
-    const parts = [`اتبعتت لـ ${successCount} محادثة`]
-    if (skipped > 0) parts.push(`اتجاهلت ${skipped} (مقفولة أو عدّت الـ٢٤ ساعة)`)
-    if (failedCount > 0) parts.push(`فشلت ${failedCount}`)
+    const parts = [t('conversations.bulkActions.sentCount', { count: successCount })]
+    if (skipped > 0) parts.push(t('conversations.bulkActions.skippedCount', { count: skipped }))
+    if (failedCount > 0) parts.push(t('conversations.bulkActions.failedCount', { count: failedCount }))
     toast[successCount > 0 ? 'success' : 'error'](parts.join(' — '))
     exitSelectionMode()
     fetchConversations()
@@ -936,16 +941,16 @@ export default function ConversationsScreen() {
             </div>
             {expanded && (
               <div className="min-w-0">
-                <p className="font-bold text-fg text-sm leading-tight truncate">Bridge - صحة وعافية</p>
+                <p className="font-bold text-fg text-sm leading-tight truncate">{t('conversations.sidebar.brandName')}</p>
                 <p className="text-xs text-fg-subtle leading-tight truncate">{agent?.name}</p>
               </div>
             )}
           </div>
-          <button onClick={() => setMobileMenuOpen(false)} title="اقفل"
+          <button onClick={() => setMobileMenuOpen(false)} title={t('conversations.sidebar.closeTitle')}
             className="lg:hidden w-7 h-7 flex-shrink-0 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             <X size={16} />
           </button>
-          <button onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? 'اقفل القايمة' : 'افتح القايمة'}
+          <button onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? t('conversations.sidebar.collapseTitle') : t('conversations.sidebar.expandTitle')}
             className="hidden lg:flex w-7 h-7 flex-shrink-0 items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             {sidebarOpen ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
           </button>
@@ -957,7 +962,7 @@ export default function ConversationsScreen() {
             <button onClick={() => setShowAgentStatus(v => !v)}
               className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg ${expanded ? 'px-2.5 py-1.5' : 'w-8 h-8 justify-center'}`}>
               <span className={`w-2 h-2 rounded-full flex-shrink-0 ${AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.dot}`} />
-              {expanded && <>{AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.label}<ChevronDown size={11} /></>}
+              {expanded && <>{t(AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.labelKey)}<ChevronDown size={11} /></>}
             </button>
             {showAgentStatus && (
               <div className="absolute right-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
@@ -966,14 +971,14 @@ export default function ConversationsScreen() {
                     onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
                     className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
-                    {s.label}
+                    {t(s.labelKey)}
                   </button>
                 ))}
               </div>
             )}
           </div>
           <div className={`flex items-center gap-1 ${expanded ? 'flex-wrap' : 'flex-col'}`}>
-            <button onClick={() => setShowNewConv(true)} title="بدء محادثة جديدة"
+            <button onClick={() => setShowNewConv(true)} title={t('conversations.newConversation.title')}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               <UserPlus size={15} />
             </button>
@@ -983,7 +988,7 @@ export default function ConversationsScreen() {
             </button>
             <PushNotificationToggle />
             {agent?.role === 'admin' && (
-              <button onClick={() => navigate('/reports')} title="التقارير"
+              <button onClick={() => navigate('/reports')} title={t('conversations.sidebar.reportsTitle')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
                 <BarChart3 size={15} />
               </button>
@@ -1007,7 +1012,7 @@ export default function ConversationsScreen() {
             <button onClick={() => isIOS ? setShowIosHelp(true) : promptInstall()}
               className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors ${expanded ? 'w-full justify-center px-2.5 py-2' : 'w-8 h-8 justify-center'}`}>
               <Download size={14} />
-              {expanded && 'ثبّت التطبيق على الموبايل'}
+              {expanded && t('conversations.sidebar.installButton')}
             </button>
           </div>
         )}
@@ -1019,7 +1024,7 @@ export default function ConversationsScreen() {
               <div className="relative">
                 <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
-                  placeholder={searchType === 'contact' ? 'بحث بالاسم أو رقم الهاتف...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
+                  placeholder={searchType === 'contact' ? t('conversations.search.placeholderContact') : searchType === 'comment' ? t('conversations.search.placeholderComment') : t('conversations.search.placeholderMessage')}
                   className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
               <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
@@ -1028,11 +1033,11 @@ export default function ConversationsScreen() {
               <div className="flex bg-surface-3 rounded-xl p-0.5 lg:mt-2">
                 <button onClick={() => { setViewMode('all'); setAgentFilter('') }}
                   className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'all' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-                  <Users size={12} /> الكل
+                  <Users size={12} /> {t('conversations.viewMode.all')}
                 </button>
                 <button onClick={() => { setViewMode('mine'); setAgentFilter('') }}
                   className={`flex-1 flex items-center justify-center gap-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors ${viewMode === 'mine' && !agentFilter ? 'bg-brand text-white' : 'text-fg-muted'}`}>
-                  <User size={12} /> بتاعتي
+                  <User size={12} /> {t('conversations.viewMode.mine')}
                 </button>
               </div>
             )}
@@ -1054,12 +1059,12 @@ export default function ConversationsScreen() {
               {agentFilter === 'unassigned' ? (
                 <>
                   <UserX size={14} className="text-fg-muted flex-shrink-0" />
-                  <span className="flex-1 text-right truncate">غير معينة</span>
+                  <span className="flex-1 text-right truncate">{t('chat.common.unassigned')}</span>
                 </>
               ) : agentFilter === 'ai' ? (
                 <>
                   <Bot size={14} className="text-brand flex-shrink-0" />
-                  <span className="flex-1 text-right truncate">AI Agent</span>
+                  <span className="flex-1 text-right truncate">{t('conversations.agentFilter.aiAgentLabel')}</span>
                 </>
               ) : agentFilter ? (
                 <>
@@ -1067,7 +1072,7 @@ export default function ConversationsScreen() {
                   <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
                 </>
               ) : (
-                <span className="flex-1 text-right text-fg-muted">كل الموظفين</span>
+                <span className="flex-1 text-right text-fg-muted">{t('conversations.agentFilter.allAgents')}</span>
               )}
               <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
             </button>
@@ -1083,15 +1088,16 @@ export default function ConversationsScreen() {
         <div className="flex-1 overflow-y-auto">
           {/* Status Tabs — عمودي */}
           <div className={expanded ? 'py-2' : 'py-2'}>
-            {STATUS_TABS.map(t => {
-              const count = t.key === 'open' ? statusCounts.openUnread : statusCounts[t.key]
+            {STATUS_TABS.map(tab => {
+              const count = tab.key === 'open' ? statusCounts.openUnread : statusCounts[tab.key]
+              const tabLabel = t(tab.labelKey)
               return (
-                <button key={t.key} onClick={() => { setStatus(t.key); setMobileMenuOpen(false) }} title={t.label}
-                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${expanded ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === t.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${t.dot}`} />
-                  {expanded && <span className="flex-1 text-right">{t.label}</span>}
+                <button key={tab.key} onClick={() => { setStatus(tab.key); setMobileMenuOpen(false) }} title={tabLabel}
+                  className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${expanded ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === tab.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                  <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />
+                  {expanded && <span className="flex-1 text-right">{tabLabel}</span>}
                   {expanded && count > 0 && (
-                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${t.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
+                    <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
                       {count}
                     </span>
                   )}
@@ -1103,10 +1109,10 @@ export default function ConversationsScreen() {
           {/* Lifecycle — عدد المحادثات المفتوحة في كل مرحلة، والضغط عليها بيفلتر القائمة (بالحالة المختارة حالياً) */}
           {expanded && lifecycles.length > 0 && (
             <div className="border-t border-surface-3 py-2">
-              <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">اللايف سايكل</p>
+              <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">{t('conversations.lifecycle.heading')}</p>
               <button onClick={() => { setSelectedLifecycle(null); setMobileMenuOpen(false) }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${!selectedLifecycle ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-                <span className="flex-1 text-right">كل المراحل</span>
+                <span className="flex-1 text-right">{t('conversations.lifecycle.allStages')}</span>
               </button>
               {lifecycles.map(l => (
                 <button key={l.id} onClick={() => { setSelectedLifecycle(prev => prev === l.id ? null : l.id); setMobileMenuOpen(false) }}
@@ -1134,8 +1140,8 @@ export default function ConversationsScreen() {
             <Menu size={19} />
           </button>
           <div className="flex items-center gap-1.5">
-            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_TABS.find(t => t.key === status)?.dot}`} />
-            <p className="font-semibold text-sm text-fg">{STATUS_TABS.find(t => t.key === status)?.label}</p>
+            <span className={`w-1.5 h-1.5 rounded-full ${STATUS_TABS.find(s => s.key === status)?.dot}`} />
+            <p className="font-semibold text-sm text-fg">{t(STATUS_TABS.find(s => s.key === status)?.labelKey)}</p>
           </div>
           <div className="w-9 h-9" />
         </div>
@@ -1145,7 +1151,7 @@ export default function ConversationsScreen() {
           <div className="relative">
             <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input value={search} onChange={e => setSearch(e.target.value)}
-              placeholder={searchType === 'contact' ? 'بحث بالاسم أو رقم الهاتف...' : searchType === 'comment' ? 'بحث في التعليقات...' : 'بحث في الرسايل...'}
+              placeholder={searchType === 'contact' ? t('conversations.search.placeholderContact') : searchType === 'comment' ? t('conversations.search.placeholderComment') : t('conversations.search.placeholderMessage')}
               className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
@@ -1167,20 +1173,20 @@ export default function ConversationsScreen() {
           <button onClick={() => setUnrepliedOnly(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${unrepliedOnly ? 'bg-danger text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <CircleDot size={11} />
-            بدون رد
+            {t('conversations.filters.unrepliedOnly')}
           </button>
           <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
           <button onClick={() => setShowAdvFilter(v => !v)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${advFilterActiveCount > 0 ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <Filter size={11} />
-            فلتر
+            {t('conversations.filters.advancedButton')}
             {advFilterActiveCount > 0 && <span className="text-[10px] font-bold bg-white/25 rounded-full px-1.5">{advFilterActiveCount}</span>}
           </button>
           <span className="w-px h-4 bg-surface-3 flex-shrink-0" />
           <button onClick={() => selectionMode ? exitSelectionMode() : setSelectionMode(true)}
             className={`flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium whitespace-nowrap transition-colors flex-shrink-0 ${selectionMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <CheckSquare size={11} />
-            {selectionMode ? 'إلغاء التحديد' : 'تحديد'}
+            {selectionMode ? t('conversations.selection.disable') : t('conversations.selection.enable')}
           </button>
         </div>
         {showAdvFilter && (
@@ -1203,7 +1209,7 @@ export default function ConversationsScreen() {
           ) : filtered.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-40 text-fg-subtle">
               <MessageSquare size={32} className="mb-2 opacity-20" />
-              <p className="text-sm">لا توجد محادثات</p>
+              <p className="text-sm">{t('conversations.list.empty')}</p>
             </div>
           ) : (
             <>
@@ -1226,7 +1232,7 @@ export default function ConversationsScreen() {
                 <div className="flex justify-center py-4">
                   <button onClick={() => setVisibleLimit(v => v + CONVERSATIONS_PAGE_SIZE)}
                     className="text-xs text-brand font-medium px-4 py-2 rounded-full bg-surface-2 hover:bg-surface-3 transition-colors">
-                    تحميل المزيد
+                    {t('conversations.list.loadMore')}
                   </button>
                 </div>
               )}
@@ -1238,20 +1244,20 @@ export default function ConversationsScreen() {
         {selectionMode && selectedIds.size > 0 && (
           <div className="flex-shrink-0 bg-surface-2 border-t border-surface-3 px-4 py-3 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-sm font-medium text-fg">تم تحديد {selectedIds.size}</span>
-              <button onClick={exitSelectionMode} className="text-xs text-fg-muted hover:text-fg">إلغاء</button>
+              <span className="text-sm font-medium text-fg">{t('conversations.selection.selectedLabel', { count: selectedIds.size })}</span>
+              <button onClick={exitSelectionMode} className="text-xs text-fg-muted hover:text-fg">{t('chat.common.cancel')}</button>
             </div>
             <div className="flex items-center gap-2 flex-wrap">
-              {STATUS_TABS.filter(t => t.key !== 'all').map(t => (
-                <button key={t.key} onClick={() => bulkChangeStatus(t.key)} disabled={bulkBusy}
+              {STATUS_TABS.filter(tab => tab.key !== 'all').map(tab => (
+                <button key={tab.key} onClick={() => bulkChangeStatus(tab.key)} disabled={bulkBusy}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                  <span className={`w-2 h-2 rounded-full ${t.dot}`} /> نقل لـ{t.label}
+                  <span className={`w-2 h-2 rounded-full ${tab.dot}`} /> {t('conversations.bulkActions.moveToStatus', { status: t(tab.labelKey) })}
                 </button>
               ))}
               <div className="relative">
                 <button onClick={() => setShowBulkAssign(v => !v)} disabled={bulkBusy}
                   className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                  <Users size={12} /> تعيين لموظف <ChevronDown size={11} />
+                  <Users size={12} /> {t('conversations.bulkActions.assignToAgent')} <ChevronDown size={11} />
                 </button>
                 {showBulkAssign && (
                   <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-56 overflow-y-auto">
@@ -1266,7 +1272,7 @@ export default function ConversationsScreen() {
               </div>
               <button onClick={() => setBulkMessageOpen(true)} disabled={bulkBusy}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50">
-                <Send size={12} /> رسالة جماعية
+                <Send size={12} /> {t('conversations.bulkActions.bulkMessage')}
               </button>
             </div>
           </div>
@@ -1277,19 +1283,19 @@ export default function ConversationsScreen() {
       {bulkMessageOpen && (
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !bulkBusy && setBulkMessageOpen(false)}>
           <div className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-96 p-5" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-fg mb-1">رسالة جماعية لـ {selectedIds.size} محادثة</p>
-            <p className="text-xs text-fg-subtle mb-3">هتتبعت بس للمحادثات المفتوحة/في المتابعة واللي لسه في نافذة الـ٢٤ ساعة — الباقي هيتجاهل تلقائي.</p>
+            <p className="font-semibold text-fg mb-1">{t('conversations.bulkActions.bulkMessageTitle', { count: selectedIds.size })}</p>
+            <p className="text-xs text-fg-subtle mb-3">{t('conversations.bulkActions.messageHint')}</p>
             <textarea value={bulkMessageText} onChange={e => setBulkMessageText(e.target.value)}
-              placeholder="اكتب الرسالة..." rows={4}
+              placeholder={t('conversations.bulkActions.messagePlaceholder')} rows={4}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
             <div className="flex gap-2 mt-4">
               <button onClick={() => setBulkMessageOpen(false)} disabled={bulkBusy}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                إلغاء
+                {t('chat.common.cancel')}
               </button>
               <button onClick={bulkSendMessage} disabled={bulkBusy || !bulkMessageText.trim()}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-                {bulkBusy ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'إرسال'}
+                {bulkBusy ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('conversations.common.send')}
               </button>
             </div>
           </div>
@@ -1310,15 +1316,15 @@ export default function ConversationsScreen() {
       {showIosHelp && (
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => setShowIosHelp(false)}>
           <div className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-96 p-5" onClick={e => e.stopPropagation()}>
-            <p className="font-semibold text-fg mb-3">تثبيت التطبيق على آيفون</p>
+            <p className="font-semibold text-fg mb-3">{t('conversations.install.iosTitle')}</p>
             <ol className="space-y-2 text-sm text-fg-muted list-decimal pr-4">
-              <li className="flex items-center gap-1.5">اضغط زر المشاركة <Share size={14} className="inline text-brand" /> في متصفح سفاري</li>
-              <li>مرّر لتحت واختار "إضافة إلى الشاشة الرئيسية"</li>
-              <li>اضغط "إضافة" في أعلى الشاشة</li>
+              <li className="flex items-center gap-1.5">{t('conversations.install.iosStep1Before')} <Share size={14} className="inline text-brand" /> {t('conversations.install.iosStep1After')}</li>
+              <li>{t('conversations.install.iosStep2')}</li>
+              <li>{t('conversations.install.iosStep3')}</li>
             </ol>
             <button onClick={() => setShowIosHelp(false)}
               className="w-full mt-4 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white">
-              تمام
+              {t('conversations.install.okButton')}
             </button>
           </div>
         </div>
@@ -1328,15 +1334,16 @@ export default function ConversationsScreen() {
 }
 
 function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer }) {
+  const { t } = useTranslation()
   const contact = conv.contacts
 
   const lastMsgText = lastMsg
     ? lastMsg.content_type !== 'text'
-      ? lastMsg.content_type === 'image' ? '📷 صورة'
-        : lastMsg.content_type === 'sticker' ? '👍 ملصق'
-        : lastMsg.content_type === 'video' ? '🎥 فيديو'
-        : lastMsg.content_type === 'audio' ? '🎵 صوت'
-        : '📎 ملف'
+      ? lastMsg.content_type === 'image' ? t('conversations.contentTypes.image')
+        : lastMsg.content_type === 'sticker' ? t('conversations.contentTypes.sticker')
+        : lastMsg.content_type === 'video' ? t('conversations.contentTypes.video')
+        : lastMsg.content_type === 'audio' ? t('conversations.contentTypes.audio')
+        : t('conversations.contentTypes.file')
       : (lastMsg.direction === 'outbound' ? '↩ ' : '') + (lastMsg.content || '')
     : ''
 
@@ -1355,11 +1362,11 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         </div>
         <div className="flex-1 min-w-0">
           <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
-          <p className="text-xs text-fg-subtle truncate">مع: {assignedAgent?.name || 'موظف تاني'}</p>
+          <p className="text-xs text-fg-subtle truncate">{t('conversations.card.withAgent', { agent: assignedAgent?.name || t('conversations.card.otherAgent') })}</p>
         </div>
         <button onClick={onRequestTransfer}
           className="flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors">
-          اطلب النقل
+          {t('conversations.card.requestTransferButton')}
         </button>
       </div>
     )
@@ -1388,12 +1395,12 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
           {PLATFORM_ICONS[conv.platform]}
         </div>
         {conv.ai_active && (
-          <div className="absolute -top-0.5 -left-0.5 bg-brand text-white p-0.5 rounded-full" title="الـ AI Agent شغال على المحادثة دي">
+          <div className="absolute -top-0.5 -left-0.5 bg-brand text-white p-0.5 rounded-full" title={t('conversations.card.aiActiveTitle')}>
             <Bot size={11} />
           </div>
         )}
         {conv.ad_referral && (
-          <div className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white p-0.5 rounded-full" title="العميل ده جاي من إعلان ممول — لازم اهتمام">
+          <div className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white p-0.5 rounded-full" title={t('conversations.card.adReferralTitle')}>
             <DollarSign size={11} />
           </div>
         )}
@@ -1415,7 +1422,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <span className="text-xs text-fg-muted truncate flex-1">
-            {lastMsgText || (assignedAgent?.name ? `@${assignedAgent.name}` : 'غير معين')}
+            {lastMsgText || (assignedAgent?.name ? `@${assignedAgent.name}` : t('chat.common.unassigned'))}
           </span>
           {conv.myUnread && (
             <span className="bg-brand text-white text-xs font-bold px-1.5 py-0.5 rounded-full min-w-[20px] text-center flex-shrink-0 pulse-dot">
@@ -1431,9 +1438,9 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         )}
         {tags?.length > 0 && (
           <div className="flex gap-1 mt-1 flex-wrap">
-            {tags.map(t => (
-              <span key={t.id} className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: t.color }}>
-                {t.name}
+            {tags.map(tg => (
+              <span key={tg.id} className="text-[10px] px-1.5 py-0.5 rounded-full text-white" style={{ background: tg.color }}>
+                {tg.name}
               </span>
             ))}
           </div>
@@ -1448,6 +1455,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
 // العادية — من هناك الإرسال بيمشي بنفس المسارات الموجودة أصلاً حسب المنصة (واتساب QR: صندوق
 // كتابة عادي على طول، واتساب الرسمي: بيتجبر على "ابعت قالب معتمد" لأول رسالة لعميل جديد)
 function NewConversationModal({ agentId, channels, onClose, onStarted }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const [name, setName] = useState('')
   const [phone, setPhone] = useState('')
@@ -1456,7 +1464,7 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
 
   const start = async () => {
     if (!name.trim() || !phone.trim() || !channelId) {
-      toast.error('املا الاسم ورقم التليفون واختار قناة')
+      toast.error(t('conversations.newConversation.missingFieldsError'))
       return
     }
     setSending(true)
@@ -1466,10 +1474,10 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), channel_id: channelId, agent_id: agentId })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل بدء المحادثة')
+      if (!res.ok) throw new Error(data.error || t('conversations.newConversation.startError'))
       onStarted(data.conversation_id)
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     } finally {
       setSending(false)
     }
@@ -1480,7 +1488,7 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
       <div onClick={e => e.stopPropagation()}
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[400px] max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
-          <p className="text-sm font-semibold text-fg">بدء محادثة جديدة</p>
+          <p className="text-sm font-semibold text-fg">{t('conversations.newConversation.title')}</p>
           <button onClick={onClose} disabled={sending}
             className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 disabled:opacity-50">
             <X size={16} />
@@ -1489,35 +1497,35 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
 
         <div className="p-5 space-y-4">
           <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">الاسم</label>
-            <input value={name} onChange={e => setName(e.target.value)} placeholder="اسم العميل"
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('conversations.newConversation.nameLabel')}</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder={t('conversations.newConversation.namePlaceholder')}
               className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">رقم التليفون</label>
-            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="بالكود الدولي، مثلاً 201001234567" dir="ltr"
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('conversations.newConversation.phoneLabel')}</label>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder={t('conversations.newConversation.phonePlaceholder')} dir="ltr"
               className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle text-left focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <div>
-            <label className="block text-xs font-semibold text-fg mb-1.5">تبعت من رقم</label>
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('conversations.newConversation.sendFromLabel')}</label>
             {channels.length === 0 ? (
-              <p className="text-xs text-danger">مفيش رقم واتساب نشط متربط</p>
+              <p className="text-xs text-danger">{t('conversations.newConversation.noActiveChannel')}</p>
             ) : (
               <select value={channelId} onChange={e => setChannelId(e.target.value)}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
                 {channels.map(c => (
                   <option key={c.id} value={c.id}>
-                    {getChannelLabel(c) || c.display_name} {c.platform === 'whatsapp_qr' ? '(ربط سريع)' : ''}
+                    {getChannelLabel(c) || c.display_name} {c.platform === 'whatsapp_qr' ? t('conversations.newConversation.quickLinkTag') : ''}
                   </option>
                 ))}
               </select>
             )}
             {/* واتساب الرسمي هيتجبر على قالب معتمد لأول رسالة — دي قاعدة ميتا نفسها مش اختيار عندنا */}
-            <p className="text-[11px] text-fg-subtle mt-1.5">لو اخترت واتساب الرسمي، أول رسالة هتبقى لازم قالب معتمد من ميتا.</p>
+            <p className="text-[11px] text-fg-subtle mt-1.5">{t('conversations.newConversation.officialTemplateHint')}</p>
           </div>
           <button onClick={start} disabled={sending || channels.length === 0}
             className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-            {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'بدء المحادثة'}
+            {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('conversations.newConversation.submitButton')}
           </button>
         </div>
       </div>

@@ -720,5 +720,163 @@
     "channelLabel": {
       "whatsappFallback": "WhatsApp"
     }
+  },
+  "conversations": {
+    "sidebar": {
+      "brandName": "Bridge - Seha Wa Afeya",
+      "closeTitle": "Close",
+      "collapseTitle": "Collapse menu",
+      "expandTitle": "Expand menu",
+      "reportsTitle": "Reports",
+      "installButton": "Install app on phone"
+    },
+    "viewMode": {
+      "all": "All",
+      "mine": "Mine"
+    },
+    "agentStatus": {
+      "online": "Active",
+      "busy": "Busy",
+      "offline": "Offline"
+    },
+    "statusTabs": {
+      "all": "All"
+    },
+    "channels": {
+      "all": "All"
+    },
+    "agentFilter": {
+      "allAgents": "All agents",
+      "aiEnabledTitle": "AI Agent is enabled",
+      "aiDisabledTitle": "AI Agent is disabled",
+      "aiAgentLabel": "AI Agent",
+      "aiOpenCountTitle": "Open conversations handled by AI",
+      "agentOpenCountTitle": "Open conversations assigned to them"
+    },
+    "common": {
+      "send": "Send"
+    },
+    "search": {
+      "placeholderContact": "Search by name or phone number...",
+      "placeholderComment": "Search in comments...",
+      "placeholderMessage": "Search in messages...",
+      "error": "Search failed, please try again",
+      "types": {
+        "contact": "Contact",
+        "message": "Message",
+        "comment": "Comment"
+      }
+    },
+    "filters": {
+      "advancedButton": "Filter",
+      "unrepliedOnly": "No reply",
+      "title": "Advanced filter",
+      "clearAll": "Clear all",
+      "date": {
+        "label": "Date",
+        "to": "to",
+        "singleDayHint": "To filter a single day, select the same date in both fields"
+      },
+      "tags": {
+        "label": "Tags",
+        "empty": "No tags available"
+      },
+      "campaigns": {
+        "label": "Ads / Campaigns",
+        "empty": "No campaigns available (make sure the ads account is set up correctly)"
+      }
+    },
+    "lifecycle": {
+      "heading": "Lifecycle stages",
+      "allStages": "All stages"
+    },
+    "list": {
+      "empty": "No conversations",
+      "loadMore": "Load more",
+      "loadError": "Failed to load conversations, please try again"
+    },
+    "selection": {
+      "enable": "Select",
+      "disable": "Cancel selection",
+      "selectedLabel": "{{count}} selected"
+    },
+    "bulkActions": {
+      "moveToStatus": "Move to {{status}}",
+      "assignToAgent": "Assign to agent",
+      "bulkMessage": "Bulk message",
+      "bulkMessageTitle_one": "Bulk message to {{count}} conversation",
+      "bulkMessageTitle_two": "Bulk message to {{count}} conversations",
+      "bulkMessageTitle_few": "Bulk message to {{count}} conversations",
+      "bulkMessageTitle_many": "Bulk message to {{count}} conversations",
+      "bulkMessageTitle_other": "Bulk message to {{count}} conversations",
+      "messageHint": "This will only be sent to open or follow-up conversations still within the 24-hour window — the rest will be skipped automatically.",
+      "messagePlaceholder": "Type your message...",
+      "statusChangeError": "Failed to change status",
+      "statusChangeLogDescription": "Changed the conversation status to \"{{status}}\" (bulk update)",
+      "statusChangeSuccess_one": "Changed the status of {{count}} conversation to \"{{status}}\"",
+      "statusChangeSuccess_two": "Changed the status of {{count}} conversations to \"{{status}}\"",
+      "statusChangeSuccess_few": "Changed the status of {{count}} conversations to \"{{status}}\"",
+      "statusChangeSuccess_many": "Changed the status of {{count}} conversations to \"{{status}}\"",
+      "statusChangeSuccess_other": "Changed the status of {{count}} conversations to \"{{status}}\"",
+      "assignError": "Failed to assign",
+      "assignSuccess_one": "Assigned {{count}} conversation to {{agent}}",
+      "assignSuccess_two": "Assigned {{count}} conversations to {{agent}}",
+      "assignSuccess_few": "Assigned {{count}} conversations to {{agent}}",
+      "assignSuccess_many": "Assigned {{count}} conversations to {{agent}}",
+      "assignSuccess_other": "Assigned {{count}} conversations to {{agent}}",
+      "sentCount_one": "Sent to {{count}} conversation",
+      "sentCount_two": "Sent to {{count}} conversations",
+      "sentCount_few": "Sent to {{count}} conversations",
+      "sentCount_many": "Sent to {{count}} conversations",
+      "sentCount_other": "Sent to {{count}} conversations",
+      "skippedCount": "Skipped {{count}} (closed or past the 24-hour window)",
+      "failedCount": "Failed: {{count}}"
+    },
+    "transfer": {
+      "requestError": "Failed to send the request",
+      "requestSent": "Transfer request sent, waiting for the agent's response"
+    },
+    "card": {
+      "withAgent": "With: {{agent}}",
+      "otherAgent": "Another agent",
+      "requestTransferButton": "Request transfer",
+      "aiActiveTitle": "AI Agent is handling this conversation",
+      "adReferralTitle": "This contact came from a paid ad — needs attention"
+    },
+    "contentTypes": {
+      "image": "📷 Photo",
+      "sticker": "👍 Sticker",
+      "video": "🎥 Video",
+      "audio": "🎵 Audio",
+      "file": "📎 File"
+    },
+    "time": {
+      "now": "Now",
+      "minutesShort": "{{count}}m",
+      "hoursShort": "{{count}}h",
+      "daysShort": "{{count}}d"
+    },
+    "newConversation": {
+      "title": "Start new conversation",
+      "missingFieldsError": "Please enter the name, phone number, and select a channel",
+      "startError": "Failed to start the conversation",
+      "nameLabel": "Name",
+      "namePlaceholder": "Contact name",
+      "phoneLabel": "Phone number",
+      "phonePlaceholder": "With country code, e.g. 201001234567",
+      "sendFromLabel": "Send from number",
+      "noActiveChannel": "No active WhatsApp number linked",
+      "quickLinkTag": "(Quick link)",
+      "officialTemplateHint": "If you choose official WhatsApp, the first message must be a template approved by Meta.",
+      "submitButton": "Start conversation"
+    },
+    "install": {
+      "iosTitle": "Install the app on iPhone",
+      "iosStep1Before": "Tap the Share button",
+      "iosStep1After": "in Safari",
+      "iosStep2": "Scroll down and choose \"Add to Home Screen\"",
+      "iosStep3": "Tap \"Add\" at the top of the screen",
+      "okButton": "OK"
+    }
   }
 }

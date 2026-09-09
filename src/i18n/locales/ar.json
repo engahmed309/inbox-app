@@ -720,5 +720,163 @@
     "channelLabel": {
       "whatsappFallback": "واتساب"
     }
+  },
+  "conversations": {
+    "sidebar": {
+      "brandName": "Bridge - صحة وعافية",
+      "closeTitle": "إغلاق",
+      "collapseTitle": "أغلق القائمة",
+      "expandTitle": "افتح القائمة",
+      "reportsTitle": "التقارير",
+      "installButton": "ثبّت التطبيق على الهاتف"
+    },
+    "viewMode": {
+      "all": "الكل",
+      "mine": "الخاصة بي"
+    },
+    "agentStatus": {
+      "online": "نشط",
+      "busy": "مشغول",
+      "offline": "غير متصل"
+    },
+    "statusTabs": {
+      "all": "الكل"
+    },
+    "channels": {
+      "all": "الكل"
+    },
+    "agentFilter": {
+      "allAgents": "كل الموظفين",
+      "aiEnabledTitle": "الـ AI Agent مفعّل",
+      "aiDisabledTitle": "الـ AI Agent متوقف",
+      "aiAgentLabel": "AI Agent",
+      "aiOpenCountTitle": "محادثات مفتوحة يرد عليها الـ AI",
+      "agentOpenCountTitle": "محادثات مفتوحة معيّنة له"
+    },
+    "common": {
+      "send": "إرسال"
+    },
+    "search": {
+      "placeholderContact": "البحث بالاسم أو رقم الهاتف...",
+      "placeholderComment": "البحث في التعليقات...",
+      "placeholderMessage": "البحث في الرسائل...",
+      "error": "فشل البحث، حاول مرة أخرى",
+      "types": {
+        "contact": "عميل",
+        "message": "رسالة",
+        "comment": "تعليق"
+      }
+    },
+    "filters": {
+      "advancedButton": "تصفية",
+      "unrepliedOnly": "بدون رد",
+      "title": "تصفية متقدمة",
+      "clearAll": "مسح الكل",
+      "date": {
+        "label": "التاريخ",
+        "to": "إلى",
+        "singleDayHint": "لتصفية يوم واحد فقط، اختر نفس التاريخ في كلا الحقلين"
+      },
+      "tags": {
+        "label": "الوسوم",
+        "empty": "لا توجد وسوم متاحة"
+      },
+      "campaigns": {
+        "label": "الإعلانات / الحملات",
+        "empty": "لا توجد حملات متاحة (تأكد من أن حساب الإعلانات مُعد بشكل صحيح)"
+      }
+    },
+    "lifecycle": {
+      "heading": "مراحل الـ Lifecycle",
+      "allStages": "كل المراحل"
+    },
+    "list": {
+      "empty": "لا توجد محادثات",
+      "loadMore": "تحميل المزيد",
+      "loadError": "فشل تحميل المحادثات، حاول مرة أخرى"
+    },
+    "selection": {
+      "enable": "تحديد",
+      "disable": "إلغاء التحديد",
+      "selectedLabel": "تم تحديد {{count}}"
+    },
+    "bulkActions": {
+      "moveToStatus": "نقل إلى {{status}}",
+      "assignToAgent": "تعيين لموظف",
+      "bulkMessage": "رسالة جماعية",
+      "bulkMessageTitle_one": "رسالة جماعية لمحادثة واحدة",
+      "bulkMessageTitle_two": "رسالة جماعية لمحادثتين",
+      "bulkMessageTitle_few": "رسالة جماعية إلى {{count}} محادثات",
+      "bulkMessageTitle_many": "رسالة جماعية إلى {{count}} محادثة",
+      "bulkMessageTitle_other": "رسالة جماعية إلى {{count}} محادثة",
+      "messageHint": "سيتم الإرسال فقط للمحادثات المفتوحة أو قيد المتابعة والتي لا تزال ضمن نافذة الـ٢٤ ساعة — سيتم تجاهل البقية تلقائيًا.",
+      "messagePlaceholder": "اكتب الرسالة...",
+      "statusChangeError": "فشل تغيير الحالة",
+      "statusChangeLogDescription": "غيّر حالة المحادثة إلى \"{{status}}\" (تعديل جماعي)",
+      "statusChangeSuccess_one": "تم تغيير حالة محادثة واحدة إلى \"{{status}}\"",
+      "statusChangeSuccess_two": "تم تغيير حالة محادثتين إلى \"{{status}}\"",
+      "statusChangeSuccess_few": "تم تغيير حالة {{count}} محادثات إلى \"{{status}}\"",
+      "statusChangeSuccess_many": "تم تغيير حالة {{count}} محادثة إلى \"{{status}}\"",
+      "statusChangeSuccess_other": "تم تغيير حالة {{count}} محادثة إلى \"{{status}}\"",
+      "assignError": "فشل التعيين",
+      "assignSuccess_one": "تم تعيين محادثة واحدة لـ {{agent}}",
+      "assignSuccess_two": "تم تعيين محادثتين لـ {{agent}}",
+      "assignSuccess_few": "تم تعيين {{count}} محادثات لـ {{agent}}",
+      "assignSuccess_many": "تم تعيين {{count}} محادثة لـ {{agent}}",
+      "assignSuccess_other": "تم تعيين {{count}} محادثة لـ {{agent}}",
+      "sentCount_one": "أُرسلت إلى محادثة واحدة",
+      "sentCount_two": "أُرسلت إلى محادثتين",
+      "sentCount_few": "أُرسلت إلى {{count}} محادثات",
+      "sentCount_many": "أُرسلت إلى {{count}} محادثة",
+      "sentCount_other": "أُرسلت إلى {{count}} محادثة",
+      "skippedCount": "تم تجاهل {{count}} (مغلقة أو تجاوزت الـ24 ساعة)",
+      "failedCount": "فشل {{count}}"
+    },
+    "transfer": {
+      "requestError": "فشل إرسال الطلب",
+      "requestSent": "تم إرسال طلب النقل، بانتظار رد الموظف"
+    },
+    "card": {
+      "withAgent": "مع: {{agent}}",
+      "otherAgent": "موظف آخر",
+      "requestTransferButton": "طلب النقل",
+      "aiActiveTitle": "الـ AI Agent يعمل على هذه المحادثة",
+      "adReferralTitle": "هذا العميل قادم من إعلان مموّل — يحتاج إلى اهتمام"
+    },
+    "contentTypes": {
+      "image": "📷 صورة",
+      "sticker": "👍 ملصق",
+      "video": "🎥 فيديو",
+      "audio": "🎵 صوت",
+      "file": "📎 ملف"
+    },
+    "time": {
+      "now": "الآن",
+      "minutesShort": "{{count}}د",
+      "hoursShort": "{{count}}س",
+      "daysShort": "{{count}}ي"
+    },
+    "newConversation": {
+      "title": "بدء محادثة جديدة",
+      "missingFieldsError": "يرجى إدخال الاسم ورقم الهاتف واختيار القناة",
+      "startError": "فشل بدء المحادثة",
+      "nameLabel": "الاسم",
+      "namePlaceholder": "اسم العميل",
+      "phoneLabel": "رقم الهاتف",
+      "phonePlaceholder": "بالرمز الدولي، مثال: 201001234567",
+      "sendFromLabel": "الإرسال من رقم",
+      "noActiveChannel": "لا يوجد رقم واتساب نشط مرتبط",
+      "quickLinkTag": "(ربط سريع)",
+      "officialTemplateHint": "في حال اختيار واتساب الرسمي، يجب أن تكون أول رسالة قالبًا معتمدًا من ميتا.",
+      "submitButton": "بدء المحادثة"
+    },
+    "install": {
+      "iosTitle": "تثبيت التطبيق على آيفون",
+      "iosStep1Before": "اضغط زر المشاركة",
+      "iosStep1After": "في متصفح سفاري",
+      "iosStep2": "مرر للأسفل واختر \"إضافة إلى الشاشة الرئيسية\"",
+      "iosStep3": "اضغط \"إضافة\" في أعلى الشاشة",
+      "okButton": "حسنًا"
+    }
   }
 }
