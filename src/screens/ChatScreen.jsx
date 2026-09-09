@@ -9,7 +9,7 @@ import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -25,7 +25,9 @@ const MESSAGES_PAGE_SIZE = 50 // بنجيب آخر ٥٠ رسالة بس، وال
 // نرد فيها برسالة عادية — بعد كده الرد بيترفض (واتساب بيتطلب Template معتمد، فيسبوك/انستجرام بيمنعوا الرد خالص)
 // نافذة الرد المسموحة بتختلف من منصة للتانية — ميتا/واتساب ٢٤ ساعة، وتيك توك ٤٨ ساعة
 const MESSAGE_WINDOW_HOURS = 24
-const PLATFORM_WINDOW_HOURS = { tiktok: 48 }
+// whatsapp_qr مالوش قيد نافذة الـ٢٤ ساعة أصلاً — ده بالظبط سبب وجود القناة دي — فـ Infinity
+// بتخلّي شرط isWindowExpired تحت دايمًا false ليها من غير أي شرط إضافي في أي مكان تاني
+const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity }
 const WINDOW_EXPIRED_TEXT = {
   tiktok: 'عدّت ٤٨ ساعة من آخر رسالة للعميل — تيك توك بيرفض أي رد بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
   whatsapp: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — واتساب مايسمحش برسالة عادية دلوقتي، لازم تبعت Template معتمد مسبقاً من ميتا.',
@@ -273,7 +275,7 @@ export default function ChatScreen() {
       fetch(`${API_URL}/conversations/${id}/mark-seen`, { method: 'POST' }).catch(() => {})
 
       // القنوات المتصلة بمحادثة الواتساب دي (كل رقم كلّم بيه العميل) — لتحديد رقم افتراضي وعرضها للموظف
-      if (convData?.platform === 'whatsapp') {
+      if (convData?.platform === 'whatsapp' || convData?.platform === 'whatsapp_qr') {
         try {
           const chRes = await fetch(`${API_URL}/conversations/${id}/channels`)
           const chData = await chRes.json()
@@ -488,7 +490,7 @@ export default function ChatScreen() {
       body: JSON.stringify({
         conversation_id: id, content, content_type, media_url, agent_id: agent?.id,
         reply_to_message_id: replyToId || undefined,
-        channel_id: conv?.platform === 'whatsapp' ? (selectedChannelId || undefined) : undefined
+        channel_id: (conv?.platform === 'whatsapp' || conv?.platform === 'whatsapp_qr') ? (selectedChannelId || undefined) : undefined
       })
     })
     if (!res.ok) {
@@ -918,7 +920,7 @@ export default function ChatScreen() {
   const isWindowExpired = conv?.last_inbound_at
     ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > (PLATFORM_WINDOW_HOURS[conv.platform] || MESSAGE_WINDOW_HOURS)
     : false
-  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'tiktok' ? Music2 : Facebook
+  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : Facebook
   // تيك توك بيقبل نص وصور بس في الـ Business Messaging API — لا فيديو ولا صوت ولا ملفات،
   // فبنخفي أزرار الحاجات دي بدل ما الموظف يبعتها ويكتشف إنها فشلت (أو الأسوأ: توصل كنص فيه اسم الملف)
   const isTiktok = conv?.platform === 'tiktok'
@@ -1293,7 +1295,7 @@ export default function ChatScreen() {
               </div>
             )}
             {/* العميل ده كلّم من أكتر من رقم واتساب — اختار ترد من أنهي رقم منهم (لسه في نافذة الـ٢٤ ساعة) */}
-            {conv?.platform === 'whatsapp' && connectedChannels.filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000).length > 1 && (
+            {(conv?.platform === 'whatsapp' || conv?.platform === 'whatsapp_qr') && connectedChannels.filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000).length > 1 && (
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
                 <span className="text-[11px] text-fg-subtle flex-shrink-0">رد من:</span>
                 {connectedChannels
@@ -1676,6 +1678,12 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             </a>
           ) : (
             <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+          )}
+          {/* القالب بيتخزن كنص عادي، فمن غير العلامة دي مافيش أي فرق ظاهر بينه وبين رسالة مكتوبة */}
+          {msg.template_name && (
+            <span className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-white/15 text-[10px] opacity-70">
+              <FileText size={10} /> قالب: {msg.template_name}
+            </span>
           )}
         </div>
         {msg.reaction_emoji && (

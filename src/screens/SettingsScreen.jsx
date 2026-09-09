@@ -7,7 +7,8 @@ import {
   ArrowRight, Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2
+  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
+  QrCode
 } from 'lucide-react'
 
 const TABS = [
@@ -589,6 +590,7 @@ const PLATFORM_META = {
   instagram: { label: 'إنستجرام', icon: Instagram, color: 'text-pink-400' },
   whatsapp: { label: 'واتساب', icon: Phone, color: 'text-green-400' },
   tiktok: { label: 'تيك توك', icon: Music2, color: 'text-fg' },
+  whatsapp_qr: { label: 'واتساب (ربط سريع)', icon: QrCode, color: 'text-emerald-400' },
 }
 
 function ChannelsTab() {
@@ -696,7 +698,7 @@ function ConnectedChannelsList() {
 
   return (
     <div className="space-y-3 pt-1">
-      {['facebook', 'instagram', 'whatsapp', 'tiktok'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
         // فيسبوك وانستجرام لسه رقم واحد بس، بس الواتساب ممكن يكون فيه أكتر من رقم مربوط
@@ -1445,6 +1447,7 @@ function ConnectNewChannel() {
   const toast = useToast()
   const { agent } = useAuth()
   const [connecting, setConnecting] = useState(null)
+  const [qrModal, setQrModal] = useState(null) // { channelId, qr, status }
 
   const connectWhatsApp = async () => {
     if (!WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID) {
@@ -1564,6 +1567,44 @@ function ConnectNewChannel() {
     window.location.href = `https://www.tiktok.com/v2/auth/authorize?${params.toString()}`
   }
 
+  // ربط رقم واتساب غير رسمي عن طريق QR (زي واتساب ويب) — نعمل صف "pending" فورًا في السيرفر،
+  // ونفتح مودال بيعمل poll على /qr كل ٣ ثواني لحد ما الكود يظهر ويتمسح
+  const connectWhatsappQr = async () => {
+    setConnecting('whatsapp_qr')
+    try {
+      const res = await fetch(`${API_URL}/channels/whatsapp-qr/connect`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل بدء الربط')
+      setQrModal({ channelId: data.channel_id, qr: null, status: 'pending' })
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setConnecting(null)
+    }
+  }
+
+  useEffect(() => {
+    if (!qrModal?.channelId || qrModal.status !== 'pending') return
+    let cancelled = false
+    const poll = setInterval(async () => {
+      try {
+        const res = await fetch(`${API_URL}/channels/${qrModal.channelId}/qr`)
+        const data = await res.json()
+        if (cancelled) return
+        if (data.status === 'active') {
+          setQrModal(null)
+          toast.success('اترابط رقم الواتساب بنجاح')
+        } else {
+          setQrModal(prev => prev && { ...prev, qr: data.qr, status: data.status })
+        }
+      } catch { /* هيعاود المحاولة في التيك الجاي */ }
+    }, 3000)
+    return () => { cancelled = true; clearInterval(poll) }
+  }, [qrModal?.channelId, qrModal?.status])
+
   const finishWhatsAppConnect = async (code, sessionInfo) => {
     try {
       const res = await fetch(`${API_URL}/channels/whatsapp/connect`, {
@@ -1585,14 +1626,15 @@ function ConnectNewChannel() {
   }
 
   return (
+    <>
     <div className="space-y-3 pt-1">
       <p className="text-xs text-fg-subtle -mt-1">اختار القناة اللي عايز تربطها. هتتحول لصفحة ميتا تختار منها الصفحة أو الحساب وتوافق على الصلاحيات.</p>
-      {['facebook', 'instagram', 'whatsapp', 'tiktok'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook' || platform === 'tiktok'
+        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook' || platform === 'tiktok' || platform === 'whatsapp_qr'
         const isConnecting = connecting === platform
-        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok }
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok, whatsapp_qr: connectWhatsappQr }
         return (
           <button key={platform}
             disabled={!isReady || isConnecting}
@@ -1611,6 +1653,37 @@ function ConnectNewChannel() {
         )
       })}
     </div>
+
+    {qrModal && (
+      <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => setQrModal(null)}>
+        <div onClick={e => e.stopPropagation()}
+          className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
+          <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2 z-10">
+            <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+              <QrCode size={15} className="text-emerald-400" />
+            </div>
+            <p className="flex-1 text-sm font-semibold text-fg">اربط واتساب بمسح QR</p>
+            <button onClick={() => setQrModal(null)} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="p-5 flex flex-col items-center gap-3">
+            {qrModal.qr ? (
+              <img src={qrModal.qr} alt="QR" className="w-56 h-56 rounded-xl bg-white p-2" />
+            ) : (
+              <div className="w-56 h-56 flex items-center justify-center">
+                <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+              </div>
+            )}
+            <p className="text-xs text-fg-subtle text-center">
+              افتح واتساب في تليفونك → الإعدادات → الأجهزة المرتبطة → ربط جهاز، وامسح الكود ده.
+              <br />الكود بيتجدد كل شوية تلقائي — سيب الصفحة مفتوحة لحد ما يتربط.
+            </p>
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
