@@ -197,31 +197,26 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     toast.success(newVal ? 'اتحظر العميل' : 'اتلغى حظر العميل')
   }
 
-  // بيمسح كل أثر العميل من قاعدة البيانات — المحادثات والرسايل والتاجات والحقول الإضافية، بالترتيب
-  // الصح عشان مايصطدمش بقيود الـ foreign key
+  // بيمسح كل أثر العميل نهائيًا — لازم يتم من السيرفر مش من هنا مباشرة: عميل حقيقي بيكون ليه
+  // آلاف الرسايل، ومتصفحنا بيشتغل بصلاحية ليها statement_timeout قصير (٨ ثواني) بيتضرب أحيانًا
+  // على جدول كبير مشغول ويطلع خطأ غامض. السيرفر بيمسح contacts بس وباقي الجداول بتتشال
+  // تلقائي بالـ cascade، بصلاحية من غير أي مهلة زمنية
   const deleteContact = async () => {
     if (!confirm(`متأكد إنك عايز تمسح كل بيانات "${contact?.name || 'العميل ده'}" نهائياً؟ الإجراء ده مينفعش يتراجع فيه.`)) return
     if (!confirm('تأكيد أخير: هيتم حذف المحادثة وكل الرسايل المرتبطة بالعميل ده نهائياً. متأكد؟')) return
 
     setDeleting(true)
-    const { data: convs } = await supabase.from('conversations').select('id').eq('contact_id', contact.id)
-    const convIds = (convs || []).map(c => c.id)
-
-    if (convIds.length) {
-      await supabase.from('messages').delete().in('conversation_id', convIds)
-      await supabase.from('conversation_reads').delete().in('conversation_id', convIds)
-      await supabase.from('conversation_assignment_log').delete().in('conversation_id', convIds)
-      await supabase.from('conversation_activity_log').delete().in('conversation_id', convIds)
-      await supabase.from('conversations').delete().in('id', convIds)
+    try {
+      const res = await fetch(`${API_URL}/contacts/${contact.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'حصل خطأ أثناء الحذف')
+      toast.success('اتمسحت بيانات العميل')
+      onDeleted?.()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setDeleting(false)
     }
-    await supabase.from('contact_tags').delete().eq('contact_id', contact.id)
-    await supabase.from('contact_custom_fields').delete().eq('contact_id', contact.id)
-    const { error } = await supabase.from('contacts').delete().eq('id', contact.id)
-
-    setDeleting(false)
-    if (error) { toast.error('حصل خطأ أثناء الحذف'); return }
-    toast.success('اتمسحت بيانات العميل')
-    onDeleted?.()
   }
 
   const currentStage = lifecycles.find(l => l.id === form.lifecycle_stage_id)
