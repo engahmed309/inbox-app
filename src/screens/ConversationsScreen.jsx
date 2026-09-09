@@ -951,8 +951,8 @@ export default function ConversationsScreen() {
           </button>
         </div>
 
-        {/* حالة الموظف + الوضع + الإعدادات + خروج */}
-        <div className={`flex border-b border-surface-3 py-2.5 ${expanded ? 'items-center justify-between px-3' : 'flex-col items-center gap-1.5'}`}>
+        {/* حالة الموظف (صف لوحده) + الوضع/الإعدادات/خروج (صف تاني) */}
+        <div className={`flex flex-col gap-2 border-b border-surface-3 py-2.5 ${expanded ? 'px-3' : 'items-center'}`}>
           <div className="relative">
             <button onClick={() => setShowAgentStatus(v => !v)}
               className={`flex items-center gap-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg ${expanded ? 'px-2.5 py-1.5' : 'w-8 h-8 justify-center'}`}>
@@ -972,7 +972,7 @@ export default function ConversationsScreen() {
               </div>
             )}
           </div>
-          <div className={`flex items-center gap-1 ${expanded ? '' : 'flex-col'}`}>
+          <div className={`flex items-center gap-1 ${expanded ? 'flex-wrap' : 'flex-col'}`}>
             <button onClick={() => setShowNewConv(true)} title="بدء محادثة جديدة"
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               <UserPlus size={15} />
