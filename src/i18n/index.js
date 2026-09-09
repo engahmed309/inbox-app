@@ -1,5 +1,5 @@
-// تهيئة الترجمة — العربي الفصحى هي اللغة النشطة الوحيدة حاليًا، وملف الإنجليزي جاهز ومترجم
-// بالكامل بس مش مفعّل في أي واجهة بعد (تبديل اللغة واتجاه الصفحة RTL/LTR مرحلة منفصلة لاحقة)
+// تهيئة الترجمة — اللغة الفعلية بتتحدد عن طريق LanguageContext (بيقرا آخر اختيار محفوظ وينادي
+// i18n.changeLanguage()). fallbackLng هنا بس للحالة الاستثنائية اللي المفتاح مش موجود في اللغة الحالية
 import i18n from 'i18next'
 import { initReactI18next } from 'react-i18next'
 import ar from './locales/ar.json'
@@ -10,7 +10,6 @@ i18n.use(initReactI18next).init({
     ar: { translation: ar },
     en: { translation: en }
   },
-  lng: 'ar',
   fallbackLng: 'ar',
   interpolation: { escapeValue: false }
 })

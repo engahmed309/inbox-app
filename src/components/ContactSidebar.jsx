@@ -4,6 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
+import { formatDate } from '../lib/locale'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
 import { COUNTRY_MAP } from '../lib/countries'
@@ -261,7 +262,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
               {connectedChannels.map(c => (
                 <div key={c.channel_id} className="flex items-center justify-between text-xs">
                   <span className="text-fg truncate">{c.channels?.custom_name || c.channels?.display_name || t('contactSidebar.connectedChannels.numberFallback', { platform: t('chat.platformLabels.whatsapp') })}</span>
-                  <span className="text-fg-subtle flex-shrink-0">{new Date(c.last_inbound_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</span>
+                  <span className="text-fg-subtle flex-shrink-0">{formatDate(c.last_inbound_at, { day: 'numeric', month: 'short' })}</span>
                 </div>
               ))}
             </div>

@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
+import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
@@ -113,18 +114,18 @@ function AgentAvatar({ agent, size = 22 }) {
 function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFilter, aiEnabled, aiOpenCount, agentsList, agentOpenCounts, unassignedOpenCount }) {
   const { t } = useTranslation()
   return (
-    <div className={vertical ? 'absolute left-4 right-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
+    <div className={vertical ? 'absolute inset-x-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden max-h-72 overflow-y-auto' : 'absolute start-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[200px] overflow-hidden max-h-72 overflow-y-auto'}>
       <button onClick={() => { setAgentFilter(''); setShowAgentFilter(false) }}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right ${!agentFilter ? 'bg-surface-3' : ''}`}>
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start ${!agentFilter ? 'bg-surface-3' : ''}`}>
         <Users size={14} className="text-fg-muted flex-shrink-0" />
         <span className="flex-1">{t('conversations.agentFilter.allAgents')}</span>
       </button>
       <button onClick={() => { setAgentFilter('ai'); setShowAgentFilter(false) }}
         title={aiEnabled ? t('conversations.agentFilter.aiEnabledTitle') : t('conversations.agentFilter.aiDisabledTitle')}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start border-t border-surface-3 ${agentFilter === 'ai' ? 'bg-surface-3' : ''}`}>
         <span className="relative flex-shrink-0">
           <span className="w-[22px] h-[22px] rounded-full bg-brand/15 flex items-center justify-center text-brand"><Bot size={13} /></span>
-          <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
+          <span className={`absolute -bottom-0.5 -end-0.5 w-2 h-2 rounded-full border border-surface-2 ${aiEnabled ? 'bg-success' : 'bg-slate-500'}`} />
         </span>
         <span className="flex-1 truncate">{t('conversations.agentFilter.aiAgentLabel')}</span>
         <span className="text-[11px] text-fg-subtle flex-shrink-0" title={t('conversations.agentFilter.aiOpenCountTitle')}>{aiOpenCount}</span>
@@ -133,10 +134,10 @@ function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFi
         const st = AGENT_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || AGENT_STATUS_OPTS[2]
         return (
           <button key={a.id} onClick={() => { setAgentFilter(a.id); setShowAgentFilter(false) }}
-            className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
+            className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start border-t border-surface-3 ${agentFilter === a.id ? 'bg-surface-3' : ''}`}>
             <span className="relative flex-shrink-0">
               <AgentAvatar agent={a} size={22} />
-              <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
+              <span className={`absolute -bottom-0.5 -end-0.5 w-2 h-2 rounded-full border border-surface-2 ${st.dot}`} />
             </span>
             <span className="flex-1 truncate">{a.name}</span>
             <span className="text-[11px] text-fg-subtle flex-shrink-0" title={t('conversations.agentFilter.agentOpenCountTitle')}>{agentOpenCounts[a.id] || 0}</span>
@@ -144,7 +145,7 @@ function AgentFilterList({ vertical, agentFilter, setAgentFilter, setShowAgentFi
         )
       })}
       <button onClick={() => { setAgentFilter('unassigned'); setShowAgentFilter(false) }}
-        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right border-t border-surface-3 ${agentFilter === 'unassigned' ? 'bg-surface-3' : ''}`}>
+        className={`flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start border-t border-surface-3 ${agentFilter === 'unassigned' ? 'bg-surface-3' : ''}`}>
         <span className="w-[22px] h-[22px] rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 text-fg-subtle">
           <UserX size={12} />
         </span>
@@ -163,7 +164,7 @@ function AdvancedFilterPanel({
 }) {
   const { t } = useTranslation()
   return (
-    <div className="absolute left-4 right-4 lg:right-auto lg:left-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 w-auto lg:w-80 max-h-[70vh] overflow-y-auto">
+    <div className="absolute inset-x-4 lg:start-auto lg:end-4 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 w-auto lg:w-80 max-h-[70vh] overflow-y-auto">
       <div className="flex items-center justify-between px-3 py-2.5 border-b border-surface-3 sticky top-0 bg-surface-2">
         <span className="text-sm font-semibold text-fg">{t('conversations.filters.title')}</span>
         <div className="flex items-center gap-2">
@@ -222,7 +223,7 @@ function AdvancedFilterPanel({
                     <input type="checkbox" checked={allSelected} onChange={() => toggleCampaign(c)} className="accent-brand w-3.5 h-3.5" />
                     <span className="text-fg truncate">{c.name}</span>
                   </label>
-                  <div className="pr-5 space-y-1">
+                  <div className="ps-5 space-y-1">
                     {c.ads.map(a => (
                       <label key={a.id} className="flex items-center gap-2 px-1.5 py-1 rounded-lg hover:bg-surface-3 cursor-pointer text-xs">
                         <input type="checkbox" checked={selectedAdIds.includes(a.id)} onChange={() => toggleAdId(a.id)}
@@ -367,6 +368,7 @@ export default function ConversationsScreen() {
   const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const toast = useToast()
   const { theme, toggleTheme } = useTheme()
+  const { language, toggleLanguage } = useLanguage()
   const navigate = useNavigate()
   const { t } = useTranslation()
   const realtimeRef = useRef(null)
@@ -932,7 +934,7 @@ export default function ConversationsScreen() {
       )}
 
       {/* ─── القائمة الجانبية — سايدبار ثابت على الديسكتوب، ودرج منزلق على الموبايل ─── */}
-      <div className={`${mobileMenuOpen ? 'flex' : 'hidden'} lg:flex fixed lg:static inset-y-0 right-0 z-40 lg:z-auto w-72 ${sidebarOpen ? 'lg:w-72' : 'lg:w-16'} flex-col bg-surface-2 border-l border-surface-3 transition-all duration-200 flex-shrink-0`}>
+      <div className={`${mobileMenuOpen ? 'flex' : 'hidden'} lg:flex fixed lg:static inset-y-0 start-0 z-40 lg:z-auto w-72 ${sidebarOpen ? 'lg:w-72' : 'lg:w-16'} flex-col bg-surface-2 border-e border-surface-3 transition-all duration-200 flex-shrink-0`}>
         {/* Logo + إغلاق (موبايل) / طي (ديسكتوب) */}
         <div className={`flex items-center gap-2 px-3 pt-4 pb-3 border-b border-surface-3 ${expanded ? 'justify-between' : 'flex-col-reverse gap-2'}`}>
           <div className="flex items-center gap-2 min-w-0">
@@ -952,7 +954,9 @@ export default function ConversationsScreen() {
           </button>
           <button onClick={() => setSidebarOpen(v => !v)} title={sidebarOpen ? t('conversations.sidebar.collapseTitle') : t('conversations.sidebar.expandTitle')}
             className="hidden lg:flex w-7 h-7 flex-shrink-0 items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
-            {sidebarOpen ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />}
+            {sidebarOpen
+              ? (language === 'en' ? <ChevronsLeft size={15} /> : <ChevronsRight size={15} />)
+              : (language === 'en' ? <ChevronsRight size={15} /> : <ChevronsLeft size={15} />)}
           </button>
         </div>
 
@@ -965,11 +969,11 @@ export default function ConversationsScreen() {
               {expanded && <>{t(AGENT_STATUS_OPTS.find(s => s.key === agentStatusBtn)?.labelKey)}<ChevronDown size={11} /></>}
             </button>
             {showAgentStatus && (
-              <div className="absolute right-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
+              <div className="absolute start-0 top-full mt-1 bg-surface border border-surface-3 rounded-xl shadow-xl z-50 min-w-[130px] overflow-hidden">
                 {AGENT_STATUS_OPTS.map(s => (
                   <button key={s.key}
                     onClick={() => { setAgentStatus(agent.id, s.key); setShowAgentStatus(false) }}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${s.dot}`} />
                     {t(s.labelKey)}
                   </button>
@@ -985,6 +989,10 @@ export default function ConversationsScreen() {
             <button onClick={toggleTheme}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
+            </button>
+            <button onClick={toggleLanguage} title={t('conversations.sidebar.languageTitle')}
+              className="w-8 h-8 flex items-center justify-center text-[11px] font-bold text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+              {language === 'ar' ? 'EN' : 'ع'}
             </button>
             <PushNotificationToggle />
             {agent?.role === 'admin' && (
@@ -1022,10 +1030,10 @@ export default function ConversationsScreen() {
           <div className="px-3 py-2.5 border-b border-surface-3">
             <div className="hidden lg:block">
               <div className="relative">
-                <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input value={search} onChange={e => setSearch(e.target.value)}
                   placeholder={searchType === 'contact' ? t('conversations.search.placeholderContact') : searchType === 'comment' ? t('conversations.search.placeholderComment') : t('conversations.search.placeholderMessage')}
-                  className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                  className="w-full bg-surface-3 rounded-xl py-2 px-4 ps-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
               <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
             </div>
@@ -1059,20 +1067,20 @@ export default function ConversationsScreen() {
               {agentFilter === 'unassigned' ? (
                 <>
                   <UserX size={14} className="text-fg-muted flex-shrink-0" />
-                  <span className="flex-1 text-right truncate">{t('chat.common.unassigned')}</span>
+                  <span className="flex-1 text-start truncate">{t('chat.common.unassigned')}</span>
                 </>
               ) : agentFilter === 'ai' ? (
                 <>
                   <Bot size={14} className="text-brand flex-shrink-0" />
-                  <span className="flex-1 text-right truncate">{t('conversations.agentFilter.aiAgentLabel')}</span>
+                  <span className="flex-1 text-start truncate">{t('conversations.agentFilter.aiAgentLabel')}</span>
                 </>
               ) : agentFilter ? (
                 <>
                   <AgentAvatar agent={agentsList.find(a => a.id === agentFilter)} size={16} />
-                  <span className="flex-1 text-right truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
+                  <span className="flex-1 text-start truncate">{agentsList.find(a => a.id === agentFilter)?.name}</span>
                 </>
               ) : (
-                <span className="flex-1 text-right text-fg-muted">{t('conversations.agentFilter.allAgents')}</span>
+                <span className="flex-1 text-start text-fg-muted">{t('conversations.agentFilter.allAgents')}</span>
               )}
               <ChevronDown size={13} className="text-fg-subtle flex-shrink-0" />
             </button>
@@ -1095,7 +1103,7 @@ export default function ConversationsScreen() {
                 <button key={tab.key} onClick={() => { setStatus(tab.key); setMobileMenuOpen(false) }} title={tabLabel}
                   className={`w-full flex items-center gap-2 px-3 py-2.5 text-sm font-medium transition-colors rounded-lg mx-auto ${expanded ? 'max-w-[calc(100%-1rem)]' : 'justify-center w-10'} ${status === tab.key ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
                   <span className={`w-2 h-2 rounded-full flex-shrink-0 ${tab.dot}`} />
-                  {expanded && <span className="flex-1 text-right">{tabLabel}</span>}
+                  {expanded && <span className="flex-1 text-start">{tabLabel}</span>}
                   {expanded && count > 0 && (
                     <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${tab.key === 'open' ? 'bg-danger text-white' : 'bg-surface-2 text-fg-muted'}`}>
                       {count}
@@ -1112,13 +1120,13 @@ export default function ConversationsScreen() {
               <p className="px-3 pb-1.5 pt-1 text-[11px] font-semibold text-fg-subtle">{t('conversations.lifecycle.heading')}</p>
               <button onClick={() => { setSelectedLifecycle(null); setMobileMenuOpen(false) }}
                 className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${!selectedLifecycle ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
-                <span className="flex-1 text-right">{t('conversations.lifecycle.allStages')}</span>
+                <span className="flex-1 text-start">{t('conversations.lifecycle.allStages')}</span>
               </button>
               {lifecycles.map(l => (
                 <button key={l.id} onClick={() => { setSelectedLifecycle(prev => prev === l.id ? null : l.id); setMobileMenuOpen(false) }}
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
-                  <span className="flex-1 text-right truncate">{l.icon && `${l.icon} `}{l.name}</span>
+                  <span className="flex-1 text-start truncate">{l.icon && `${l.icon} `}{l.name}</span>
                   {lifecycleCounts[l.id] > 0 && (
                     <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
                       {lifecycleCounts[l.id]}
@@ -1149,10 +1157,10 @@ export default function ConversationsScreen() {
         {/* البحث — موبايل بس، ظاهر فوق قائمة المحادثات مباشرة (الديسكتوب عنده البحث جوا السايدبار) */}
         <div className="lg:hidden px-4 py-2.5 bg-surface-2 border-b border-surface-3">
           <div className="relative">
-            <Search size={14} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+            <Search size={14} className="absolute start-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input value={search} onChange={e => setSearch(e.target.value)}
               placeholder={searchType === 'contact' ? t('conversations.search.placeholderContact') : searchType === 'comment' ? t('conversations.search.placeholderComment') : t('conversations.search.placeholderMessage')}
-              className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              className="w-full bg-surface-3 rounded-xl py-2 px-4 ps-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
           <SearchTypeChips searchType={searchType} setSearchType={setSearchType} />
         </div>
@@ -1260,10 +1268,10 @@ export default function ConversationsScreen() {
                   <Users size={12} /> {t('conversations.bulkActions.assignToAgent')} <ChevronDown size={11} />
                 </button>
                 {showBulkAssign && (
-                  <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-56 overflow-y-auto">
+                  <div className="absolute bottom-full start-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-56 overflow-y-auto">
                     {agentsList.map(a => (
                       <button key={a.id} onClick={() => { bulkAssign(a.id); setShowBulkAssign(false) }}
-                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                         {a.name}
                       </button>
                     ))}
@@ -1317,7 +1325,7 @@ export default function ConversationsScreen() {
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => setShowIosHelp(false)}>
           <div className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-96 p-5" onClick={e => e.stopPropagation()}>
             <p className="font-semibold text-fg mb-3">{t('conversations.install.iosTitle')}</p>
-            <ol className="space-y-2 text-sm text-fg-muted list-decimal pr-4">
+            <ol className="space-y-2 text-sm text-fg-muted list-decimal ps-4">
               <li className="flex items-center gap-1.5">{t('conversations.install.iosStep1Before')} <Share size={14} className="inline text-brand" /> {t('conversations.install.iosStep1After')}</li>
               <li>{t('conversations.install.iosStep2')}</li>
               <li>{t('conversations.install.iosStep3')}</li>
@@ -1374,7 +1382,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
 
   return (
     <button onClick={onClick}
-      className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-right ${selected ? 'bg-brand/10' : ''}`}>
+      className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-start ${selected ? 'bg-brand/10' : ''}`}>
       {selectionMode && (
         <span onClick={e => { e.stopPropagation(); onToggleSelect?.() }} className="flex-shrink-0 text-brand">
           {selected ? <CheckSquare size={20} /> : <Square size={20} className="text-fg-subtle" />}
@@ -1391,16 +1399,16 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
             {contact?.name?.[0]?.toUpperCase() || '?'}
           </div>
         )}
-        <div className="absolute -bottom-0.5 -left-0.5 bg-surface p-0.5 rounded-full">
+        <div className="absolute -bottom-0.5 -end-0.5 bg-surface p-0.5 rounded-full">
           {PLATFORM_ICONS[conv.platform]}
         </div>
         {conv.ai_active && (
-          <div className="absolute -top-0.5 -left-0.5 bg-brand text-white p-0.5 rounded-full" title={t('conversations.card.aiActiveTitle')}>
+          <div className="absolute -top-0.5 -end-0.5 bg-brand text-white p-0.5 rounded-full" title={t('conversations.card.aiActiveTitle')}>
             <Bot size={11} />
           </div>
         )}
         {conv.ad_referral && (
-          <div className="absolute -top-0.5 -right-0.5 bg-amber-500 text-white p-0.5 rounded-full" title={t('conversations.card.adReferralTitle')}>
+          <div className="absolute -top-0.5 -start-0.5 bg-amber-500 text-white p-0.5 rounded-full" title={t('conversations.card.adReferralTitle')}>
             <DollarSign size={11} />
           </div>
         )}

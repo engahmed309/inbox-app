@@ -37,25 +37,25 @@ export default function CountrySelect({ value, onChange, placeholder }) {
       </button>
 
       {open && (
-        <div className="absolute top-full right-0 left-0 mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
+        <div className="absolute top-full inset-x-0 mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
           <div className="p-2 border-b border-surface-3">
             <div className="relative">
-              <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <Search size={12} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
                 placeholder={t('countrySelect.searchPlaceholder')}
-                className="w-full bg-surface-3 rounded-lg py-1.5 px-3 pr-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                className="w-full bg-surface-3 rounded-lg py-1.5 px-3 ps-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
             </div>
           </div>
           <div className="max-h-56 overflow-y-auto">
             {value && (
               <button type="button" onClick={() => { onChange(null); setOpen(false); setSearch('') }}
-                className="flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-3/60 text-xs text-danger text-right">
+                className="flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-3/60 text-xs text-danger text-start">
                 {t('countrySelect.clearSelection')}
               </button>
             )}
             {filtered.map(c => (
               <button key={c.code} type="button" onClick={() => { onChange(c.code); setOpen(false); setSearch('') }}
-                className={`flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-3/60 text-sm text-right ${value === c.code ? 'bg-surface-3/60' : ''}`}>
+                className={`flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-3/60 text-sm text-start ${value === c.code ? 'bg-surface-3/60' : ''}`}>
                 <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-surface-3 text-fg-muted flex-shrink-0">{c.code}</span>
                 <span className="text-fg truncate">{c.name}</span>
               </button>

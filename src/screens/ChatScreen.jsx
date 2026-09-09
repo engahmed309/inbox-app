@@ -8,9 +8,11 @@ import ContactSidebar from '../components/ContactSidebar'
 import RequestAdminModal from '../components/RequestAdminModal'
 import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
+import { formatTime as localeFormatTime, formatDate as localeFormatDate, formatDateTime as localeFormatDateTime } from '../lib/locale'
 import i18n from '../i18n'
+import BackArrow from '../components/BackArrow'
 import {
-  ArrowRight, Send, Paperclip, ChevronDown, Search, X,
+  Send, Paperclip, ChevronDown, Search, X,
   User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode
 } from 'lucide-react'
 
@@ -82,7 +84,7 @@ function AgentAvatar({ agent, size = 20 }) {
 }
 
 function formatTime(dateStr) {
-  return new Date(dateStr).toLocaleTimeString('ar', { hour: '2-digit', minute: '2-digit' })
+  return localeFormatTime(dateStr, { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDate(dateStr) {
@@ -92,7 +94,7 @@ function formatDate(dateStr) {
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
   if (d.toDateString() === yesterday.toDateString()) return i18n.t('chat.formatDate.yesterday')
-  return d.toLocaleDateString('ar')
+  return localeFormatDate(d)
 }
 
 // اسم مؤقت مميّز لحد ما يتسجل اسم حقيقي (فيسبوك بيمنع جلب الاسم/الصورة لأغلب الحسابات)
@@ -657,7 +659,7 @@ export default function ChatScreen() {
     }
     setConv(prev => ({ ...prev, status: 'follow_up', follow_up_at: followUpAt.toISOString() }))
 
-    const readableTime = followUpAt.toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
+    const readableTime = localeFormatDateTime(followUpAt, { dateStyle: 'medium', timeStyle: 'short' })
     const followUpLabel = t('chat.status.followUp')
     if (oldLabel !== followUpLabel) logActivity(id, agent?.id, t('chat.activity.statusChangedFollowUp', { from: oldLabel, to: followUpLabel, time: readableTime }))
 
@@ -966,10 +968,10 @@ export default function ChatScreen() {
         {/* الصف الأول: رجوع + صورة/اسم العميل + بحث + Lifecycle */}
         <div className="flex items-center gap-3">
           <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg flex-shrink-0">
-            <ArrowRight size={20} />
+            <BackArrow />
           </button>
 
-          <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-right cursor-pointer">
+          <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-start cursor-pointer">
             {contact?.profile_pic ? (
               <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt=""
                 onError={e => e.target.style.display = 'none'} />
@@ -1009,15 +1011,15 @@ export default function ChatScreen() {
                 <span className="truncate">{currentLifecycle ? `${currentLifecycle.icon ? currentLifecycle.icon + ' ' : ''}${currentLifecycle.name}` : t('chat.common.noStage')}</span> <ChevronDown size={9} className="flex-shrink-0" />
               </button>
               {showLifecycle && (
-                <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
+                <div className="absolute end-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
                   <button onClick={() => changeLifecycle(null)}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                     <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-500" />
                     {t('chat.common.noStage')}
                   </button>
                   {lifecycles.map(l => (
                     <button key={l.id} onClick={() => changeLifecycle(l.id)}
-                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                       <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
                       {l.icon && `${l.icon} `}{l.name}
                     </button>
@@ -1036,13 +1038,13 @@ export default function ChatScreen() {
               {conv?.agentName || t('chat.common.unassigned')}
             </button>
             {showAssign && (
-              <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
+              <div className="absolute start-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
                 {agents.map(ag => (
                   <button key={ag.id} onClick={() => assignAgent(ag.id)}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right">
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start">
                     <span className="relative flex-shrink-0">
                       <AgentAvatar agent={ag} size={18} />
-                      <span className={`absolute -bottom-0.5 -left-0.5 w-2 h-2 rounded-full border border-surface-2 ${ag.status === 'busy' ? 'bg-follow' : ag.is_online ? 'bg-success' : 'bg-slate-500'}`} />
+                      <span className={`absolute -bottom-0.5 -end-0.5 w-2 h-2 rounded-full border border-surface-2 ${ag.status === 'busy' ? 'bg-follow' : ag.is_online ? 'bg-success' : 'bg-slate-500'}`} />
                     </span>
                     {ag.name}
                   </button>
@@ -1060,19 +1062,19 @@ export default function ChatScreen() {
 
           <div className="relative">
             <button onClick={() => { setShowStatus(!showStatus); setShowAssign(false) }}
-              title={conv?.status === 'follow_up' && conv?.follow_up_at ? t('chat.header.followUpReturnsAt', { time: new Date(conv.follow_up_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) }) : undefined}
+              title={conv?.status === 'follow_up' && conv?.follow_up_at ? t('chat.header.followUpReturnsAt', { time: localeFormatDateTime(conv.follow_up_at, { dateStyle: 'medium', timeStyle: 'short' }) }) : undefined}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white ${currentStatus.color}`}>
               {t(currentStatus.labelKey)}
               {conv?.status === 'follow_up' && conv?.follow_up_at && (
-                <span className="opacity-90">⏰ {new Date(conv.follow_up_at).toLocaleString('ar-EG', { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric' })}</span>
+                <span className="opacity-90">⏰ {localeFormatDateTime(conv.follow_up_at, { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric' })}</span>
               )}
               <ChevronDown size={11} />
             </button>
             {showStatus && (
-              <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
+              <div className="absolute start-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 overflow-hidden">
                 {STATUS_OPTS.map(s => (
                   <button key={s.key} onClick={() => changeStatus(s.key)}
-                    className="flex items-center gap-2 w-full px-4 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                    className="flex items-center gap-2 w-full px-4 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                     <span className={`w-2 h-2 rounded-full ${s.color}`} />
                     {t(s.labelKey)}
                   </button>
@@ -1086,10 +1088,10 @@ export default function ChatScreen() {
       {showSearch && (
         <div className="flex-shrink-0 px-3 py-2 bg-surface-2 border-b border-surface-3">
           <div className="relative">
-            <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+            <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
               placeholder={t('chat.search.placeholder')}
-              className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+              className="w-full bg-surface-3 rounded-xl py-2 px-4 ps-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
         </div>
       )}
@@ -1194,20 +1196,20 @@ export default function ChatScreen() {
         )}
         {showEmojiPicker && <EmojiPicker onPick={insertEmoji} />}
         {showQuickReplies && (
-          <div className="absolute bottom-full left-3 right-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden flex flex-col">
+          <div className="absolute bottom-full inset-x-3 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 max-h-64 overflow-hidden flex flex-col">
             <div className="p-2 border-b border-surface-3 flex-shrink-0">
               <div className="relative">
-                <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <Search size={12} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input autoFocus value={quickReplyFilter} onChange={e => setQuickReplyFilter(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Escape') setShowQuickReplies(false) }}
                   placeholder={t('chat.composer.quickReplySearchPlaceholder')}
-                  className="w-full bg-surface-3 rounded-lg py-1.5 px-3 pr-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                  className="w-full bg-surface-3 rounded-lg py-1.5 px-3 ps-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
             </div>
             <div className="overflow-y-auto">
               {filteredQuickReplies.length > 0 ? filteredQuickReplies.map(qr => (
                 <button key={qr.id} onClick={() => pickQuickReply(qr)}
-                  className="flex flex-col items-start w-full px-3 py-2.5 hover:bg-surface-3 text-right border-b border-surface-3 last:border-0">
+                  className="flex flex-col items-start w-full px-3 py-2.5 hover:bg-surface-3 text-start border-b border-surface-3 last:border-0">
                   <span className="text-sm text-fg font-medium">/{qr.name}</span>
                   {qr.text && <span className="text-xs text-fg-muted truncate w-full">{qr.text}</span>}
                 </button>
@@ -1275,7 +1277,7 @@ export default function ChatScreen() {
         ) : (
           <div className="flex flex-col gap-2">
             {replyingTo && (
-              <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 border-r-2 border-brand">
+              <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 border-s-2 border-brand">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-brand-light">
                     {replyingTo.direction === 'outbound' ? t('chat.common.you') : displayName(contact)}
@@ -1333,19 +1335,19 @@ export default function ChatScreen() {
                   <Paperclip size={18} />
                 </button>
                 {showAttachMenu && (
-                  <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden">
+                  <div className="absolute bottom-full start-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden">
                     <button onClick={openLibrary}
-                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                       <FolderOpen size={14} className="text-fg-muted" /> {t('chat.composer.fromLibrary')}
                     </button>
                     <button onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click() }}
-                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
+                      className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap">
                       <Paperclip size={14} className="text-fg-muted" /> {t('chat.composer.fromDevice')}
                     </button>
                     {/* القوالب مفيدة جوه الـ٢٤ ساعة كمان (تذكير بموعد مثلاً)، مش بس لما النافذة تقفل */}
                     {conv?.platform === 'whatsapp' && (
                       <button onClick={() => { setShowAttachMenu(false); setShowTemplates(true) }}
-                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap border-t border-surface-3">
+                        className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-start whitespace-nowrap border-t border-surface-3">
                         <FileText size={14} className="text-fg-muted" /> {t('chat.composer.approvedTemplateMenuItem')}
                       </button>
                     )}
@@ -1429,10 +1431,10 @@ export default function ChatScreen() {
             </div>
             <div className="p-3 border-b border-surface-3 flex-shrink-0">
               <div className="relative">
-                <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <Search size={13} className="absolute start-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input autoFocus value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
                   placeholder={t('chat.library.searchPlaceholder')}
-                  className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+                  className="w-full bg-surface-3 rounded-xl py-2 px-4 ps-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
             </div>
             <div className="flex-1 overflow-y-auto p-3 grid grid-cols-3 gap-2 content-start">
@@ -1468,12 +1470,12 @@ export default function ChatScreen() {
           <div className="w-full sm:max-w-xs bg-surface-2 rounded-t-2xl sm:rounded-2xl shadow-2xl overflow-hidden"
             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onClick={e => e.stopPropagation()}>
             <button onClick={() => { copyMessage(actionSheetMsg); setActionSheetMsg(null) }}
-              className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right">
+              className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-start">
               <Copy size={16} className="text-fg-muted" /> {t('chat.actionSheet.copy')}
             </button>
             {conv?.platform === 'whatsapp' && (
               <button onClick={() => startReply(actionSheetMsg)}
-                className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right border-t border-surface-3">
+                className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-start border-t border-surface-3">
                 <Reply size={16} className="text-fg-muted" /> {t('chat.actionSheet.reply')}
               </button>
             )}
@@ -1624,7 +1626,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
         <div className="max-w-[90%] w-full bg-follow/15 border border-follow/30 rounded-xl px-3.5 py-2.5">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-follow mb-1">
             <StickyNote size={11} /> {authorName} · {t('chat.note.badge')}
-            <span className="text-fg-subtle font-normal mr-auto">{formatTime(msg.created_at)}</span>
+            <span className="text-fg-subtle font-normal ms-auto">{formatTime(msg.created_at)}</span>
           </div>
           <p className="text-sm text-fg whitespace-pre-wrap break-words">{msg.content}</p>
         </div>
@@ -1665,7 +1667,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
           ${isOut ? 'msg-out text-white' : 'msg-in text-fg'}
           ${isTemp ? 'opacity-50' : 'opacity-100 slide-in'}`}>
           {repliedMsg && (
-            <div className={`mb-1.5 pr-2 border-r-2 rounded-sm ${isOut ? 'border-white/50' : 'border-brand'} bg-black/10`}>
+            <div className={`mb-1.5 ps-2 border-s-2 rounded-sm ${isOut ? 'border-white/50' : 'border-brand'} bg-black/10`}>
               <p className={`text-xs font-medium ${isOut ? 'text-white/90' : 'text-brand-light'} truncate px-1.5 pt-1`}>
                 {repliedMsg.direction === 'outbound' ? t('chat.common.you') : t('chat.common.customer')}
               </p>
@@ -1700,7 +1702,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
           )}
         </div>
         {msg.reaction_emoji && (
-          <span className={`absolute -bottom-2.5 bg-surface-2 border border-surface-3 rounded-full px-1 text-xs shadow ${isOut ? 'left-1' : 'right-1'}`}>
+          <span className={`absolute -bottom-2.5 bg-surface-2 border border-surface-3 rounded-full px-1 text-xs shadow ${isOut ? 'end-1' : 'start-1'}`}>
             {msg.reaction_emoji}
           </span>
         )}
@@ -1833,7 +1835,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
           ) : !selected ? (
             templates.map(tpl => (
               <button key={tpl.id || tpl.name} onClick={() => { setSelected(tpl); setParams([]) }}
-                className="w-full text-right bg-surface-3/50 hover:bg-surface-3 rounded-xl px-3 py-2.5 transition-colors">
+                className="w-full text-start bg-surface-3/50 hover:bg-surface-3 rounded-xl px-3 py-2.5 transition-colors">
                 <p className="text-xs font-medium text-fg">{tpl.name}</p>
                 <p className="text-[11px] text-fg-muted mt-1 leading-relaxed line-clamp-2">{bodyOf(tpl)}</p>
               </button>
@@ -1873,7 +1875,7 @@ function Lightbox({ item, onClose }) {
   return (
     <div className="fixed inset-0 z-[100] bg-black/90 flex items-center justify-center" onClick={onClose}>
       <button onClick={onClose}
-        className="absolute top-4 left-4 w-10 h-10 flex items-center justify-center text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
+        className="absolute top-4 end-4 w-10 h-10 flex items-center justify-center text-white bg-white/10 hover:bg-white/20 rounded-full transition-colors">
         <X size={20} />
       </button>
       {item.type === 'image' ? (

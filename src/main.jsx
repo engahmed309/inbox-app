@@ -5,6 +5,7 @@ import { registerSW } from 'virtual:pwa-register'
 import App from './App'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
+import { LanguageProvider } from './contexts/LanguageContext'
 import { ToastProvider } from './contexts/ToastContext'
 import './index.css'
 import './i18n'
@@ -29,13 +30,15 @@ registerSW({
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
     <BrowserRouter>
-      <ThemeProvider>
-        <ToastProvider>
-          <AuthProvider>
-            <App />
-          </AuthProvider>
-        </ToastProvider>
-      </ThemeProvider>
+      <LanguageProvider>
+        <ThemeProvider>
+          <ToastProvider>
+            <AuthProvider>
+              <App />
+            </AuthProvider>
+          </ToastProvider>
+        </ThemeProvider>
+      </LanguageProvider>
     </BrowserRouter>
   </React.StrictMode>
 )

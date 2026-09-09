@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { formatDateTime } from '../lib/locale'
 import { Bell, Check, X, UserPlus, Tag } from 'lucide-react'
 
 // جرس الإشعارات — ثابت فوق كل الشاشات بعد تسجيل الدخول. أول استخدام له طلبات نقل المحادثات
@@ -106,19 +107,19 @@ export default function NotificationBell() {
   if (!agent) return null
 
   return (
-    <div ref={wrapRef} className="fixed z-[60] left-3" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+    <div ref={wrapRef} className="fixed z-[60] end-3" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
       <button onClick={() => setOpen(v => !v)} title={t('notificationBell.title')}
         className="relative w-10 h-10 flex items-center justify-center bg-surface-2 border border-surface-3 rounded-full shadow-lg text-fg-muted hover:text-fg transition-colors">
         <Bell size={17} />
         {unreadCount > 0 && (
-          <span className="absolute -top-1 -right-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-danger text-white text-[10px] font-bold rounded-full">
+          <span className="absolute -top-1 -start-1 min-w-[16px] h-4 px-1 flex items-center justify-center bg-danger text-white text-[10px] font-bold rounded-full">
             {unreadCount > 9 ? '9+' : unreadCount}
           </span>
         )}
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
+        <div className="absolute top-full end-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
           <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">{t('notificationBell.title')}</div>
           {items.length === 0 && (
             <p className="text-center text-fg-subtle text-sm py-8">{t('notificationBell.noNotifications')}</p>
@@ -133,7 +134,7 @@ export default function NotificationBell() {
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-fg font-medium">{n.title}</p>
                   {n.body && <p className="text-xs text-fg-muted mt-0.5">{n.body}</p>}
-                  <p className="text-[10px] text-fg-subtle mt-1">{new Date(n.created_at).toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</p>
+                  <p className="text-[10px] text-fg-subtle mt-1">{formatDateTime(n.created_at, { dateStyle: 'short', timeStyle: 'short' })}</p>
 
                   {n.type === 'transfer_request' && n.action_status === 'pending' && (
                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>

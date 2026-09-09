@@ -6,7 +6,9 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { ArrowRight, BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2 } from 'lucide-react'
+import { formatDate as localeFormatDate, formatTime as localeFormatTime } from '../lib/locale'
+import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2 } from 'lucide-react'
+import BackArrow from '../components/BackArrow'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -58,7 +60,7 @@ export default function ReportsScreen() {
       {/* Header */}
       <div className="flex items-center gap-3 px-4 pt-safe pt-4 pb-3 bg-surface-2 border-b border-surface-3">
         <button onClick={() => navigate('/')} className="text-fg-muted hover:text-fg">
-          <ArrowRight size={20} />
+          <BackArrow />
         </button>
         <span className="font-bold text-fg">{t('reports.title')}</span>
       </div>
@@ -149,10 +151,10 @@ function AiReportsTab() {
         {history.map((h, i) => (
           <div key={i} className="space-y-1.5">
             <div className="flex justify-end">
-              <div className="bg-brand text-white rounded-2xl rounded-bl-sm px-4 py-2.5 text-sm max-w-[85%]">{h.question}</div>
+              <div className="bg-brand text-white rounded-2xl rounded-ee-sm px-4 py-2.5 text-sm max-w-[85%]">{h.question}</div>
             </div>
             <div className="flex justify-start">
-              <div className="bg-surface-2 border border-surface-3 rounded-2xl rounded-br-sm px-4 py-2.5 text-sm text-fg max-w-[85%]">
+              <div className="bg-surface-2 border border-surface-3 rounded-2xl rounded-es-sm px-4 py-2.5 text-sm text-fg max-w-[85%]">
                 {h.loading ? (
                   <div className="flex items-center gap-2 text-fg-subtle">
                     <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> {t('reports.ai.thinking')}
@@ -230,7 +232,7 @@ function mondayOf(d) {
   return x
 }
 function formatShort(dateObj) {
-  return dateObj.toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })
+  return localeFormatDate(dateObj, { day: 'numeric', month: 'short' })
 }
 
 // حدود التاريخ (من/إلى بصيغة ISO) لأي فترة مختارة — نفس المنطق مستخدم في أكتر من تقرير
@@ -663,7 +665,7 @@ function CountriesTab() {
                     <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
                       <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
                     </div>
-                    <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+                    <span className="text-sm font-semibold text-fg w-10 text-end">{r.count}</span>
                   </div>
                 ))}
               </div>
@@ -932,7 +934,7 @@ function OverviewTab() {
                         <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: d.color }} />
                         <span className="text-fg flex-1 truncate">{d.name}</span>
                         <span className="text-fg-muted text-xs">{pct}%</span>
-                        <span className="font-semibold text-fg w-8 text-left">{d.count}</span>
+                        <span className="font-semibold text-fg w-8 text-end">{d.count}</span>
                       </div>
                     )
                   })}
@@ -975,7 +977,7 @@ function relTime(dateStr) {
 }
 
 function formatClock(d) {
-  return d.toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' })
+  return localeFormatTime(d, { hour: '2-digit', minute: '2-digit' })
 }
 
 function formatDuration(ms) {
@@ -1115,9 +1117,9 @@ function AttendanceTab() {
             <ChevronDown size={14} className={`text-fg-subtle transition-transform ${showAgentDropdown ? 'rotate-180' : ''}`} />
           </button>
           {showAgentDropdown && (
-            <div className="absolute top-full right-0 left-0 mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-20 max-h-72 overflow-y-auto">
+            <div className="absolute top-full inset-x-0 mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-20 max-h-72 overflow-y-auto">
               <button onClick={toggleAll}
-                className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right border-b border-surface-3">
+                className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-start border-b border-surface-3">
                 <input type="checkbox" readOnly checked={selectedAgentIds?.length === agents.length} />
                 <span className="font-medium text-fg">{t('reports.attendance.selectAll')}</span>
               </button>
@@ -1125,7 +1127,7 @@ function AttendanceTab() {
                 const st = ATTENDANCE_STATUS_OPTS.find(s => s.key === (a.status || 'offline')) || ATTENDANCE_STATUS_OPTS[2]
                 return (
                   <button key={a.id} onClick={() => toggleAgent(a.id)}
-                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-right">
+                    className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3/60 text-sm text-start">
                     <input type="checkbox" readOnly checked={selectedAgentIds?.includes(a.id) || false} />
                     <span className={`w-2 h-2 rounded-full flex-shrink-0 ${st.dot}`} />
                     <span className="flex-1 text-fg truncate">{a.name}</span>
@@ -1154,10 +1156,10 @@ function AttendanceTab() {
             if (!a) return null
             return (
               <button key={s.agentId} onClick={() => setExpandedAgentId(expandedAgentId === s.agentId ? null : s.agentId)}
-                className={`w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/60 transition-colors ${expandedAgentId === s.agentId ? 'bg-surface-3/60' : ''}`}>
+                className={`w-full flex items-center gap-3 px-4 py-3 text-start hover:bg-surface-3/60 transition-colors ${expandedAgentId === s.agentId ? 'bg-surface-3/60' : ''}`}>
                 <span className="flex-1 text-sm font-medium text-fg truncate">{a.name}</span>
                 <span className="text-xs text-fg-subtle hidden sm:inline">{t('reports.attendance.statusDuration', { duration: formatDuration((s.totals.online || 0) + (s.totals.busy || 0)) })}</span>
-                <span className="text-xs text-fg font-semibold w-28 text-left">{t('reports.attendance.actualDuration', { duration: formatDuration(s.presenceMs || 0) })}</span>
+                <span className="text-xs text-fg font-semibold w-28 text-end">{t('reports.attendance.actualDuration', { duration: formatDuration(s.presenceMs || 0) })}</span>
               </button>
             )
           })}
@@ -1284,7 +1286,7 @@ function TagsReportTab() {
       {tags.map(tag => (
         <div key={tag.id} className="bg-surface-2 rounded-2xl border border-surface-3 overflow-hidden">
           <button onClick={() => setExpandedTagId(expandedTagId === tag.id ? null : tag.id)}
-            className="w-full flex items-center gap-3 px-4 py-3 text-right hover:bg-surface-3/40 transition-colors">
+            className="w-full flex items-center gap-3 px-4 py-3 text-start hover:bg-surface-3/40 transition-colors">
             <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tag.color }} />
             <span className="flex-1 text-sm font-medium text-fg">{tag.name}</span>
             <span className="text-xs text-fg-subtle">{t('reports.tags.contactsCount', { count: tag.count })}</span>
@@ -1595,7 +1597,7 @@ function ChannelVolumeTab() {
                     <div className="w-32 h-1.5 rounded-full bg-surface-3 overflow-hidden hidden sm:block">
                       <div className="h-full bg-brand" style={{ width: `${total ? (r.count / total) * 100 : 0}%` }} />
                     </div>
-                    <span className="text-sm font-semibold text-fg w-10 text-left">{r.count}</span>
+                    <span className="text-sm font-semibold text-fg w-10 text-end">{r.count}</span>
                   </div>
                 ))}
               </div>
@@ -1668,7 +1670,7 @@ function ExportTab() {
           c.phone || '',
           c.country || '',
           PLATFORM_LABEL[c.platform] || c.platform || '',
-          c.created_at ? new Date(c.created_at).toLocaleDateString('ar-EG') : '',
+          c.created_at ? localeFormatDate(c.created_at) : '',
           stageMap[c.lifecycle_stage_id] || '',
           (tagsByContact[c.id] || []).join(' / '),
           c.notes || '',
