@@ -811,6 +811,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
   const [name, setName] = useState(channel.custom_name || '')
   const [saving, setSaving] = useState(false)
   const [disconnecting, setDisconnecting] = useState(false)
+  const [deletingForever, setDeletingForever] = useState(false)
 
   const meta = PLATFORM_META[channel.platform] || { label: channel.platform, icon: Radio, color: 'text-fg' }
   const Icon = meta.icon
@@ -845,6 +846,25 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
     } catch (err) {
       toast.error('خطأ: ' + err.message)
       setDisconnecting(false)
+    }
+  }
+
+  // بعكس "فصل" اللي بيسيب الصف موجود عشان يرجع يشتغل تلقائي لو اترّبط تاني — ده بيمسح الصف
+  // خالص من السجل. المحادثات والرسايل القديمة مش بتتمسح (بيفضل تاريخها محفوظ)، بس هتبقى
+  // "من غير قناة" لحد ما رقم جديد يترّبط
+  const deleteForever = async () => {
+    if (!confirm(`حذف ${channel.custom_name || channel.display_name || meta.label} نهائيًا من السجل؟ مش هيرجع تاني إلا لو ربطتها من الأول. المحادثات القديمة هتفضل موجودة.`)) return
+    if (!confirm('تأكيد أخير: الحذف ده نهائي ومينفعش يتراجع فيه. متأكد؟')) return
+    setDeletingForever(true)
+    try {
+      const res = await fetch(`${API_URL}/channels/${channel.id}/permanent`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل الحذف')
+      toast.success('اتحذفت القناة نهائيًا')
+      onChanged()
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+      setDeletingForever(false)
     }
   }
 
@@ -890,8 +910,8 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             <p className="text-[11px] text-fg-subtle">معرّف القناة: {channel.external_id}</p>
           </div>
 
-          <div className="pt-3 border-t border-surface-3">
-            <button onClick={disconnect} disabled={disconnecting}
+          <div className="pt-3 border-t border-surface-3 space-y-2">
+            <button onClick={disconnect} disabled={disconnecting || deletingForever}
               className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger/10 text-danger hover:bg-danger/20 transition-colors disabled:opacity-50">
               {disconnecting ? (
                 <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" />
@@ -899,6 +919,17 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
                 <><Trash2 size={14} /> فصل القناة</>
               )}
             </button>
+            <button onClick={deleteForever} disabled={disconnecting || deletingForever}
+              className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:brightness-110 transition-colors disabled:opacity-50">
+              {deletingForever ? (
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+              ) : (
+                <><Trash2 size={14} /> حذف القناة نهائيًا من السجل</>
+              )}
+            </button>
+            <p className="text-[11px] text-fg-subtle text-center">
+              "فصل" بيسيبها في السجل عشان ترجع تشتغل لوحدها لو اترّبطت تاني. "حذف نهائيًا" بيشيلها خالص.
+            </p>
           </div>
         </div>
       </div>
