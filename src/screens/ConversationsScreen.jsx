@@ -4,7 +4,7 @@ import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2 } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 
@@ -352,6 +352,7 @@ export default function ConversationsScreen() {
   const [showAdvFilter, setShowAdvFilter] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
+  const [showNewConv, setShowNewConv] = useState(false)
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [showBulkAssign, setShowBulkAssign] = useState(false)
@@ -960,6 +961,10 @@ export default function ConversationsScreen() {
             )}
           </div>
           <div className={`flex items-center gap-1 ${expanded ? '' : 'flex-col'}`}>
+            <button onClick={() => setShowNewConv(true)} title="بدء محادثة جديدة"
+              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+              <UserPlus size={15} />
+            </button>
             <button onClick={toggleTheme}
               className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
               {theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
@@ -1279,6 +1284,16 @@ export default function ConversationsScreen() {
         </div>
       )}
 
+      {/* بدء محادثة يدوي مع جهة اتصال جديدة */}
+      {showNewConv && (
+        <NewConversationModal
+          agentId={agent?.id}
+          channels={allChannels.filter(c => c.platform === 'whatsapp' || c.platform === 'whatsapp_qr')}
+          onClose={() => setShowNewConv(false)}
+          onStarted={(conversationId) => { setShowNewConv(false); navigate(`/chat/${conversationId}`) }}
+        />
+      )}
+
       {/* تعليمات تثبيت آيفون (مفيش API تلقائي في سفاري) */}
       {showIosHelp && (
         <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => setShowIosHelp(false)}>
@@ -1413,5 +1428,87 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         )}
       </div>
     </button>
+  )
+}
+
+// ─── بدء محادثة يدوي مع اسم + رقم تليفون لسه ما كلّمناش خالص ─────────────
+// بيعمل جهة اتصال + محادثة فاضية بس (POST /conversations/start)، وبعدين بينتقل لشاشة الشات
+// العادية — من هناك الإرسال بيمشي بنفس المسارات الموجودة أصلاً حسب المنصة (واتساب QR: صندوق
+// كتابة عادي على طول، واتساب الرسمي: بيتجبر على "ابعت قالب معتمد" لأول رسالة لعميل جديد)
+function NewConversationModal({ agentId, channels, onClose, onStarted }) {
+  const toast = useToast()
+  const [name, setName] = useState('')
+  const [phone, setPhone] = useState('')
+  const [channelId, setChannelId] = useState(channels[0]?.id || '')
+  const [sending, setSending] = useState(false)
+
+  const start = async () => {
+    if (!name.trim() || !phone.trim() || !channelId) {
+      toast.error('املا الاسم ورقم التليفون واختار قناة')
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch(`${API_URL}/conversations/start`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: name.trim(), phone: phone.trim(), channel_id: channelId, agent_id: agentId })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'فشل بدء المحادثة')
+      onStarted(data.conversation_id)
+    } catch (err) {
+      toast.error('خطأ: ' + err.message)
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !sending && onClose()}>
+      <div onClick={e => e.stopPropagation()}
+        className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[400px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
+          <p className="text-sm font-semibold text-fg">بدء محادثة جديدة</p>
+          <button onClick={onClose} disabled={sending}
+            className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 disabled:opacity-50">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="p-5 space-y-4">
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">الاسم</label>
+            <input value={name} onChange={e => setName(e.target.value)} placeholder="اسم العميل"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">رقم التليفون</label>
+            <input value={phone} onChange={e => setPhone(e.target.value)} placeholder="بالكود الدولي، مثلاً 201001234567" dir="ltr"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle text-left focus:outline-none focus:ring-1 focus:ring-brand" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">تبعت من رقم</label>
+            {channels.length === 0 ? (
+              <p className="text-xs text-danger">مفيش رقم واتساب نشط متربط</p>
+            ) : (
+              <select value={channelId} onChange={e => setChannelId(e.target.value)}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
+                {channels.map(c => (
+                  <option key={c.id} value={c.id}>
+                    {getChannelLabel(c) || c.display_name} {c.platform === 'whatsapp_qr' ? '(ربط سريع)' : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {/* واتساب الرسمي هيتجبر على قالب معتمد لأول رسالة — دي قاعدة ميتا نفسها مش اختيار عندنا */}
+            <p className="text-[11px] text-fg-subtle mt-1.5">لو اخترت واتساب الرسمي، أول رسالة هتبقى لازم قالب معتمد من ميتا.</p>
+          </div>
+          <button onClick={start} disabled={sending || channels.length === 0}
+            className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+            {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'بدء المحادثة'}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }

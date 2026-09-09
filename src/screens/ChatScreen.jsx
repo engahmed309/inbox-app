@@ -919,7 +919,7 @@ export default function ChatScreen() {
   const currentLifecycle = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)
   const isWindowExpired = conv?.last_inbound_at
     ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > (PLATFORM_WINDOW_HOURS[conv.platform] || MESSAGE_WINDOW_HOURS)
-    : false
+    : conv?.platform === 'whatsapp' // لسه ما كلمناش خالص على واتساب الرسمي — لازم قالب معتمد لأول رسالة
   const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : Facebook
   // تيك توك بيقبل نص وصور بس في الـ Business Messaging API — لا فيديو ولا صوت ولا ملفات،
   // فبنخفي أزرار الحاجات دي بدل ما الموظف يبعتها ويكتشف إنها فشلت (أو الأسوأ: توصل كنص فيه اسم الملف)
