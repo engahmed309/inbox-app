@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -7,15 +8,16 @@ import ContactSidebar from '../components/ContactSidebar'
 import RequestAdminModal from '../components/RequestAdminModal'
 import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
+import i18n from '../i18n'
 import {
   ArrowRight, Send, Paperclip, ChevronDown, Search, X,
   User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode
 } from 'lucide-react'
 
 const STATUS_OPTS = [
-  { key: 'open', label: 'مفتوحة', color: 'bg-success' },
-  { key: 'follow_up', label: 'متابعة', color: 'bg-follow' },
-  { key: 'closed', label: 'مغلقة', color: 'bg-slate-500' },
+  { key: 'open', labelKey: 'chat.status.open', color: 'bg-success' },
+  { key: 'follow_up', labelKey: 'chat.status.followUp', color: 'bg-follow' },
+  { key: 'closed', labelKey: 'chat.status.closed', color: 'bg-slate-500' },
 ]
 
 const MAX_RECORD_SECONDS = 180 // ٣ دقايق أقصى مدة لتسجيل الرسالة الصوتية
@@ -28,13 +30,19 @@ const MESSAGE_WINDOW_HOURS = 24
 // whatsapp_qr مالوش قيد نافذة الـ٢٤ ساعة أصلاً — ده بالظبط سبب وجود القناة دي — فـ Infinity
 // بتخلّي شرط isWindowExpired تحت دايمًا false ليها من غير أي شرط إضافي في أي مكان تاني
 const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity }
-const WINDOW_EXPIRED_TEXT = {
-  tiktok: 'عدّت ٤٨ ساعة من آخر رسالة للعميل — تيك توك بيرفض أي رد بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
-  whatsapp: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — واتساب مايسمحش برسالة عادية دلوقتي، لازم تبعت Template معتمد مسبقاً من ميتا.',
-  instagram: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — انستجرام بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
-  facebook: 'عدّت ٢٤ ساعة من آخر رسالة للعميل — فيسبوك بيرفض أي رد عادي بعد المدة دي. المحادثة تترجع تشتغل تاني بس لو العميل بعت رسالة جديدة.',
+// كل قيمة هنا مفتاح ترجمة (مش نص جاهز) — بيتحل بـ t() وقت الاستخدام جوه الكومبوننت
+const WINDOW_EXPIRED_KEYS = {
+  tiktok: 'chat.windowExpired.tiktok',
+  whatsapp: 'chat.windowExpired.whatsapp',
+  instagram: 'chat.windowExpired.instagram',
+  facebook: 'chat.windowExpired.facebook',
 }
-const PLATFORM_LABEL = { facebook: 'فيسبوك', instagram: 'إنستجرام', whatsapp: 'واتساب', tiktok: 'تيك توك' }
+const PLATFORM_LABEL_KEYS = {
+  facebook: 'chat.platformLabels.facebook',
+  instagram: 'chat.platformLabels.instagram',
+  whatsapp: 'chat.platformLabels.whatsapp',
+  tiktok: 'chat.platformLabels.tiktok',
+}
 
 // الاسم اللي بيظهر للقناة: الاسم المختصر لو المستخدم حطه، وإلا لكل واتساب بنعرض اسم الـ WABA +
 // آخر رقمين من الـ ID عشان نفرّق بين أرقام كتير بنفس الاسم، ولباقي المنصات بنرجع لاسم الحساب من ميتا
@@ -43,7 +51,7 @@ function getChannelLabel(ch) {
   if (ch.custom_name) return ch.custom_name
   if (ch.platform === 'whatsapp') {
     const last2 = String(ch.external_id || '').slice(-2)
-    return `${ch.display_name || 'واتساب'} #${last2}`
+    return `${ch.display_name || i18n.t('chat.channelLabel.whatsappFallback')} #${last2}`
   }
   return ch.display_name || null
 }
@@ -80,18 +88,18 @@ function formatTime(dateStr) {
 function formatDate(dateStr) {
   const d = new Date(dateStr)
   const today = new Date()
-  if (d.toDateString() === today.toDateString()) return 'اليوم'
+  if (d.toDateString() === today.toDateString()) return i18n.t('chat.formatDate.today')
   const yesterday = new Date(today)
   yesterday.setDate(today.getDate() - 1)
-  if (d.toDateString() === yesterday.toDateString()) return 'أمس'
+  if (d.toDateString() === yesterday.toDateString()) return i18n.t('chat.formatDate.yesterday')
   return d.toLocaleDateString('ar')
 }
 
 // اسم مؤقت مميّز لحد ما يتسجل اسم حقيقي (فيسبوك بيمنع جلب الاسم/الصورة لأغلب الحسابات)
 function displayName(contact) {
   if (contact?.name) return contact.name
-  if (contact?.platform_id) return `زائر ${contact.platform_id.slice(-4)}`
-  return 'مجهول'
+  if (contact?.platform_id) return i18n.t('chat.displayName.visitor', { id: contact.platform_id.slice(-4) })
+  return i18n.t('chat.displayName.unknown')
 }
 
 export default function ChatScreen() {
@@ -99,6 +107,7 @@ export default function ChatScreen() {
   const navigate = useNavigate()
   const { agent } = useAuth()
   const toast = useToast()
+  const { t } = useTranslation()
 
   const [conv, setConv] = useState(null)
   const [contact, setContact] = useState(null)
@@ -495,7 +504,7 @@ export default function ChatScreen() {
     })
     if (!res.ok) {
       const data = await res.json().catch(() => null)
-      throw new Error(data?.error || 'فشل الإرسال')
+      throw new Error(data?.error || t('chat.toast.sendFailed'))
     }
   }
 
@@ -533,7 +542,7 @@ export default function ChatScreen() {
       if (msgText) { await sendOne(msgText, 'text', null, replyToId); textSent = true }
       if (pf) {
         const url = await uploadPendingFile(pf)
-        await sendOne(pf.name || 'ملف', pf.type, url, msgText ? null : replyToId)
+        await sendOne(pf.name || t('chat.common.file'), pf.type, url, msgText ? null : replyToId)
       }
       await fetchMessages()
       // اتردّ فعلاً، دلوقتي بس تتعلّم "مقروءة"
@@ -545,11 +554,11 @@ export default function ChatScreen() {
         // النص اتبعت فعلاً وسجّل في القاعدة — منرجعوش عشان مايتبعتش تاني، بس نرجّع الملف عشان يعيد المحاولة بيه بس
         await fetchMessages()
         setPendingFile(pf)
-        toast.error(`اتبعتت الرسالة النصية، لكن فشل إرسال الملف: ${err.message || 'خطأ غير معروف'}`)
+        toast.error(t('chat.toast.textSentFileFailed', { error: err.message || t('chat.common.unknownError') }))
       } else {
         setText(msgText)
         setPendingFile(pf)
-        toast.error(`فشل الإرسال: ${err.message || 'خطأ غير معروف'}`)
+        toast.error(t('chat.toast.sendFailedWithReason', { error: err.message || t('chat.common.unknownError') }))
       }
     } finally {
       setSending(false)
@@ -559,9 +568,9 @@ export default function ChatScreen() {
   const copyMessage = async (msg) => {
     try {
       await navigator.clipboard.writeText(msg.content || '')
-      toast.success('اتنسخت الرسالة')
+      toast.success(t('chat.toast.messageCopied'))
     } catch {
-      toast.error('فشل النسخ')
+      toast.error(t('chat.toast.copyFailed'))
     }
   }
 
@@ -582,12 +591,12 @@ export default function ChatScreen() {
         body: JSON.stringify({ conversation_id: id, content: noteContent, agent_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إضافة الملاحظة')
+      if (!res.ok) throw new Error(data.error || t('chat.toast.noteAddFailed'))
       setNoteText('')
       setShowNoteBox(false)
       await fetchMessages(false)
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     } finally {
       setSendingNote(false)
     }
@@ -600,7 +609,7 @@ export default function ChatScreen() {
       openFollowUpModal()
       return
     }
-    const oldLabel = currentStatus.label
+    const oldLabel = t(currentStatus.labelKey)
     const oldStatus = conv?.status
     setConv(prev => ({ ...prev, status: s, follow_up_at: null }))
     setShowStatus(false)
@@ -608,11 +617,11 @@ export default function ChatScreen() {
     const { error } = await supabase.from('conversations').update({ status: s, follow_up_at: null }).eq('id', id)
     if (error) {
       setConv(prev => ({ ...prev, status: oldStatus }))
-      toast.error('فشل تغيير حالة المحادثة، حاول تاني')
+      toast.error(t('chat.toast.statusChangeFailed'))
       return
     }
-    const newLabel = STATUS_OPTS.find(o => o.key === s)?.label || s
-    if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "${newLabel}"`)
+    const newLabel = t(STATUS_OPTS.find(o => o.key === s)?.labelKey || s)
+    if (oldLabel !== newLabel) logActivity(id, agent?.id, t('chat.activity.statusChanged', { from: oldLabel, to: newLabel }))
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
     if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
   }
@@ -632,62 +641,63 @@ export default function ChatScreen() {
   }
 
   const confirmFollowUp = async () => {
-    if (!followUpDateTime) { toast.error('حدد معاد الرجوع الأول'); return }
+    if (!followUpDateTime) { toast.error(t('chat.toast.followUpDateRequired')); return }
     const followUpAt = new Date(followUpDateTime)
-    if (followUpAt.getTime() <= Date.now()) { toast.error('المعاد لازم يكون في المستقبل'); return }
+    if (followUpAt.getTime() <= Date.now()) { toast.error(t('chat.toast.followUpMustBeFuture')); return }
 
     setSavingFollowUp(true)
-    const oldLabel = currentStatus.label
+    const oldLabel = t(currentStatus.labelKey)
     const { error } = await supabase.from('conversations')
       .update({ status: 'follow_up', follow_up_at: followUpAt.toISOString() })
       .eq('id', id)
     if (error) {
       setSavingFollowUp(false)
-      toast.error('فشل حفظ المتابعة، حاول تاني')
+      toast.error(t('chat.toast.followUpSaveFailed'))
       return
     }
     setConv(prev => ({ ...prev, status: 'follow_up', follow_up_at: followUpAt.toISOString() }))
 
     const readableTime = followUpAt.toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })
-    if (oldLabel !== 'متابعة') logActivity(id, agent?.id, `غيّر حالة المحادثة من "${oldLabel}" إلى "متابعة" — هترجع الساعة ${readableTime}`)
+    const followUpLabel = t('chat.status.followUp')
+    if (oldLabel !== followUpLabel) logActivity(id, agent?.id, t('chat.activity.statusChangedFollowUp', { from: oldLabel, to: followUpLabel, time: readableTime }))
 
     if (followUpNote.trim()) {
       try {
         const res = await fetch(`${API_URL}/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation_id: id, content: `🔔 متابعة (${readableTime}): ${followUpNote.trim()}`, agent_id: agent?.id })
+          body: JSON.stringify({ conversation_id: id, content: t('chat.followUpNote.prefix', { time: readableTime, note: followUpNote.trim() }), agent_id: agent?.id })
         })
         if (!res.ok) throw new Error()
         await fetchMessages(false)
       } catch {
-        toast.error('اتحفظت المتابعة بس فشل حفظ الملاحظة')
+        toast.error(t('chat.toast.followUpNoteSaveFailed'))
       }
     }
 
     setSavingFollowUp(false)
     setShowFollowUpModal(false)
-    toast.success(`هترجع المحادثة تاني الساعة ${readableTime}`)
+    toast.success(t('chat.toast.followUpSaved', { time: readableTime }))
   }
 
   const changeLifecycle = async (stageId) => {
-    const oldLabel = currentLifecycle?.name || 'بدون مرحلة'
+    const oldLabel = currentLifecycle?.name || t('chat.common.noStage')
     const oldStageId = contact?.lifecycle_stage_id
     setContact(prev => prev ? { ...prev, lifecycle_stage_id: stageId || null } : prev)
     setShowLifecycle(false)
     const { error } = await supabase.from('contacts').update({ lifecycle_stage_id: stageId || null }).eq('id', contact.id)
     if (error) {
       setContact(prev => prev ? { ...prev, lifecycle_stage_id: oldStageId } : prev)
-      toast.error('فشل تغيير مرحلة الـ Lifecycle، حاول تاني')
+      toast.error(t('chat.toast.lifecycleChangeFailed'))
       return
     }
-    const newLabel = lifecycles.find(l => l.id === stageId)?.name || 'بدون مرحلة'
-    if (oldLabel !== newLabel) logActivity(id, agent?.id, `غيّر مرحلة الـ Lifecycle من "${oldLabel}" إلى "${newLabel}"`)
+    const newLabel = lifecycles.find(l => l.id === stageId)?.name || t('chat.common.noStage')
+    if (oldLabel !== newLabel) logActivity(id, agent?.id, t('chat.activity.lifecycleChanged', { from: oldLabel, to: newLabel }))
   }
 
   const assignAgent = async (agentId) => {
     const { error } = await supabase.from('conversations').update({ assigned_agent_id: agentId }).eq('id', id)
-    if (error) { toast.error('فشل تعيين المحادثة، حاول تاني'); return }
+    if (error) { toast.error(t('chat.toast.assignFailed')); return }
     await supabase.from('conversation_assignment_log').insert({
       conversation_id: id, assigned_to: agentId, assigned_by: agent?.id
     })
@@ -700,22 +710,22 @@ export default function ChatScreen() {
   // استلام المحادثة من الـ AI Agent — بيوقف رد الـ AI التلقائي ويفتح مربع الكتابة للموظف البشري
   const takeOverFromAi = async () => {
     const { error } = await supabase.from('conversations').update({ ai_active: false }).eq('id', id)
-    if (error) { toast.error('فشل استلام المحادثة، حاول تاني'); return }
+    if (error) { toast.error(t('chat.toast.takeOverFailed')); return }
     setConv(prev => ({ ...prev, ai_active: false }))
     if (!conv?.assigned_agent_id && agent?.id) {
       await supabase.from('conversations').update({ assigned_agent_id: agent.id }).eq('id', id)
       await supabase.from('conversation_assignment_log').insert({ conversation_id: id, assigned_to: agent.id, assigned_by: agent?.id })
       setConv(prev => ({ ...prev, assigned_agent_id: agent.id, agentName: agent.name, agentAvatarUrl: agent.avatar_url }))
     }
-    toast.success('استلمت المحادثة من الـ AI Agent')
+    toast.success(t('chat.toast.takeOverSuccess'))
   }
 
   // عكس الـ takeover — يرجّع التحكم للـ AI تاني بعد ما موظف كان استلمها
   const assignToAi = async () => {
     const { error } = await supabase.from('conversations').update({ ai_active: true }).eq('id', id)
-    if (error) { toast.error('فشل تحويل المحادثة للـ AI، حاول تاني'); return }
+    if (error) { toast.error(t('chat.toast.assignAiFailed')); return }
     setConv(prev => ({ ...prev, ai_active: true }))
-    toast.success('اتحوّلت المحادثة للـ AI Agent')
+    toast.success(t('chat.toast.assignAiSuccess'))
   }
 
   // زرار "عصاية سحرية" — الـ AI بيقترح رد بناءً على المحادثة، والموظف يعدّله ويبعته أو يتجاهله
@@ -729,11 +739,11 @@ export default function ChatScreen() {
         body: JSON.stringify({ conversation_id: id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل توليد اقتراح')
+      if (!res.ok) throw new Error(data.error || t('chat.toast.suggestFailed'))
       onTextChange(data.suggestion || '')
       textareaRef.current?.focus()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     } finally {
       setSuggesting(false)
     }
@@ -746,7 +756,7 @@ export default function ChatScreen() {
     e.target.value = ''
     const type = file.type.startsWith('image') ? 'image' : file.type.startsWith('video') ? 'video' : file.type.startsWith('audio') ? 'audio' : 'file'
     if (isTiktok && type !== 'image') {
-      toast.error('تيك توك بيقبل صور بس — مش بيدعم إرسال فيديو أو صوت أو ملفات')
+      toast.error(t('chat.toast.tiktokImageOnlyFull'))
       return
     }
     setPendingFile({ file, url: null, previewUrl: URL.createObjectURL(file), type, name: file.name })
@@ -772,7 +782,7 @@ export default function ChatScreen() {
 
   const pickFromLibrary = (item) => {
     if (isTiktok && item.file_type !== 'image') {
-      toast.error('تيك توك بيقبل صور بس — مش بيدعم إرسال فيديو أو ملفات')
+      toast.error(t('chat.toast.tiktokImageOnlyShort'))
       return
     }
     setPendingFile({ file: null, url: item.file_url, previewUrl: item.file_url, type: item.file_type, name: item.name })
@@ -799,7 +809,7 @@ export default function ChatScreen() {
       setRecordSeconds(0)
       recordTimerRef.current = setInterval(() => setRecordSeconds(s => s + 1), 1000)
     } catch {
-      toast.error('لازم تسمح بالوصول للميكروفون')
+      toast.error(t('chat.toast.micPermissionRequired'))
     }
   }
 
@@ -807,7 +817,7 @@ export default function ChatScreen() {
   useEffect(() => {
     if (isRecording && recordSeconds >= MAX_RECORD_SECONDS) {
       stopRecording(true)
-      toast.info('وصلت لأقصى مدة تسجيل (٣ دقايق)، اتوقف التسجيل تلقائياً')
+      toast.info(t('chat.toast.maxRecordReached'))
     }
   }, [recordSeconds, isRecording])
 
@@ -833,7 +843,7 @@ export default function ChatScreen() {
       if (!send) return
       const blob = new Blob(audioChunksRef.current, { type: 'audio/webm' })
       const file = new File([blob], `voice_${Date.now()}.webm`, { type: 'audio/webm' })
-      setPendingFile({ file, url: null, previewUrl: URL.createObjectURL(blob), type: 'audio', name: 'رسالة صوتية' })
+      setPendingFile({ file, url: null, previewUrl: URL.createObjectURL(blob), type: 'audio', name: t('chat.composer.voiceMessageName') })
     }
     recorder.stop()
   }
@@ -861,7 +871,7 @@ export default function ChatScreen() {
       const now = Date.now()
       if (now - ref.lastSentAt > 5000) {
         ref.lastSentAt = now
-        const label = agent?.name || 'موظف'
+        const label = agent?.name || t('chat.common.agentFallback')
         typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: true, label, agentId: agent?.id } })
         fetch(`${API_URL}/conversations/${id}/typing`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: true })
@@ -870,7 +880,7 @@ export default function ChatScreen() {
       ref.offTimeout = setTimeout(() => sendTyping(false), 3000)
     } else {
       ref.lastSentAt = 0
-      const label = agent?.name || 'موظف'
+      const label = agent?.name || t('chat.common.agentFallback')
       typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: false, label, agentId: agent?.id } })
       fetch(`${API_URL}/conversations/${id}/typing`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: false })
@@ -973,14 +983,14 @@ export default function ChatScreen() {
                 <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
                 {contact?.is_blocked && (
                   <span className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger text-white flex-shrink-0">
-                    <Ban size={9} /> محظور
+                    <Ban size={9} /> {t('chat.header.blockedBadge')}
                   </span>
                 )}
               </div>
               <div className="flex items-center gap-1">
                 <PlatformIcon size={11} className="text-fg-muted" />
                 {!contact?.name && (
-                  <span className="text-xs text-fg-muted truncate">اضغط لإضافة الاسم</span>
+                  <span className="text-xs text-fg-muted truncate">{t('chat.header.addNamePrompt')}</span>
                 )}
               </div>
             </div>
@@ -996,14 +1006,14 @@ export default function ChatScreen() {
               <button onClick={() => setShowLifecycle(v => !v)}
                 className="flex items-center gap-1 text-[10px] font-medium px-1.5 py-1.5 rounded-full text-white max-w-[90px]"
                 style={{ background: currentLifecycle?.color || '#64748B' }}>
-                <span className="truncate">{currentLifecycle ? `${currentLifecycle.icon ? currentLifecycle.icon + ' ' : ''}${currentLifecycle.name}` : 'بدون مرحلة'}</span> <ChevronDown size={9} className="flex-shrink-0" />
+                <span className="truncate">{currentLifecycle ? `${currentLifecycle.icon ? currentLifecycle.icon + ' ' : ''}${currentLifecycle.name}` : t('chat.common.noStage')}</span> <ChevronDown size={9} className="flex-shrink-0" />
               </button>
               {showLifecycle && (
                 <div className="absolute left-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden max-h-64 overflow-y-auto">
                   <button onClick={() => changeLifecycle(null)}
                     className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
                     <span className="w-2 h-2 rounded-full flex-shrink-0 bg-slate-500" />
-                    بدون مرحلة
+                    {t('chat.common.noStage')}
                   </button>
                   {lifecycles.map(l => (
                     <button key={l.id} onClick={() => changeLifecycle(l.id)}
@@ -1023,7 +1033,7 @@ export default function ChatScreen() {
           <div className="relative">
             <button onClick={() => { setShowAssign(!showAssign); setShowStatus(false) }}
               className="px-2.5 py-1.5 text-xs bg-surface-3 rounded-lg text-fg-muted hover:text-fg max-w-[140px] truncate">
-              {conv?.agentName || 'غير معين'}
+              {conv?.agentName || t('chat.common.unassigned')}
             </button>
             {showAssign && (
               <div className="absolute right-0 top-full mt-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[150px] overflow-hidden">
@@ -1042,7 +1052,7 @@ export default function ChatScreen() {
           </div>
 
           {!conv?.ai_active && (
-            <button onClick={assignToAi} title="رجّع التحكم للـ AI Agent"
+            <button onClick={assignToAi} title={t('chat.header.returnToAiTitle')}
               className="flex items-center gap-1 px-2.5 py-1.5 text-xs bg-brand/10 text-brand rounded-lg hover:bg-brand/20 flex-shrink-0">
               <Bot size={12} /> AI
             </button>
@@ -1050,9 +1060,9 @@ export default function ChatScreen() {
 
           <div className="relative">
             <button onClick={() => { setShowStatus(!showStatus); setShowAssign(false) }}
-              title={conv?.status === 'follow_up' && conv?.follow_up_at ? `هترجع الساعة ${new Date(conv.follow_up_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' })}` : undefined}
+              title={conv?.status === 'follow_up' && conv?.follow_up_at ? t('chat.header.followUpReturnsAt', { time: new Date(conv.follow_up_at).toLocaleString('ar-EG', { dateStyle: 'medium', timeStyle: 'short' }) }) : undefined}
               className={`flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium text-white ${currentStatus.color}`}>
-              {currentStatus.label}
+              {t(currentStatus.labelKey)}
               {conv?.status === 'follow_up' && conv?.follow_up_at && (
                 <span className="opacity-90">⏰ {new Date(conv.follow_up_at).toLocaleString('ar-EG', { hour: 'numeric', minute: '2-digit', day: 'numeric', month: 'numeric' })}</span>
               )}
@@ -1064,7 +1074,7 @@ export default function ChatScreen() {
                   <button key={s.key} onClick={() => changeStatus(s.key)}
                     className="flex items-center gap-2 w-full px-4 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
                     <span className={`w-2 h-2 rounded-full ${s.color}`} />
-                    {s.label}
+                    {t(s.labelKey)}
                   </button>
                 ))}
               </div>
@@ -1078,7 +1088,7 @@ export default function ChatScreen() {
           <div className="relative">
             <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
             <input autoFocus value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
-              placeholder="ابحث في هذه المحادثة..."
+              placeholder={t('chat.search.placeholder')}
               className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
           </div>
         </div>
@@ -1091,7 +1101,7 @@ export default function ChatScreen() {
           <div className="flex justify-center mb-3">
             <button onClick={loadOlderMessages} disabled={loadingOlder}
               className="text-xs text-brand font-medium px-3 py-1.5 rounded-full bg-surface-2 hover:bg-surface-3 transition-colors disabled:opacity-50">
-              {loadingOlder ? 'جاري التحميل...' : 'تحميل رسائل أقدم'}
+              {loadingOlder ? t('chat.messages.loading') : t('chat.messages.loadOlder')}
             </button>
           </div>
         )}
@@ -1099,7 +1109,7 @@ export default function ChatScreen() {
           <div className="flex justify-start mb-3">
             <div className="max-w-[85%] sm:max-w-sm bg-surface-2 border border-surface-3 rounded-2xl overflow-hidden">
               <p className="text-[11px] text-fg-subtle px-3 pt-2 flex items-center gap-1">
-                <Megaphone size={11} /> جاي من إعلان ممول
+                <Megaphone size={11} /> {t('chat.messages.adReferral')}
               </p>
               {conv.ad_referral.image_url && (
                 <img src={conv.ad_referral.image_url} alt="" className="w-full max-h-48 object-cover" />
@@ -1140,7 +1150,7 @@ export default function ChatScreen() {
           </div>
         ))}
         {timeline.length === 0 && searchQuery && (
-          <p className="text-center text-fg-subtle text-sm mt-8">مفيش نتايج لـ "{searchQuery}"</p>
+          <p className="text-center text-fg-subtle text-sm mt-8">{t('chat.search.noResults', { query: searchQuery })}</p>
         )}
         <div ref={messagesEndRef} className="h-2" />
       </div>
@@ -1150,24 +1160,24 @@ export default function ChatScreen() {
         <div className="flex items-center gap-1.5 mb-2">
           <button onClick={() => setShowNoteBox(v => !v)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${showNoteBox ? 'bg-follow text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            <StickyNote size={13} /> ملاحظة داخلية
+            <StickyNote size={13} /> {t('chat.composer.internalNoteButton')}
           </button>
           <button onClick={() => { setShowQuickReplies(v => !v); setQuickReplyFilter('') }}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${showQuickReplies ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
-            <MessageSquareText size={13} /> ردود سريعة
+            <MessageSquareText size={13} /> {t('chat.composer.quickRepliesButton')}
           </button>
         </div>
         {showNoteBox && (
           <div className="mb-2 bg-follow/10 border border-follow/30 rounded-xl p-2.5">
             <div className="flex items-center gap-1.5 text-xs font-medium text-follow mb-1.5">
-              <StickyNote size={12} /> ملاحظة داخلية — مش هتتبعت للعميل، الموظفين بس هيشوفوها
+              <StickyNote size={12} /> {t('chat.composer.internalNoteHint')}
             </div>
             <div className="flex items-end gap-2">
               <textarea
                 value={noteText}
                 onChange={e => setNoteText(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendNote() } }}
-                placeholder="اكتب ملاحظتك للموظفين هنا..."
+                placeholder={t('chat.composer.internalNotePlaceholder')}
                 rows={2}
                 autoFocus
                 className="flex-1 bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-follow resize-none"
@@ -1190,7 +1200,7 @@ export default function ChatScreen() {
                 <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input autoFocus value={quickReplyFilter} onChange={e => setQuickReplyFilter(e.target.value)}
                   onKeyDown={e => { if (e.key === 'Escape') setShowQuickReplies(false) }}
-                  placeholder="دور على رد سريع..."
+                  placeholder={t('chat.composer.quickReplySearchPlaceholder')}
                   className="w-full bg-surface-3 rounded-lg py-1.5 px-3 pr-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
             </div>
@@ -1202,13 +1212,13 @@ export default function ChatScreen() {
                   {qr.text && <span className="text-xs text-fg-muted truncate w-full">{qr.text}</span>}
                 </button>
               )) : (
-                <p className="text-xs text-fg-subtle text-center py-4">مفيش ردود سريعة مطابقة</p>
+                <p className="text-xs text-fg-subtle text-center py-4">{t('chat.composer.noQuickReplies')}</p>
               )}
             </div>
             {agent?.role !== 'admin' && (
               <button onClick={() => { setShowQuickReplies(false); setShowRequestModal(true) }}
                 className="flex items-center gap-1.5 justify-center w-full px-3 py-2 text-xs text-brand hover:bg-surface-3 border-t border-surface-3 flex-shrink-0">
-                <Send size={11} /> اطلب رد سريع جديد من الأدمن
+                <Send size={11} /> {t('chat.composer.requestQuickReply')}
               </button>
             )}
           </div>
@@ -1222,7 +1232,7 @@ export default function ChatScreen() {
             </button>
             <div className="flex-1 flex items-center gap-2 bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg">
               <span className="w-2 h-2 rounded-full bg-danger pulse-dot" />
-              جاري التسجيل... {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:{String(recordSeconds % 60).padStart(2, '0')}
+              {t('chat.composer.recording')} {String(Math.floor(recordSeconds / 60)).padStart(2, '0')}:{String(recordSeconds % 60).padStart(2, '0')}
             </div>
             <button onClick={() => stopRecording(true)}
               className="w-10 h-10 flex-shrink-0 flex items-center justify-center bg-brand hover:bg-brand-dark text-white rounded-xl transition-colors">
@@ -1232,33 +1242,33 @@ export default function ChatScreen() {
         ) : !channelActive ? (
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
             <Ban size={18} className="flex-shrink-0" />
-            <span>قناة {PLATFORM_LABEL[conv?.platform] || conv?.platform} اتفصلت من التطبيق — لازم تتربط تاني من الإعدادات → القنوات عشان تقدر ترد.</span>
+            <span>{t('chat.composer.channelDisconnected', { platform: t(PLATFORM_LABEL_KEYS[conv?.platform] || 'chat.platformLabels.facebook') })}</span>
           </div>
         ) : contact?.is_blocked ? (
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
             <Ban size={18} className="flex-shrink-0" />
-            <span>العميل ده محظور — مينفعش تبعتله رسايل. تقدر تلغي الحظر من بيانات العميل.</span>
+            <span>{t('chat.composer.contactBlocked')}</span>
           </div>
         ) : conv?.ai_active ? (
           <div className="flex items-center gap-2.5 bg-brand/10 rounded-xl px-4 py-3 text-sm text-fg">
             <Bot size={18} className="flex-shrink-0 text-brand" />
-            <span className="flex-1">الـ AI Agent بيرد على المحادثة دي دلوقتي.</span>
+            <span className="flex-1">{t('chat.composer.aiRespondingNotice')}</span>
             <button onClick={takeOverFromAi}
               className="flex-shrink-0 px-3 py-1.5 bg-brand rounded-lg text-xs text-white font-medium hover:brightness-110">
-              استلم المحادثة
+              {t('chat.composer.takeOverButton')}
             </button>
           </div>
         ) : isWindowExpired ? (
           <div className="flex flex-col gap-2">
             <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
               <Clock size={18} className="flex-shrink-0 text-follow" />
-              <span>{WINDOW_EXPIRED_TEXT[conv?.platform] || WINDOW_EXPIRED_TEXT.facebook}</span>
+              <span>{t(WINDOW_EXPIRED_KEYS[conv?.platform] || WINDOW_EXPIRED_KEYS.facebook)}</span>
             </div>
             {/* الواتساب هو الوحيد اللي عنده قوالب معتمدة تشتغل بعد انتهاء النافذة */}
             {conv?.platform === 'whatsapp' && (
               <button onClick={() => setShowTemplates(true)}
                 className="flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors">
-                <FileText size={15} /> ابعت قالب معتمد
+                <FileText size={15} /> {t('chat.composer.sendApprovedTemplate')}
               </button>
             )}
           </div>
@@ -1268,10 +1278,10 @@ export default function ChatScreen() {
               <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2 border-r-2 border-brand">
                 <div className="flex-1 min-w-0">
                   <p className="text-xs font-medium text-brand-light">
-                    {replyingTo.direction === 'outbound' ? 'أنت' : displayName(contact)}
+                    {replyingTo.direction === 'outbound' ? t('chat.common.you') : displayName(contact)}
                   </p>
                   <p className="text-xs text-fg-muted truncate">
-                    {replyingTo.content_type === 'text' ? replyingTo.content : `📎 ${replyingTo.content || 'ملف'}`}
+                    {replyingTo.content_type === 'text' ? replyingTo.content : `📎 ${replyingTo.content || t('chat.common.file')}`}
                   </p>
                 </div>
                 <button onClick={() => setReplyingTo(null)} className="text-fg-muted hover:text-danger flex-shrink-0">
@@ -1297,20 +1307,20 @@ export default function ChatScreen() {
             {/* العميل ده كلّم من أكتر من رقم واتساب — اختار ترد من أنهي رقم منهم (لسه في نافذة الـ٢٤ ساعة) */}
             {(conv?.platform === 'whatsapp' || conv?.platform === 'whatsapp_qr') && connectedChannels.filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000).length > 1 && (
               <div className="flex items-center gap-1.5 overflow-x-auto scrollbar-hide">
-                <span className="text-[11px] text-fg-subtle flex-shrink-0">رد من:</span>
+                <span className="text-[11px] text-fg-subtle flex-shrink-0">{t('chat.composer.replyFrom')}</span>
                 {connectedChannels
                   .filter(c => Date.now() - new Date(c.last_inbound_at).getTime() < 24 * 3600 * 1000)
                   .map(c => (
                     <button key={c.channel_id} onClick={() => setSelectedChannelId(c.channel_id)}
                       className={`px-2.5 py-1 rounded-full text-[11px] font-medium whitespace-nowrap flex-shrink-0 ${selectedChannelId === c.channel_id ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                      {c.channels?.custom_name || c.channels?.display_name || 'رقم'}
+                      {c.channels?.custom_name || c.channels?.display_name || t('chat.common.number')}
                     </button>
                   ))}
               </div>
             )}
             {Object.keys(typingUsers).length > 0 && (
               <p className="text-[11px] text-brand px-1 animate-pulse">
-                {Object.keys(typingUsers).join('، ')} {Object.keys(typingUsers).length > 1 ? 'بيكتبوا الآن...' : 'بيكتب الآن...'}
+                {t('chat.composer.typingIndicator', { names: Object.keys(typingUsers).join('، '), count: Object.keys(typingUsers).length })}
               </p>
             )}
             <div className="flex items-end gap-2">
@@ -1318,7 +1328,7 @@ export default function ChatScreen() {
                 accept={isTiktok ? 'image/*' : 'image/*,video/*,audio/*,.pdf,.doc,.docx'} />
               <div className="relative flex-shrink-0">
                 <button onClick={() => setShowAttachMenu(v => !v)}
-                  title={isTiktok ? 'تيك توك بيقبل صور بس' : undefined}
+                  title={isTiktok ? t('chat.composer.tiktokImagesOnlyTitle') : undefined}
                   className="w-10 h-10 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
                   <Paperclip size={18} />
                 </button>
@@ -1326,17 +1336,17 @@ export default function ChatScreen() {
                   <div className="absolute bottom-full right-0 mb-1 bg-surface-2 border border-surface-3 rounded-xl shadow-xl z-50 min-w-[160px] overflow-hidden">
                     <button onClick={openLibrary}
                       className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
-                      <FolderOpen size={14} className="text-fg-muted" /> من المكتبة
+                      <FolderOpen size={14} className="text-fg-muted" /> {t('chat.composer.fromLibrary')}
                     </button>
                     <button onClick={() => { setShowAttachMenu(false); fileInputRef.current?.click() }}
                       className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap">
-                      <Paperclip size={14} className="text-fg-muted" /> من الجهاز
+                      <Paperclip size={14} className="text-fg-muted" /> {t('chat.composer.fromDevice')}
                     </button>
                     {/* القوالب مفيدة جوه الـ٢٤ ساعة كمان (تذكير بموعد مثلاً)، مش بس لما النافذة تقفل */}
                     {conv?.platform === 'whatsapp' && (
                       <button onClick={() => { setShowAttachMenu(false); setShowTemplates(true) }}
                         className="flex items-center gap-2 w-full px-3 py-2.5 hover:bg-surface-3 text-sm text-right whitespace-nowrap border-t border-surface-3">
-                        <FileText size={14} className="text-fg-muted" /> قالب معتمد
+                        <FileText size={14} className="text-fg-muted" /> {t('chat.composer.approvedTemplateMenuItem')}
                       </button>
                     )}
                   </div>
@@ -1346,7 +1356,7 @@ export default function ChatScreen() {
                 className={`w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl transition-colors ${showEmojiPicker ? 'bg-brand text-white' : 'text-fg-muted hover:text-fg hover:bg-surface-3'}`}>
                 <Smile size={18} />
               </button>
-              <button onClick={suggestReply} disabled={suggesting} title="اقترح رد بالـ AI"
+              <button onClick={suggestReply} disabled={suggesting} title={t('chat.composer.suggestReplyTitle')}
                 className="w-10 h-10 flex-shrink-0 flex items-center justify-center rounded-xl text-fg-muted hover:text-brand hover:bg-surface-3 transition-colors disabled:opacity-40">
                 {suggesting ? <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" /> : <Wand2 size={18} />}
               </button>
@@ -1361,7 +1371,7 @@ export default function ChatScreen() {
                   scrollToBottom()
                   setTimeout(scrollToBottom, 350)
                 }}
-                placeholder="اكتب رسالة... (اكتب / للردود السريعة)"
+                placeholder={t('chat.composer.placeholder')}
                 rows={1}
                 className="flex-1 bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none overflow-y-auto min-h-[42px]"
                 style={{ maxHeight: '104px' }}
@@ -1413,7 +1423,7 @@ export default function ChatScreen() {
             <div className="flex items-center justify-between px-4 py-3.5 border-b border-surface-3 flex-shrink-0">
               <div className="flex items-center gap-2">
                 <FolderOpen size={16} className="text-brand" />
-                <span className="font-semibold text-fg text-sm">مكتبة الملفات</span>
+                <span className="font-semibold text-fg text-sm">{t('chat.library.title')}</span>
               </div>
               <button onClick={() => setShowLibraryModal(false)} className="text-fg-muted hover:text-fg"><X size={18} /></button>
             </div>
@@ -1421,7 +1431,7 @@ export default function ChatScreen() {
               <div className="relative">
                 <Search size={13} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
                 <input autoFocus value={librarySearch} onChange={e => setLibrarySearch(e.target.value)}
-                  placeholder="دور على ملف..."
+                  placeholder={t('chat.library.searchPlaceholder')}
                   className="w-full bg-surface-3 rounded-xl py-2 px-4 pr-9 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
             </div>
@@ -1441,7 +1451,7 @@ export default function ChatScreen() {
               ))}
               {filteredLibraryItems.length === 0 && (
                 <p className="col-span-3 text-center text-fg-subtle text-sm py-8">
-                  مفيش ملفات في المكتبة — ضيف ملفات من الإعدادات → الردود السريعة
+                  {t('chat.library.empty')}
                 </p>
               )}
             </div>
@@ -1459,17 +1469,17 @@ export default function ChatScreen() {
             style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }} onClick={e => e.stopPropagation()}>
             <button onClick={() => { copyMessage(actionSheetMsg); setActionSheetMsg(null) }}
               className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right">
-              <Copy size={16} className="text-fg-muted" /> نسخ
+              <Copy size={16} className="text-fg-muted" /> {t('chat.actionSheet.copy')}
             </button>
             {conv?.platform === 'whatsapp' && (
               <button onClick={() => startReply(actionSheetMsg)}
                 className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-right border-t border-surface-3">
-                <Reply size={16} className="text-fg-muted" /> رد
+                <Reply size={16} className="text-fg-muted" /> {t('chat.actionSheet.reply')}
               </button>
             )}
             <button onClick={() => setActionSheetMsg(null)}
               className="flex items-center justify-center w-full px-4 py-3.5 text-sm text-fg-muted border-t border-surface-3">
-              إلغاء
+              {t('chat.common.cancel')}
             </button>
           </div>
         </div>
@@ -1481,19 +1491,19 @@ export default function ChatScreen() {
           <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-2 px-4 py-3.5 border-b border-surface-3">
               <Clock size={16} className="text-follow" />
-              <span className="font-semibold text-fg text-sm">تحديد معاد المتابعة</span>
+              <span className="font-semibold text-fg text-sm">{t('chat.followUpModal.title')}</span>
             </div>
             <div className="p-4 space-y-3.5">
               <div>
-                <label className="block text-xs text-fg-muted mb-1">هترجع المحادثة تفتح تاني في</label>
+                <label className="block text-xs text-fg-muted mb-1">{t('chat.followUpModal.reopenLabel')}</label>
                 <input type="datetime-local" value={followUpDateTime} onChange={e => setFollowUpDateTime(e.target.value)}
                   min={defaultFollowUpDateTime()}
                   className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
               </div>
               <div>
-                <label className="block text-xs text-fg-muted mb-1">ملاحظة (اختياري) — تفكرك ليه حطيت المتابعة</label>
+                <label className="block text-xs text-fg-muted mb-1">{t('chat.followUpModal.noteLabel')}</label>
                 <textarea value={followUpNote} onChange={e => setFollowUpNote(e.target.value)}
-                  placeholder="مثال: العميل هيدفع بكرة بليل، تابع معاه..."
+                  placeholder={t('chat.followUpModal.notePlaceholder')}
                   rows={3}
                   className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
               </div>
@@ -1501,11 +1511,11 @@ export default function ChatScreen() {
             <div className="flex items-center gap-2 p-4 border-t border-surface-3">
               <button onClick={() => setShowFollowUpModal(false)} disabled={savingFollowUp}
                 className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-                إلغاء
+                {t('chat.common.cancel')}
               </button>
               <button onClick={confirmFollowUp} disabled={savingFollowUp}
                 className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-follow text-white hover:brightness-110 transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-                {savingFollowUp ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'تأكيد المتابعة'}
+                {savingFollowUp ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('chat.followUpModal.confirm')}
               </button>
             </div>
           </div>
@@ -1516,15 +1526,16 @@ export default function ChatScreen() {
 }
 
 function AssignmentEvent({ log }) {
-  const toName = log.assigned_to_agent?.name || 'غير معين'
+  const { t } = useTranslation()
+  const toName = log.assigned_to_agent?.name || t('chat.common.unassigned')
   const byName = log.assigned_by_agent?.name
   return (
     <div className="flex justify-center my-2">
       <span className="flex items-center gap-1.5 text-xs text-fg-muted bg-surface-2 px-3 py-1.5 rounded-full">
         <UserCog size={11} />
         {byName
-          ? <>تم تعيين المحادثة لـ <b className="text-fg">{toName}</b> بواسطة <b className="text-fg">{byName}</b></>
-          : <>تم توزيع المحادثة تلقائياً لـ <b className="text-fg">{toName}</b></>}
+          ? <>{t('chat.timeline.assignedManualPrefix')} <b className="text-fg">{toName}</b> {t('chat.timeline.assignedManualBy')} <b className="text-fg">{byName}</b></>
+          : <>{t('chat.timeline.autoAssignedPrefix')} <b className="text-fg">{toName}</b></>}
         <span className="text-fg-subtle">· {formatTime(log.created_at)}</span>
       </span>
     </div>
@@ -1532,7 +1543,8 @@ function AssignmentEvent({ log }) {
 }
 
 function ActivityEvent({ log, agentsMap }) {
-  const agentName = agentsMap?.[log.agent_id] || 'موظف'
+  const { t } = useTranslation()
+  const agentName = agentsMap?.[log.agent_id] || t('chat.common.agentFallback')
   return (
     <div className="flex justify-center my-2">
       <span className="flex items-center gap-1.5 text-xs text-fg-muted bg-surface-2 px-3 py-1.5 rounded-full text-center">
@@ -1547,6 +1559,7 @@ function ActivityEvent({ log, agentsMap }) {
 const SWIPE_REPLY_THRESHOLD = 56
 
 function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canReply, onLongPress, onSwipeReply }) {
+  const { t } = useTranslation()
   const [dragX, setDragX] = useState(0)
   const dragInfo = useRef({ startX: 0, startY: 0, dragging: false, longPressTimer: null, longPressFired: false })
 
@@ -1605,12 +1618,12 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
   // ملاحظة داخلية — بتتحط جوه المحادثة زي أي رسالة بالترتيب الزمني بالظبط، بس بشكل مميز
   // (لون مختلف، من غير محاذاة يمين/شمال) عشان الموظفين يفرقوها فورًا من رسالة حقيقية للعميل
   if (msg.content_type === 'note') {
-    const authorName = agentsMap?.[msg.sent_by_agent_id] || 'موظف'
+    const authorName = agentsMap?.[msg.sent_by_agent_id] || t('chat.common.agentFallback')
     return (
       <div className="flex justify-center mb-2 px-2">
         <div className="max-w-[90%] w-full bg-follow/15 border border-follow/30 rounded-xl px-3.5 py-2.5">
           <div className="flex items-center gap-1.5 text-[11px] font-medium text-follow mb-1">
-            <StickyNote size={11} /> {authorName} · ملاحظة داخلية
+            <StickyNote size={11} /> {authorName} · {t('chat.note.badge')}
             <span className="text-fg-subtle font-normal mr-auto">{formatTime(msg.created_at)}</span>
           </div>
           <p className="text-sm text-fg whitespace-pre-wrap break-words">{msg.content}</p>
@@ -1654,10 +1667,10 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
           {repliedMsg && (
             <div className={`mb-1.5 pr-2 border-r-2 rounded-sm ${isOut ? 'border-white/50' : 'border-brand'} bg-black/10`}>
               <p className={`text-xs font-medium ${isOut ? 'text-white/90' : 'text-brand-light'} truncate px-1.5 pt-1`}>
-                {repliedMsg.direction === 'outbound' ? 'أنت' : 'العميل'}
+                {repliedMsg.direction === 'outbound' ? t('chat.common.you') : t('chat.common.customer')}
               </p>
               <p className={`text-xs truncate px-1.5 pb-1 ${isOut ? 'text-white/70' : 'text-fg-muted'}`}>
-                {repliedMsg.content_type === 'text' ? repliedMsg.content : `📎 ${repliedMsg.content || 'ملف'}`}
+                {repliedMsg.content_type === 'text' ? repliedMsg.content : `📎 ${repliedMsg.content || t('chat.common.file')}`}
               </p>
             </div>
           )}
@@ -1682,7 +1695,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
           {/* القالب بيتخزن كنص عادي، فمن غير العلامة دي مافيش أي فرق ظاهر بينه وبين رسالة مكتوبة */}
           {msg.template_name && (
             <span className="flex items-center gap-1 mt-1.5 pt-1.5 border-t border-white/15 text-[10px] opacity-70">
-              <FileText size={10} /> قالب: {msg.template_name}
+              <FileText size={10} /> {t('chat.bubble.templateLabel', { name: msg.template_name })}
             </span>
           )}
         </div>
@@ -1698,7 +1711,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
         <span className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${
           msg.status === 'failed' ? 'text-danger' : msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
           {isTemp ? <span className="animate-pulse">...</span>
-            : msg.status === 'failed' ? <><Ban size={11} className="inline" /> فشل الإرسال</>
+            : msg.status === 'failed' ? <><Ban size={11} className="inline" /> {t('chat.bubble.sendFailedStatus')}</>
             : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
             : <Check size={12} className="inline" />}
         </span>
@@ -1711,6 +1724,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
 // بنعرض القوالب المعتمدة بس (اللي لسه تحت المراجعة أو مرفوضة ميتا هترفض إرسالها)
 function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent }) {
   const toast = useToast()
+  const { t } = useTranslation()
   const [numbers, setNumbers] = useState([])
   const [activeChannelId, setActiveChannelId] = useState(channelId || null)
   const [templates, setTemplates] = useState(null)
@@ -1733,7 +1747,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   }, [])
 
   useEffect(() => {
-    if (!activeChannelId) { setError('مفيش رقم واتساب متاح'); return }
+    if (!activeChannelId) { setError(t('chat.toast.noWhatsappNumber')); return }
     setTemplates(null)
     setSelected(null)
     setParams([])
@@ -1754,7 +1768,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
 
   const send = async () => {
     if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
-      toast.error('املا كل المتغيرات الأول')
+      toast.error(t('chat.toast.fillVariablesFirst'))
       return
     }
     setSending(true)
@@ -1768,11 +1782,11 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إرسال القالب')
-      toast.success('اتبعت القالب')
+      if (!res.ok) throw new Error(data.error || t('chat.toast.templateSendFailed'))
+      toast.success(t('chat.toast.templateSent'))
       onSent()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     } finally {
       setSending(false)
     }
@@ -1783,7 +1797,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
       <div onClick={e => e.stopPropagation()}
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[420px] max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
-          <p className="text-sm font-semibold text-fg">{selected ? selected.name : 'اختار قالب'}</p>
+          <p className="text-sm font-semibold text-fg">{selected ? selected.name : t('chat.template.chooseTitle')}</p>
           <button onClick={selected ? () => { setSelected(null); setParams([]) } : onClose}
             className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             <X size={16} />
@@ -1793,7 +1807,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         <div className="p-5 space-y-3">
           {numbers.length > 1 && !selected && (
             <div>
-              <label className="block text-xs font-semibold text-fg mb-1.5">ابعت من رقم</label>
+              <label className="block text-xs font-semibold text-fg mb-1.5">{t('chat.template.sendFromNumber')}</label>
               <select value={activeChannelId || ''} onChange={e => setActiveChannelId(e.target.value)}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none">
                 {numbers.map(n => (
@@ -1802,7 +1816,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
                   </option>
                 ))}
               </select>
-              <p className="text-[11px] text-fg-subtle mt-1">كل رقم له قوالبه المعتمدة الخاصة بيه</p>
+              <p className="text-[11px] text-fg-subtle mt-1">{t('chat.template.perNumberHint')}</p>
             </div>
           )}
 
@@ -1814,8 +1828,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
             </div>
           ) : templates.length === 0 ? (
             <p className="text-xs text-fg-muted bg-surface-3/50 rounded-lg px-3 py-2.5 leading-relaxed">
-              مفيش قوالب معتمدة على الرقم ده. تقدري تعملي قالب من الإعدادات ← القنوات ← ترس القناة،
-              بس محتاج موافقة ميتا الأول.
+              {t('chat.template.noneApproved')}
             </p>
           ) : !selected ? (
             templates.map(tpl => (
@@ -1829,24 +1842,24 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
             <>
               {varCount > 0 && (
                 <div className="space-y-2">
-                  <p className="text-xs font-semibold text-fg">املا المتغيرات</p>
+                  <p className="text-xs font-semibold text-fg">{t('chat.template.fillVariables')}</p>
                   {Array.from({ length: varCount }, (_, i) => (
                     <input key={i} value={params[i] || ''} autoFocus={i === 0}
                       onChange={e => { const next = [...params]; next[i] = e.target.value; setParams(next) }}
-                      placeholder={`القيمة رقم ${i + 1}`}
+                      placeholder={t('chat.template.valuePlaceholder', { n: i + 1 })}
                       className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
                   ))}
                 </div>
               )}
               <div>
-                <p className="text-xs font-semibold text-fg mb-1.5">معاينة</p>
+                <p className="text-xs font-semibold text-fg mb-1.5">{t('chat.template.preview')}</p>
                 <div className="bg-brand/10 rounded-xl px-3 py-2.5">
                   <p className="text-sm text-fg whitespace-pre-wrap leading-relaxed">{preview}</p>
                 </div>
               </div>
               <button onClick={send} disabled={sending}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
-                {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={15} /> ابعت</>}
+                {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={15} /> {t('chat.template.send')}</>}
               </button>
             </>
           )}

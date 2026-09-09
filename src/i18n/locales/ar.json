@@ -560,5 +560,165 @@
       "yes": "نعم",
       "no": "لا"
     }
+  },
+  "chat": {
+    "common": {
+      "you": "أنت",
+      "customer": "العميل",
+      "file": "ملف",
+      "cancel": "إلغاء",
+      "unassigned": "غير معيّن",
+      "agentFallback": "موظف",
+      "noStage": "بدون مرحلة",
+      "number": "رقم",
+      "unknownError": "خطأ غير معروف"
+    },
+    "header": {
+      "blockedBadge": "محظور",
+      "addNamePrompt": "اضغط لإضافة الاسم",
+      "followUpReturnsAt": "سيعود الساعة {{time}}",
+      "returnToAiTitle": "إرجاع التحكم إلى الـ AI Agent"
+    },
+    "status": {
+      "open": "مفتوحة",
+      "followUp": "متابعة",
+      "closed": "مغلقة"
+    },
+    "platformLabels": {
+      "facebook": "فيسبوك",
+      "instagram": "إنستجرام",
+      "whatsapp": "واتساب",
+      "tiktok": "تيك توك"
+    },
+    "windowExpired": {
+      "tiktok": "انقضت ٤٨ ساعة منذ آخر رسالة من العميل — تيك توك يرفض أي رد بعد هذه المدة. ستعمل المحادثة من جديد فقط إذا أرسل العميل رسالة جديدة.",
+      "whatsapp": "انقضت ٢٤ ساعة منذ آخر رسالة من العميل — لا يسمح واتساب بإرسال رسالة عادية الآن، يجب إرسال قالب معتمد مسبقًا من ميتا.",
+      "instagram": "انقضت ٢٤ ساعة منذ آخر رسالة من العميل — يرفض إنستجرام أي رد عادي بعد هذه المدة. ستعمل المحادثة من جديد فقط إذا أرسل العميل رسالة جديدة.",
+      "facebook": "انقضت ٢٤ ساعة منذ آخر رسالة من العميل — يرفض فيسبوك أي رد عادي بعد هذه المدة. ستعمل المحادثة من جديد فقط إذا أرسل العميل رسالة جديدة."
+    },
+    "search": {
+      "placeholder": "ابحث في هذه المحادثة...",
+      "noResults": "لا توجد نتائج لـ \"{{query}}\""
+    },
+    "messages": {
+      "loadOlder": "تحميل رسائل أقدم",
+      "loading": "جارٍ التحميل...",
+      "adReferral": "وارد من إعلان ممول"
+    },
+    "composer": {
+      "internalNoteButton": "ملاحظة داخلية",
+      "quickRepliesButton": "ردود سريعة",
+      "internalNoteHint": "ملاحظة داخلية — لن تُرسل للعميل، يراها الموظفون فقط",
+      "internalNotePlaceholder": "اكتب ملاحظتك للموظفين هنا...",
+      "quickReplySearchPlaceholder": "ابحث عن رد سريع...",
+      "noQuickReplies": "لا توجد ردود سريعة مطابقة",
+      "requestQuickReply": "اطلب ردًا سريعًا جديدًا من المسؤول",
+      "recording": "جارٍ التسجيل...",
+      "channelDisconnected": "قناة {{platform}} منفصلة عن التطبيق — يجب ربطها من جديد من الإعدادات ← القنوات لتتمكن من الرد.",
+      "contactBlocked": "هذا العميل محظور — لا يمكن إرسال رسائل إليه. يمكنك إلغاء الحظر من بيانات العميل.",
+      "aiRespondingNotice": "يتولى الـ AI Agent الرد على هذه المحادثة الآن.",
+      "takeOverButton": "استلام المحادثة",
+      "sendApprovedTemplate": "إرسال قالب معتمد",
+      "replyFrom": "الرد من:",
+      "typingIndicator_one": "{{names}} يكتب الآن...",
+      "typingIndicator_two": "{{names}} يكتبان الآن...",
+      "typingIndicator_few": "{{names}} يكتبون الآن...",
+      "typingIndicator_many": "{{names}} يكتبون الآن...",
+      "typingIndicator_other": "{{names}} يكتبون الآن...",
+      "tiktokImagesOnlyTitle": "تيك توك يقبل الصور فقط",
+      "fromLibrary": "من المكتبة",
+      "fromDevice": "من الجهاز",
+      "approvedTemplateMenuItem": "قالب معتمد",
+      "suggestReplyTitle": "اقتراح رد بالذكاء الاصطناعي",
+      "placeholder": "اكتب رسالة... (اكتب / للردود السريعة)",
+      "voiceMessageName": "رسالة صوتية"
+    },
+    "toast": {
+      "messageCopied": "تم نسخ الرسالة",
+      "copyFailed": "فشل النسخ",
+      "noteAddFailed": "فشل إضافة الملاحظة",
+      "genericErrorPrefix": "خطأ: {{message}}",
+      "statusChangeFailed": "فشل تغيير حالة المحادثة، حاول مرة أخرى",
+      "followUpDateRequired": "حدد موعد المتابعة أولاً",
+      "followUpMustBeFuture": "يجب أن يكون الموعد في المستقبل",
+      "followUpSaveFailed": "فشل حفظ المتابعة، حاول مرة أخرى",
+      "followUpNoteSaveFailed": "تم حفظ المتابعة، لكن فشل حفظ الملاحظة",
+      "followUpSaved": "ستعود المحادثة مرة أخرى الساعة {{time}}",
+      "lifecycleChangeFailed": "فشل تغيير مرحلة الـ Lifecycle، حاول مرة أخرى",
+      "assignFailed": "فشل تعيين المحادثة، حاول مرة أخرى",
+      "takeOverFailed": "فشل استلام المحادثة، حاول مرة أخرى",
+      "takeOverSuccess": "تم استلام المحادثة من الـ AI Agent",
+      "assignAiFailed": "فشل تحويل المحادثة إلى الـ AI، حاول مرة أخرى",
+      "assignAiSuccess": "تم تحويل المحادثة إلى الـ AI Agent",
+      "suggestFailed": "فشل توليد الاقتراح",
+      "tiktokImageOnlyFull": "تيك توك يقبل الصور فقط — لا يدعم إرسال الفيديو أو الصوت أو الملفات",
+      "tiktokImageOnlyShort": "تيك توك يقبل الصور فقط — لا يدعم إرسال الفيديو أو الملفات",
+      "micPermissionRequired": "يجب السماح بالوصول إلى الميكروفون",
+      "maxRecordReached": "تم الوصول إلى الحد الأقصى لمدة التسجيل (٣ دقائق)، توقف التسجيل تلقائيًا",
+      "textSentFileFailed": "أُرسلت الرسالة النصية، لكن فشل إرسال الملف: {{error}}",
+      "sendFailedWithReason": "فشل الإرسال: {{error}}",
+      "sendFailed": "فشل الإرسال",
+      "noWhatsappNumber": "لا يوجد رقم واتساب متاح",
+      "fillVariablesFirst": "املأ جميع المتغيرات أولاً",
+      "templateSendFailed": "فشل إرسال القالب",
+      "templateSent": "تم إرسال القالب"
+    },
+    "activity": {
+      "statusChanged": "غيّر حالة المحادثة من \"{{from}}\" إلى \"{{to}}\"",
+      "statusChangedFollowUp": "غيّر حالة المحادثة من \"{{from}}\" إلى \"{{to}}\" — ستعود الساعة {{time}}",
+      "lifecycleChanged": "غيّر مرحلة الـ Lifecycle من \"{{from}}\" إلى \"{{to}}\""
+    },
+    "followUpNote": {
+      "prefix": "🔔 متابعة ({{time}}): {{note}}"
+    },
+    "followUpModal": {
+      "title": "تحديد موعد المتابعة",
+      "reopenLabel": "ستُفتح المحادثة من جديد في",
+      "noteLabel": "ملاحظة (اختياري) — تذكّرك بسبب المتابعة",
+      "notePlaceholder": "مثال: سيدفع العميل غدًا مساءً، تابع معه...",
+      "confirm": "تأكيد المتابعة"
+    },
+    "actionSheet": {
+      "copy": "نسخ",
+      "reply": "رد"
+    },
+    "timeline": {
+      "assignedManualPrefix": "تم تعيين المحادثة إلى",
+      "assignedManualBy": "بواسطة",
+      "autoAssignedPrefix": "تم توزيع المحادثة تلقائيًا إلى"
+    },
+    "note": {
+      "badge": "ملاحظة داخلية"
+    },
+    "bubble": {
+      "templateLabel": "قالب: {{name}}",
+      "sendFailedStatus": "فشل الإرسال"
+    },
+    "library": {
+      "title": "مكتبة الملفات",
+      "searchPlaceholder": "ابحث عن ملف...",
+      "empty": "لا توجد ملفات في المكتبة — أضف ملفات من الإعدادات ← الردود السريعة"
+    },
+    "template": {
+      "chooseTitle": "اختر قالبًا",
+      "sendFromNumber": "الإرسال من رقم",
+      "perNumberHint": "لكل رقم قوالبه المعتمدة الخاصة به",
+      "noneApproved": "لا توجد قوالب معتمدة على هذا الرقم. يمكنك إنشاء قالب من الإعدادات ← القنوات ← إعدادات القناة، لكن ذلك يتطلب موافقة ميتا أولًا.",
+      "fillVariables": "املأ المتغيرات",
+      "valuePlaceholder": "القيمة رقم {{n}}",
+      "preview": "معاينة",
+      "send": "إرسال"
+    },
+    "formatDate": {
+      "today": "اليوم",
+      "yesterday": "أمس"
+    },
+    "displayName": {
+      "visitor": "زائر {{id}}",
+      "unknown": "مجهول"
+    },
+    "channelLabel": {
+      "whatsappFallback": "واتساب"
+    }
   }
 }

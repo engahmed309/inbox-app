@@ -560,5 +560,165 @@
       "yes": "Yes",
       "no": "No"
     }
+  },
+  "chat": {
+    "common": {
+      "you": "You",
+      "customer": "Customer",
+      "file": "File",
+      "cancel": "Cancel",
+      "unassigned": "Unassigned",
+      "agentFallback": "Agent",
+      "noStage": "No stage",
+      "number": "Number",
+      "unknownError": "Unknown error"
+    },
+    "header": {
+      "blockedBadge": "Blocked",
+      "addNamePrompt": "Tap to add a name",
+      "followUpReturnsAt": "Will return at {{time}}",
+      "returnToAiTitle": "Hand control back to the AI Agent"
+    },
+    "status": {
+      "open": "Open",
+      "followUp": "Follow-up",
+      "closed": "Closed"
+    },
+    "platformLabels": {
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "whatsapp": "WhatsApp",
+      "tiktok": "TikTok"
+    },
+    "windowExpired": {
+      "tiktok": "48 hours have passed since the customer's last message — TikTok rejects any reply after this period. The conversation will reopen only if the customer sends a new message.",
+      "whatsapp": "24 hours have passed since the customer's last message — WhatsApp no longer allows a regular message now; you must send a template pre-approved by Meta.",
+      "instagram": "24 hours have passed since the customer's last message — Instagram rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message.",
+      "facebook": "24 hours have passed since the customer's last message — Facebook rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message."
+    },
+    "search": {
+      "placeholder": "Search this conversation...",
+      "noResults": "No results for \"{{query}}\""
+    },
+    "messages": {
+      "loadOlder": "Load older messages",
+      "loading": "Loading...",
+      "adReferral": "From a paid ad"
+    },
+    "composer": {
+      "internalNoteButton": "Internal note",
+      "quickRepliesButton": "Quick replies",
+      "internalNoteHint": "Internal note — won't be sent to the customer, only staff can see it",
+      "internalNotePlaceholder": "Write your note for staff here...",
+      "quickReplySearchPlaceholder": "Search quick replies...",
+      "noQuickReplies": "No matching quick replies",
+      "requestQuickReply": "Request a new quick reply from the admin",
+      "recording": "Recording...",
+      "channelDisconnected": "The {{platform}} channel is disconnected from the app — reconnect it from Settings ← Channels to be able to reply.",
+      "contactBlocked": "This customer is blocked — you can't send them messages. You can unblock them from the contact details.",
+      "aiRespondingNotice": "The AI Agent is currently replying to this conversation.",
+      "takeOverButton": "Take over conversation",
+      "sendApprovedTemplate": "Send approved template",
+      "replyFrom": "Reply from:",
+      "typingIndicator_one": "{{names}} is typing...",
+      "typingIndicator_two": "{{names}} are typing...",
+      "typingIndicator_few": "{{names}} are typing...",
+      "typingIndicator_many": "{{names}} are typing...",
+      "typingIndicator_other": "{{names}} are typing...",
+      "tiktokImagesOnlyTitle": "TikTok accepts images only",
+      "fromLibrary": "From library",
+      "fromDevice": "From device",
+      "approvedTemplateMenuItem": "Approved template",
+      "suggestReplyTitle": "Suggest a reply with AI",
+      "placeholder": "Type a message... (type / for quick replies)",
+      "voiceMessageName": "Voice message"
+    },
+    "toast": {
+      "messageCopied": "Message copied",
+      "copyFailed": "Copy failed",
+      "noteAddFailed": "Failed to add the note",
+      "genericErrorPrefix": "Error: {{message}}",
+      "statusChangeFailed": "Failed to change the conversation status, try again",
+      "followUpDateRequired": "Set the follow-up time first",
+      "followUpMustBeFuture": "The time must be in the future",
+      "followUpSaveFailed": "Failed to save the follow-up, try again",
+      "followUpNoteSaveFailed": "The follow-up was saved, but the note failed to save",
+      "followUpSaved": "The conversation will return at {{time}}",
+      "lifecycleChangeFailed": "Failed to change the Lifecycle stage, try again",
+      "assignFailed": "Failed to assign the conversation, try again",
+      "takeOverFailed": "Failed to take over the conversation, try again",
+      "takeOverSuccess": "Conversation taken over from the AI Agent",
+      "assignAiFailed": "Failed to hand the conversation to the AI, try again",
+      "assignAiSuccess": "Conversation handed to the AI Agent",
+      "suggestFailed": "Failed to generate a suggestion",
+      "tiktokImageOnlyFull": "TikTok accepts images only — it doesn't support sending video, audio, or files",
+      "tiktokImageOnlyShort": "TikTok accepts images only — it doesn't support sending video or files",
+      "micPermissionRequired": "You must allow microphone access",
+      "maxRecordReached": "The maximum recording time (3 minutes) was reached, recording stopped automatically",
+      "textSentFileFailed": "The text message was sent, but the file failed to send: {{error}}",
+      "sendFailedWithReason": "Failed to send: {{error}}",
+      "sendFailed": "Failed to send",
+      "noWhatsappNumber": "No WhatsApp number available",
+      "fillVariablesFirst": "Fill in all the variables first",
+      "templateSendFailed": "Failed to send the template",
+      "templateSent": "Template sent"
+    },
+    "activity": {
+      "statusChanged": "Changed the conversation status from \"{{from}}\" to \"{{to}}\"",
+      "statusChangedFollowUp": "Changed the conversation status from \"{{from}}\" to \"{{to}}\" — will return at {{time}}",
+      "lifecycleChanged": "Changed the Lifecycle stage from \"{{from}}\" to \"{{to}}\""
+    },
+    "followUpNote": {
+      "prefix": "🔔 Follow-up ({{time}}): {{note}}"
+    },
+    "followUpModal": {
+      "title": "Set follow-up time",
+      "reopenLabel": "The conversation will reopen at",
+      "noteLabel": "Note (optional) — reminds you why you set the follow-up",
+      "notePlaceholder": "Example: the customer will pay tomorrow evening, follow up with them...",
+      "confirm": "Confirm follow-up"
+    },
+    "actionSheet": {
+      "copy": "Copy",
+      "reply": "Reply"
+    },
+    "timeline": {
+      "assignedManualPrefix": "Conversation assigned to",
+      "assignedManualBy": "by",
+      "autoAssignedPrefix": "Conversation automatically assigned to"
+    },
+    "note": {
+      "badge": "Internal note"
+    },
+    "bubble": {
+      "templateLabel": "Template: {{name}}",
+      "sendFailedStatus": "Failed to send"
+    },
+    "library": {
+      "title": "File library",
+      "searchPlaceholder": "Search for a file...",
+      "empty": "No files in the library — add files from Settings ← Quick replies"
+    },
+    "template": {
+      "chooseTitle": "Choose a template",
+      "sendFromNumber": "Send from number",
+      "perNumberHint": "Each number has its own approved templates",
+      "noneApproved": "There are no approved templates for this number. You can create a template from Settings ← Channels ← channel settings, but it requires Meta's approval first.",
+      "fillVariables": "Fill in the variables",
+      "valuePlaceholder": "Value #{{n}}",
+      "preview": "Preview",
+      "send": "Send"
+    },
+    "formatDate": {
+      "today": "Today",
+      "yesterday": "Yesterday"
+    },
+    "displayName": {
+      "visitor": "Visitor {{id}}",
+      "unknown": "Unknown"
+    },
+    "channelLabel": {
+      "whatsappFallback": "WhatsApp"
+    }
   }
 }
