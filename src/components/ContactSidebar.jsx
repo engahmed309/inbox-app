@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -8,7 +9,7 @@ import RequestAdminModal from './RequestAdminModal'
 import { COUNTRY_MAP } from '../lib/countries'
 import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio } from 'lucide-react'
 
-const FIELD_LABELS = { name: 'الاسم', phone: 'الهاتف', country: 'الدولة', notes: 'الملاحظات' }
+const FIELD_LABEL_KEYS = { name: 'settings.common.name', phone: 'contactSidebar.fields.phone', country: 'contactSidebar.fields.country', notes: 'contactSidebar.fields.notes' }
 
 // بيقسم الرقم لكود الدولة + باقي الرقم بصيغته المحلية (بصفر في الأول) عشان يبقى واضح ومقروء أكتر
 // من رقم طويل متصل، ونحتفظ بالرقم الكامل من غير مسافات عشان النسخ يبقى دقيق
@@ -24,21 +25,22 @@ function splitPhone(phone, countryCode) {
 }
 
 function PhoneDisplay({ phone, countryCode }) {
+  const { t } = useTranslation()
   const toast = useToast()
   const [copied, setCopied] = useState(false)
   const split = splitPhone(phone, countryCode)
   if (!split) return (
-    <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg-subtle">لا يوجد رقم</div>
+    <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg-subtle">{t('contactSidebar.phone.empty')}</div>
   )
 
   const copy = async () => {
     try {
       await navigator.clipboard.writeText(`+${split.dial || ''}${split.local}`.replace(/\s/g, ''))
       setCopied(true)
-      toast.success('تم نسخ الرقم')
+      toast.success(t('contactSidebar.phone.copied'))
       setTimeout(() => setCopied(false), 1500)
     } catch {
-      toast.error('فشل النسخ')
+      toast.error(t('chat.toast.copyFailed'))
     }
   }
 
@@ -50,7 +52,7 @@ function PhoneDisplay({ phone, countryCode }) {
       <span className="text-sm text-fg flex-1 truncate" dir="ltr">
         {split.dial ? `+${split.dial} ${split.local}` : split.local}
       </span>
-      <button onClick={copy} title="انسخ الرقم" className="text-fg-muted hover:text-brand flex-shrink-0">
+      <button onClick={copy} title={t('contactSidebar.phone.copyTitle')} className="text-fg-muted hover:text-brand flex-shrink-0">
         {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
       </button>
     </div>
@@ -58,6 +60,7 @@ function PhoneDisplay({ phone, countryCode }) {
 }
 
 export default function ContactSidebar({ contact, conv, channelLabel, onClose, onUpdate, onDeleted }) {
+  const { t } = useTranslation()
   const { agent } = useAuth()
   const toast = useToast()
   const [blocking, setBlocking] = useState(false)
@@ -122,15 +125,15 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   }
 
   const toggleTag = async (tag) => {
-    const has = contactTags.some(t => t.id === tag.id)
+    const has = contactTags.some(tg => tg.id === tag.id)
     if (has) {
       await supabase.from('contact_tags').delete().eq('contact_id', contact.id).eq('tag_id', tag.id)
-      setContactTags(prev => prev.filter(t => t.id !== tag.id))
-      logActivity(conv?.id, agent?.id, `أزال تاج "${tag.name}" من العميل`)
+      setContactTags(prev => prev.filter(tg => tg.id !== tag.id))
+      logActivity(conv?.id, agent?.id, t('contactSidebar.tags.removedActivity', { name: tag.name }))
     } else {
       await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
       setContactTags(prev => [...prev, tag])
-      logActivity(conv?.id, agent?.id, `أضاف تاج "${tag.name}" للعميل`)
+      logActivity(conv?.id, agent?.id, t('contactSidebar.tags.addedActivity', { name: tag.name }))
     }
   }
 
@@ -143,19 +146,19 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
       const oldVal = contact?.[key] || ''
       const newVal = form[key] || ''
       if (oldVal !== newVal) {
-        changes.push(`غيّر ${FIELD_LABELS[key]} من "${oldVal || '—'}" إلى "${newVal || '—'}"`)
+        changes.push(t('contactSidebar.activityLog.fieldChanged', { field: t(FIELD_LABEL_KEYS[key]), oldVal: oldVal || '—', newVal: newVal || '—' }))
       }
     }
     if ((contact?.lifecycle_stage_id || '') !== (form.lifecycle_stage_id || '')) {
-      const oldName = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)?.name || 'بدون مرحلة'
-      const newName = lifecycles.find(l => l.id === form.lifecycle_stage_id)?.name || 'بدون مرحلة'
-      changes.push(`غيّر مرحلة الـ Lifecycle من "${oldName}" إلى "${newName}"`)
+      const oldName = lifecycles.find(l => l.id === contact?.lifecycle_stage_id)?.name || t('chat.common.noStage')
+      const newName = lifecycles.find(l => l.id === form.lifecycle_stage_id)?.name || t('chat.common.noStage')
+      changes.push(t('chat.activity.lifecycleChanged', { from: oldName, to: newName }))
     }
     for (const f of customFields) {
       const oldVal = originalCustomValues[f.id] || ''
       const newVal = customValues[f.id] || ''
       if (oldVal !== newVal) {
-        changes.push(`غيّر ${f.name} من "${oldVal || '—'}" إلى "${newVal || '—'}"`)
+        changes.push(t('contactSidebar.activityLog.fieldChanged', { field: f.name, oldVal: oldVal || '—', newVal: newVal || '—' }))
       }
     }
 
@@ -191,10 +194,10 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     setBlocking(true)
     const { error } = await supabase.from('contacts').update({ is_blocked: newVal }).eq('id', contact.id)
     setBlocking(false)
-    if (error) { toast.error('حصل خطأ، حاول تاني'); return }
+    if (error) { toast.error(t('contactSidebar.dangerZone.blockError')); return }
     onUpdate({ ...contact, is_blocked: newVal })
-    logActivity(conv?.id, agent?.id, newVal ? 'حظر العميل' : 'ألغى حظر العميل')
-    toast.success(newVal ? 'اتحظر العميل' : 'اتلغى حظر العميل')
+    logActivity(conv?.id, agent?.id, newVal ? t('contactSidebar.dangerZone.blockActivityBlocked') : t('contactSidebar.dangerZone.blockActivityUnblocked'))
+    toast.success(newVal ? t('contactSidebar.dangerZone.blockToastBlocked') : t('contactSidebar.dangerZone.blockToastUnblocked'))
   }
 
   // بيمسح كل أثر العميل نهائيًا — لازم يتم من السيرفر مش من هنا مباشرة: عميل حقيقي بيكون ليه
@@ -202,18 +205,18 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   // على جدول كبير مشغول ويطلع خطأ غامض. السيرفر بيمسح contacts بس وباقي الجداول بتتشال
   // تلقائي بالـ cascade، بصلاحية من غير أي مهلة زمنية
   const deleteContact = async () => {
-    if (!confirm(`متأكد إنك عايز تمسح كل بيانات "${contact?.name || 'العميل ده'}" نهائياً؟ الإجراء ده مينفعش يتراجع فيه.`)) return
-    if (!confirm('تأكيد أخير: هيتم حذف المحادثة وكل الرسايل المرتبطة بالعميل ده نهائياً. متأكد؟')) return
+    if (!confirm(t('contactSidebar.dangerZone.deleteConfirm1', { name: contact?.name || t('contactSidebar.dangerZone.deleteConfirmFallbackName') }))) return
+    if (!confirm(t('contactSidebar.dangerZone.deleteConfirm2'))) return
 
     setDeleting(true)
     try {
       const res = await fetch(`${API_URL}/contacts/${contact.id}`, { method: 'DELETE' })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'حصل خطأ أثناء الحذف')
-      toast.success('اتمسحت بيانات العميل')
+      if (!res.ok) throw new Error(data.error || t('contactSidebar.dangerZone.deleteError'))
+      toast.success(t('contactSidebar.dangerZone.deleteSuccess'))
       onDeleted?.()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
     } finally {
       setDeleting(false)
     }
@@ -227,7 +230,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
       <div className="relative w-80 h-full bg-surface-2 flex flex-col overflow-hidden shadow-2xl">
         {/* Header */}
         <div className="flex items-center justify-between px-4 py-4 border-b border-surface-3">
-          <span className="font-semibold text-fg">بيانات العميل</span>
+          <span className="font-semibold text-fg">{t('contactSidebar.title')}</span>
           <button onClick={onClose} className="text-fg-muted hover:text-fg">
             <X size={18} />
           </button>
@@ -254,10 +257,10 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           {/* القنوات المتصلة — لو العميل كلّم من أكتر من رقم واتساب، بتتجمّع كلها هنا */}
           {connectedChannels.length > 1 && (
             <div className="bg-surface-3 rounded-xl p-3 space-y-2">
-              <p className="text-xs font-medium text-fg-muted flex items-center gap-1.5"><Radio size={12} /> قنوات متصلة</p>
+              <p className="text-xs font-medium text-fg-muted flex items-center gap-1.5"><Radio size={12} /> {t('contactSidebar.connectedChannels.title')}</p>
               {connectedChannels.map(c => (
                 <div key={c.channel_id} className="flex items-center justify-between text-xs">
-                  <span className="text-fg truncate">{c.channels?.custom_name || c.channels?.display_name || 'رقم واتساب'}</span>
+                  <span className="text-fg truncate">{c.channels?.custom_name || c.channels?.display_name || t('contactSidebar.connectedChannels.numberFallback', { platform: t('chat.platformLabels.whatsapp') })}</span>
                   <span className="text-fg-subtle flex-shrink-0">{new Date(c.last_inbound_at).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}</span>
                 </div>
               ))}
@@ -265,20 +268,20 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           )}
 
           {/* Basic Fields */}
-          <Field label="الاسم" value={form.name} onChange={v => setForm({ ...form, name: v })} />
+          <Field label={t('settings.common.name')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
           <div>
-            <label className="block text-xs text-fg-muted mb-1">الهاتف</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.fields.phone')}</label>
             <PhoneDisplay phone={form.phone} countryCode={form.country} />
           </div>
           <div>
-            <label className="block text-xs text-fg-muted mb-1">الدولة</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.fields.country')}</label>
             <CountrySelect value={form.country || null} onChange={v => setForm({ ...form, country: v || '' })} />
           </div>
 
           {/* Tags — التاجات بتتحط من الأدمن بس في الإعدادات، هنا بس اختيار من الموجود */}
           <div>
             <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1.5">
-              <Tag size={12} /> التاجات
+              <Tag size={12} /> {t('contactSidebar.tags.label')}
             </label>
             {contactTags.length > 0 && (
               <div className="flex flex-wrap gap-1.5 mb-2">
@@ -291,14 +294,14 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
                 ))}
               </div>
             )}
-            {allTags.filter(t => !contactTags.some(ct => ct.id === t.id)).length > 0 && (
+            {allTags.filter(tg => !contactTags.some(ct => ct.id === tg.id)).length > 0 && (
               <select value="" onChange={e => {
-                const tag = allTags.find(t => t.id === e.target.value)
+                const tag = allTags.find(tg => tg.id === e.target.value)
                 if (tag) toggleTag(tag)
               }}
                 className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
-                <option value="">— إضافة تاج —</option>
-                {allTags.filter(t => !contactTags.some(ct => ct.id === t.id)).map(tag => (
+                <option value="">{t('contactSidebar.tags.addPlaceholder')}</option>
+                {allTags.filter(tg => !contactTags.some(ct => ct.id === tg.id)).map(tag => (
                   <option key={tag.id} value={tag.id}>{tag.name}</option>
                 ))}
               </select>
@@ -306,20 +309,20 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             {agent?.role !== 'admin' && (
               <button onClick={() => setRequestModalType('tag')}
                 className="flex items-center gap-1.5 text-xs text-brand mt-1.5 hover:underline">
-                <Send size={11} /> اطلب تاج جديد من الأدمن
+                <Send size={11} /> {t('contactSidebar.tags.requestNew')}
               </button>
             )}
           </div>
 
           {/* Lifecycle */}
           <div>
-            <label className="block text-xs text-fg-muted mb-1">مرحلة الـ Lifecycle</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.lifecycle.label')}</label>
             <select
               value={form.lifecycle_stage_id}
               onChange={e => setForm({ ...form, lifecycle_stage_id: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
             >
-              <option value="">— بدون —</option>
+              <option value="">{t('contactSidebar.lifecycle.none')}</option>
               {lifecycles.map(l => (
                 <option key={l.id} value={l.id}>{l.icon ? `${l.icon} ` : ''}{l.name}</option>
               ))}
@@ -333,7 +336,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             {agent?.role !== 'admin' && (
               <button onClick={() => setRequestModalType('lifecycle')}
                 className="flex items-center gap-1.5 text-xs text-brand mt-1.5 hover:underline">
-                <Send size={11} /> اطلب مرحلة جديدة من الأدمن
+                <Send size={11} /> {t('contactSidebar.lifecycle.requestNew')}
               </button>
             )}
           </div>
@@ -341,7 +344,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           {/* Custom Fields */}
           {customFields.length > 0 && (
             <div>
-              <p className="text-xs text-fg-muted mb-2 font-medium">حقول إضافية</p>
+              <p className="text-xs text-fg-muted mb-2 font-medium">{t('contactSidebar.customFields.title')}</p>
               <div className="space-y-3">
                 {customFields.map(f => (
                   <div key={f.id}>
@@ -352,7 +355,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
                         onChange={e => setCustomValues({ ...customValues, [f.id]: e.target.value })}
                         className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
                       >
-                        <option value="">— اختر —</option>
+                        <option value="">{t('contactSidebar.customFields.selectPlaceholder')}</option>
                         {(f.options?.choices || []).map(o => (
                           <option key={o} value={o}>{o}</option>
                         ))}
@@ -373,7 +376,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
           {/* Notes */}
           <div>
-            <label className="block text-xs text-fg-muted mb-1">ملاحظات</label>
+            <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.fields.notes')}</label>
             <textarea
               value={form.notes}
               onChange={e => setForm({ ...form, notes: e.target.value })}
@@ -385,16 +388,16 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           {/* منطقة خطرة — أدمن بس */}
           {agent?.role === 'admin' && (
             <div className="pt-2 border-t border-surface-3 space-y-2">
-              <p className="text-xs text-fg-subtle font-medium">منطقة خطرة</p>
+              <p className="text-xs text-fg-subtle font-medium">{t('contactSidebar.dangerZone.title')}</p>
               <button onClick={toggleBlock} disabled={blocking}
                 className={`w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium transition-colors disabled:opacity-50 ${
                   contact?.is_blocked ? 'bg-success/10 text-success hover:bg-success/20' : 'bg-warning/10 text-warning hover:bg-warning/20'
                 }`}>
-                {contact?.is_blocked ? <><ShieldCheck size={15} /> إلغاء حظر العميل</> : <><Ban size={15} /> حظر العميل</>}
+                {contact?.is_blocked ? <><ShieldCheck size={15} /> {t('contactSidebar.dangerZone.unblock')}</> : <><Ban size={15} /> {t('contactSidebar.dangerZone.block')}</>}
               </button>
               <button onClick={deleteContact} disabled={deleting}
                 className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl text-sm font-medium bg-danger/10 text-danger hover:bg-danger/20 transition-colors disabled:opacity-50">
-                {deleting ? <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" /> : <><Trash2 size={15} /> حذف بيانات العميل نهائياً</>}
+                {deleting ? <div className="w-4 h-4 border-2 border-danger border-t-transparent rounded-full animate-spin" /> : <><Trash2 size={15} /> {t('contactSidebar.dangerZone.deleteButton')}</>}
               </button>
             </div>
           )}
@@ -406,8 +409,8 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors flex items-center justify-center gap-2 ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
             {saving ? (
               <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-            ) : saved ? '✓ تم الحفظ' : (
-              <><Save size={14} /> حفظ التغييرات</>
+            ) : saved ? t('settings.common.savedCheck') : (
+              <><Save size={14} /> {t('contactSidebar.saveButton')}</>
             )}
           </button>
         </div>

@@ -878,5 +878,58 @@
       "iosStep3": "اضغط \"إضافة\" في أعلى الشاشة",
       "okButton": "حسنًا"
     }
+  },
+  "contactSidebar": {
+    "title": "بيانات العميل",
+    "connectedChannels": {
+      "title": "قنوات متصلة",
+      "numberFallback": "رقم {{platform}}"
+    },
+    "fields": {
+      "phone": "الهاتف",
+      "country": "الدولة",
+      "notes": "الملاحظات"
+    },
+    "phone": {
+      "empty": "لا يوجد رقم",
+      "copyTitle": "انسخ الرقم",
+      "copied": "تم نسخ الرقم"
+    },
+    "tags": {
+      "label": "الوسوم",
+      "addPlaceholder": "— إضافة وسم —",
+      "requestNew": "اطلب وسمًا جديدًا من المسؤول",
+      "removedActivity": "أزال الوسم \"{{name}}\" من العميل",
+      "addedActivity": "أضاف الوسم \"{{name}}\" إلى العميل"
+    },
+    "lifecycle": {
+      "label": "مرحلة الـ Lifecycle",
+      "none": "— بدون —",
+      "requestNew": "اطلب مرحلة جديدة من المسؤول"
+    },
+    "customFields": {
+      "title": "حقول إضافية",
+      "selectPlaceholder": "— اختر —"
+    },
+    "dangerZone": {
+      "title": "منطقة خطرة",
+      "unblock": "إلغاء حظر العميل",
+      "block": "حظر العميل",
+      "deleteButton": "حذف بيانات العميل نهائيًا",
+      "blockActivityBlocked": "حظر العميل",
+      "blockActivityUnblocked": "ألغى حظر العميل",
+      "blockToastBlocked": "تم حظر العميل",
+      "blockToastUnblocked": "تم إلغاء حظر العميل",
+      "blockError": "حدث خطأ، حاول مرة أخرى",
+      "deleteConfirm1": "هل أنت متأكد من رغبتك في حذف جميع بيانات \"{{name}}\" نهائيًا؟ لا يمكن التراجع عن هذا الإجراء.",
+      "deleteConfirmFallbackName": "هذا العميل",
+      "deleteConfirm2": "تأكيد أخير: سيتم حذف المحادثة وجميع الرسائل المرتبطة بهذا العميل نهائيًا. هل أنت متأكد؟",
+      "deleteError": "حدث خطأ أثناء الحذف",
+      "deleteSuccess": "تم حذف بيانات العميل"
+    },
+    "activityLog": {
+      "fieldChanged": "غيّر {{field}} من \"{{oldVal}}\" إلى \"{{newVal}}\""
+    },
+    "saveButton": "حفظ التغييرات"
   }
 }

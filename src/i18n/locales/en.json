@@ -878,5 +878,58 @@
       "iosStep3": "Tap \"Add\" at the top of the screen",
       "okButton": "OK"
     }
+  },
+  "contactSidebar": {
+    "title": "Customer details",
+    "connectedChannels": {
+      "title": "Connected channels",
+      "numberFallback": "{{platform}} number"
+    },
+    "fields": {
+      "phone": "Phone",
+      "country": "Country",
+      "notes": "Notes"
+    },
+    "phone": {
+      "empty": "No phone number",
+      "copyTitle": "Copy the number",
+      "copied": "Number copied"
+    },
+    "tags": {
+      "label": "Tags",
+      "addPlaceholder": "— Add a tag —",
+      "requestNew": "Request a new tag from the admin",
+      "removedActivity": "Removed the tag \"{{name}}\" from the customer",
+      "addedActivity": "Added the tag \"{{name}}\" to the customer"
+    },
+    "lifecycle": {
+      "label": "Lifecycle stage",
+      "none": "— None —",
+      "requestNew": "Request a new stage from the admin"
+    },
+    "customFields": {
+      "title": "Additional fields",
+      "selectPlaceholder": "— Select —"
+    },
+    "dangerZone": {
+      "title": "Danger zone",
+      "unblock": "Unblock customer",
+      "block": "Block customer",
+      "deleteButton": "Permanently delete customer data",
+      "blockActivityBlocked": "Blocked the customer",
+      "blockActivityUnblocked": "Unblocked the customer",
+      "blockToastBlocked": "Customer blocked",
+      "blockToastUnblocked": "Customer unblocked",
+      "blockError": "An error occurred, try again",
+      "deleteConfirm1": "Are you sure you want to permanently delete all of \"{{name}}\"'s data? This action cannot be undone.",
+      "deleteConfirmFallbackName": "this customer",
+      "deleteConfirm2": "Final confirmation: the conversation and all messages linked to this customer will be permanently deleted. Are you sure?",
+      "deleteError": "An error occurred while deleting",
+      "deleteSuccess": "Customer data deleted"
+    },
+    "activityLog": {
+      "fieldChanged": "Changed {{field}} from \"{{oldVal}}\" to \"{{newVal}}\""
+    },
+    "saveButton": "Save changes"
   }
 }
