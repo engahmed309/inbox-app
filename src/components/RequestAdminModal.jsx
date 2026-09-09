@@ -1,15 +1,16 @@
 import { useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { X, Paperclip } from 'lucide-react'
 
-const TITLES = { tag: 'طلب تاج جديد', lifecycle: 'طلب مرحلة Lifecycle جديدة', quick_reply: 'طلب رد سريع جديد' }
-const NAME_LABELS = { tag: 'اسم التاج', lifecycle: 'اسم المرحلة', quick_reply: 'الاسم (يستخدم بعد / في المحادثة)' }
-
 // موظف مش أدمن مش يقدر يضيف تاج/مرحلة/رد سريع مباشرة — بيبعت طلب هنا، وبيوصل لكل الأدمنز في
 // جرس الإشعارات، ولو حد منهم وافق بيتضاف العنصر على طول من غير ما الموظف يحتاج يعمل حاجة تانية
 export default function RequestAdminModal({ type, onClose }) {
+  const { t } = useTranslation()
+  const TITLES = { tag: t('requestAdminModal.titles.tag'), lifecycle: t('requestAdminModal.titles.lifecycle'), quick_reply: t('requestAdminModal.titles.quickReply') }
+  const NAME_LABELS = { tag: t('requestAdminModal.nameLabels.tag'), lifecycle: t('requestAdminModal.nameLabels.lifecycle'), quick_reply: t('requestAdminModal.nameLabels.quickReply') }
   const { agent } = useAuth()
   const toast = useToast()
   const [name, setName] = useState('')
@@ -21,7 +22,7 @@ export default function RequestAdminModal({ type, onClose }) {
   const fileType = (f) => f.type.startsWith('image') ? 'image' : f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'file'
 
   const submit = async () => {
-    if (!name.trim()) { toast.error('اكتب الاسم الأول'); return }
+    if (!name.trim()) { toast.error(t('requestAdminModal.nameRequired')); return }
     setSaving(true)
     try {
       const payload = { name: name.trim() }
@@ -44,11 +45,11 @@ export default function RequestAdminModal({ type, onClose }) {
         body: JSON.stringify({ agent_id: agent?.id, type, payload })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل إرسال الطلب')
-      toast.success('اتبعت طلبك للأدمن، هتوصلك رسالة لما يرد')
+      if (!res.ok) throw new Error(data.error || t('requestAdminModal.sendFailed'))
+      toast.success(t('requestAdminModal.sentSuccess'))
       onClose()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setSaving(false)
     }
@@ -70,7 +71,7 @@ export default function RequestAdminModal({ type, onClose }) {
 
           {(type === 'tag' || type === 'lifecycle') && (
             <div>
-              <label className="block text-xs text-fg-muted mb-1">اللون</label>
+              <label className="block text-xs text-fg-muted mb-1">{t('settings.common.colorLabel')}</label>
               <div className="flex items-center gap-2">
                 <input type="color" value={color} onChange={e => setColor(e.target.value)}
                   className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 cursor-pointer" />
@@ -82,15 +83,15 @@ export default function RequestAdminModal({ type, onClose }) {
           {type === 'quick_reply' && (
             <>
               <div>
-                <label className="block text-xs text-fg-muted mb-1">النص (اختياري لو فيه ملف)</label>
+                <label className="block text-xs text-fg-muted mb-1">{t('requestAdminModal.textLabel')}</label>
                 <textarea value={text} onChange={e => setText(e.target.value)} rows={3}
                   className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand resize-none" />
               </div>
               <div>
-                <label className="block text-xs text-fg-muted mb-1">ملف مرفق (اختياري)</label>
+                <label className="block text-xs text-fg-muted mb-1">{t('requestAdminModal.fileLabel')}</label>
                 <label className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg-muted cursor-pointer hover:text-fg">
                   <Paperclip size={14} />
-                  {file ? file.name : 'اختر ملف...'}
+                  {file ? file.name : t('requestAdminModal.chooseFile')}
                   <input type="file" className="hidden" accept="image/*,video/*,audio/*,.pdf,.doc,.docx"
                     onChange={e => setFile(e.target.files[0] || null)} />
                 </label>
@@ -101,11 +102,11 @@ export default function RequestAdminModal({ type, onClose }) {
         <div className="flex items-center gap-2 p-4 border-t border-surface-3">
           <button onClick={onClose} disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
-            إلغاء
+            {t('settings.common.cancel')}
           </button>
           <button onClick={submit} disabled={saving}
             className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
-            {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : 'ابعت الطلب'}
+            {saving ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('requestAdminModal.sendButton')}
           </button>
         </div>
       </div>

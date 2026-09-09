@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { MessageSquare } from 'lucide-react'
@@ -7,6 +8,7 @@ import { MessageSquare } from 'lucide-react'
 // الشاشة دي بتفتح لما موظف يدوس على رابط الدعوة اللي وصله بالإيميل — سوبابيز بتعمل session
 // تلقائي من التوكن اللي في الرابط، وهنا بس بنخليه يحط باسورد لنفسه عشان يقدر يدخل بيه بعد كده
 export default function SetPasswordScreen() {
+  const { t } = useTranslation()
   const { user, loading } = useAuth()
   const navigate = useNavigate()
   const [password, setPassword] = useState('')
@@ -17,12 +19,12 @@ export default function SetPasswordScreen() {
   const submit = async (e) => {
     e.preventDefault()
     setError('')
-    if (password.length < 6) { setError('الباسورد لازم يكون ٦ حروف على الأقل'); return }
-    if (password !== confirm) { setError('الباسوردين مش متطابقين'); return }
+    if (password.length < 6) { setError(t('setPassword.passwordTooShort')); return }
+    if (password !== confirm) { setError(t('setPassword.passwordMismatch')); return }
     setSaving(true)
     const { error: err } = await supabase.auth.updateUser({ password })
     setSaving(false)
-    if (err) { setError('حصل خطأ، حاول تاني'); return }
+    if (err) { setError(t('setPassword.genericError')); return }
     navigate('/', { replace: true })
   }
 
@@ -37,7 +39,7 @@ export default function SetPasswordScreen() {
   if (!user) {
     return (
       <div className="h-full flex items-center justify-center bg-surface p-4 text-center">
-        <p className="text-fg-muted text-sm">رابط الدعوة ده مش صالح أو خلصت صلاحيته. اطلب من الأدمن يبعتلك دعوة جديدة.</p>
+        <p className="text-fg-muted text-sm">{t('setPassword.invalidInviteLink')}</p>
       </div>
     )
   }
@@ -49,8 +51,8 @@ export default function SetPasswordScreen() {
           <div className="w-14 h-14 bg-brand rounded-2xl flex items-center justify-center mb-4 shadow-lg shadow-brand/30">
             <MessageSquare size={28} className="text-white" />
           </div>
-          <h1 className="text-xl font-bold text-fg">أهلاً بيك في الفريق</h1>
-          <p className="text-fg-muted text-sm mt-1">حط باسورد لحسابك عشان تكمل ({user.email})</p>
+          <h1 className="text-xl font-bold text-fg">{t('setPassword.welcomeTitle')}</h1>
+          <p className="text-fg-muted text-sm mt-1">{t('setPassword.subtitle', { email: user.email })}</p>
         </div>
 
         <form onSubmit={submit} className="bg-surface-2 rounded-2xl p-6 space-y-4">
@@ -60,14 +62,14 @@ export default function SetPasswordScreen() {
             </div>
           )}
           <input type="password" value={password} onChange={e => setPassword(e.target.value)}
-            placeholder="الباسورد" required
+            placeholder={t('settings.common.password')} required
             className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand" />
           <input type="password" value={confirm} onChange={e => setConfirm(e.target.value)}
-            placeholder="تأكيد الباسورد" required
+            placeholder={t('setPassword.confirmPasswordPlaceholder')} required
             className="w-full bg-surface-3 rounded-xl px-4 py-2.5 text-sm text-fg placeholder:text-fg-subtle outline-none focus:ring-2 focus:ring-brand" />
           <button type="submit" disabled={saving}
             className="w-full bg-brand hover:bg-brand/90 text-white font-semibold py-2.5 rounded-xl transition-colors disabled:opacity-60">
-            {saving ? 'جاري الحفظ...' : 'تأكيد ودخول'}
+            {saving ? t('settings.common.savingEllipsis') : t('setPassword.confirmAndLogin')}
           </button>
         </form>
       </div>

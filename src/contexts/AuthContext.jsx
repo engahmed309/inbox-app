@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
+import i18n from '../i18n'
 import { supabase, API_URL } from '../lib/supabase'
 
 const AuthContext = createContext(null)
@@ -51,7 +52,7 @@ export function AuthProvider({ children }) {
       // اتسجل دخول بجوجل/باسورد صح بس مفيش دعوة له في النظام — نرفضه فوراً
       setUser(null)
       setAgent(null)
-      setAuthError('الحساب ده مش مدعو لاستخدام النظام. تواصل مع الأدمن عشان يضيفك.')
+      setAuthError(i18n.t('auth.notInvited'))
       return
     }
 

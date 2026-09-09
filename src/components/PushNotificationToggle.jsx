@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -15,6 +16,7 @@ function urlBase64ToUint8Array(base64String) {
 
 // زرار تفعيل/إيقاف إشعارات الموبايل + ميوت الصوت — بيظهر لكل الموظفين جوا السايدبار
 export default function PushNotificationToggle() {
+  const { t } = useTranslation()
   const { agent } = useAuth()
   const toast = useToast()
   const [open, setOpen] = useState(false)
@@ -45,16 +47,16 @@ export default function PushNotificationToggle() {
   }, [])
 
   const enablePush = async () => {
-    if (!supported) { toast.error('المتصفح ده مش بيدعم الإشعارات'); return }
+    if (!supported) { toast.error(t('pushToggle.notSupported')); return }
     setLoading(true)
     try {
       const perm = await Notification.requestPermission()
       setPermission(perm)
-      if (perm !== 'granted') { toast.error('لازم توافق على الإذن عشان الإشعارات تشتغل'); return }
+      if (perm !== 'granted') { toast.error(t('pushToggle.permissionRequired')); return }
 
       const keyRes = await fetch(`${API_URL}/push/vapid-public-key`)
       const keyData = await keyRes.json()
-      if (!keyRes.ok) throw new Error(keyData.error || 'فشل تفعيل الإشعارات')
+      if (!keyRes.ok) throw new Error(keyData.error || t('pushToggle.enableFailed'))
 
       const reg = await navigator.serviceWorker.ready
       let sub = await reg.pushManager.getSubscription()
@@ -70,12 +72,12 @@ export default function PushNotificationToggle() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent.id, subscription: sub.toJSON() })
       })
-      if (!res.ok) throw new Error((await res.json()).error || 'فشل تفعيل الإشعارات')
+      if (!res.ok) throw new Error((await res.json()).error || t('pushToggle.enableFailed'))
 
       setSubscribed(true)
-      toast.success('اتفعلت إشعارات الموبايل')
+      toast.success(t('pushToggle.enabledSuccess'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setLoading(false)
     }
@@ -95,9 +97,9 @@ export default function PushNotificationToggle() {
         await sub.unsubscribe()
       }
       setSubscribed(false)
-      toast.success('اتوقفت إشعارات الموبايل')
+      toast.success(t('pushToggle.disabledSuccess'))
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setLoading(false)
     }
@@ -111,7 +113,7 @@ export default function PushNotificationToggle() {
 
   return (
     <div ref={wrapRef}>
-      <button onClick={() => setOpen(v => !v)} title="إشعارات الموبايل"
+      <button onClick={() => setOpen(v => !v)} title={t('pushToggle.title')}
         className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
         {subscribed ? <Bell size={15} /> : <BellOff size={15} />}
       </button>
@@ -119,34 +121,34 @@ export default function PushNotificationToggle() {
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60" onClick={() => setOpen(false)}>
           <div className="w-full max-w-sm bg-surface border border-surface-3 rounded-2xl shadow-2xl p-4 space-y-3" onClick={e => e.stopPropagation()}>
             <div className="flex items-center justify-between">
-              <span className="font-semibold text-fg text-sm">إشعارات الموبايل</span>
+              <span className="font-semibold text-fg text-sm">{t('pushToggle.title')}</span>
               <button onClick={() => setOpen(false)} className="text-fg-muted hover:text-fg">
                 <X size={16} />
               </button>
             </div>
             {!supported ? (
-              <p className="text-xs text-fg-subtle">المتصفح ده مش بيدعم إشعارات الموبايل</p>
+              <p className="text-xs text-fg-subtle">{t('pushToggle.notSupportedLong')}</p>
             ) : (
               <>
                 <div className="flex items-center justify-between gap-2">
-                  <span className="text-sm text-fg">إشعارات الموبايل</span>
+                  <span className="text-sm text-fg">{t('pushToggle.title')}</span>
                   <button onClick={subscribed ? disablePush : enablePush} disabled={loading}
                     className={`text-[11px] px-2.5 py-1 rounded-full font-medium disabled:opacity-50 ${subscribed ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {loading ? '...' : subscribed ? 'مفعّلة' : 'فعّل'}
+                    {loading ? t('settings.common.ellipsis') : subscribed ? t('pushToggle.enabledBadge') : t('pushToggle.enableButton')}
                   </button>
                 </div>
                 <div className="flex items-center justify-between gap-2 pt-2 border-t border-surface-3">
                   <span className="flex items-center gap-1.5 text-sm text-fg">
                     {soundEnabled ? <Volume2 size={14} className="text-fg-muted" /> : <VolumeX size={14} className="text-fg-muted" />}
-                    صوت الإشعار
+                    {t('pushToggle.soundLabel')}
                   </span>
                   <button onClick={toggleSound}
                     className={`text-[11px] px-2.5 py-1 rounded-full font-medium ${soundEnabled ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {soundEnabled ? 'شغال' : 'صامت'}
+                    {soundEnabled ? t('pushToggle.soundOn') : t('pushToggle.soundOff')}
                   </button>
                 </div>
                 <p className="text-[11px] text-fg-subtle leading-relaxed">
-                  الصوت بيجي بس لو التطبيق مقفول أو في الخلفية.
+                  {t('pushToggle.soundHint')}
                 </p>
               </>
             )}

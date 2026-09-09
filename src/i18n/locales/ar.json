@@ -931,5 +931,84 @@
       "fieldChanged": "غيّر {{field}} من \"{{oldVal}}\" إلى \"{{newVal}}\""
     },
     "saveButton": "حفظ التغييرات"
+  },
+  "setPassword": {
+    "passwordTooShort": "يجب ألا تقل كلمة المرور عن ٦ أحرف",
+    "passwordMismatch": "كلمتا المرور غير متطابقتين",
+    "genericError": "حدث خطأ، حاول مرة أخرى",
+    "invalidInviteLink": "رابط الدعوة هذا غير صالح أو انتهت صلاحيته. يرجى طلب دعوة جديدة من المسؤول.",
+    "welcomeTitle": "أهلاً بك في الفريق",
+    "subtitle": "عيّن كلمة مرور لحسابك للمتابعة ({{email}})",
+    "confirmPasswordPlaceholder": "تأكيد كلمة المرور",
+    "confirmAndLogin": "تأكيد وتسجيل الدخول"
+  },
+  "requestAdminModal": {
+    "titles": {
+      "tag": "طلب وسم جديد",
+      "lifecycle": "طلب مرحلة Lifecycle جديدة",
+      "quickReply": "طلب رد سريع جديد"
+    },
+    "nameLabels": {
+      "tag": "اسم الوسم",
+      "lifecycle": "اسم المرحلة",
+      "quickReply": "الاسم (يُستخدم بعد / في المحادثة)"
+    },
+    "nameRequired": "يرجى إدخال الاسم أولاً",
+    "sendFailed": "فشل إرسال الطلب",
+    "sentSuccess": "تم إرسال طلبك إلى المسؤول، وستصلك رسالة عند الرد",
+    "textLabel": "النص (اختياري في حال إرفاق ملف)",
+    "fileLabel": "ملف مرفق (اختياري)",
+    "chooseFile": "اختر ملفًا...",
+    "sendButton": "إرسال الطلب"
+  },
+  "notificationBell": {
+    "title": "الإشعارات",
+    "noNotifications": "لا توجد إشعارات",
+    "respondFailed": "فشل الرد على الطلب",
+    "transferAccepted": "تم تحويل المحادثة إليه",
+    "requestRejected": "تم رفض الطلب",
+    "addedSuccess": "تمت الإضافة بنجاح",
+    "approve": "موافقة",
+    "reject": "رفض",
+    "approvedStatus": "تمت الموافقة",
+    "rejectedStatus": "مرفوض"
+  },
+  "pushToggle": {
+    "title": "إشعارات الهاتف",
+    "notSupported": "هذا المتصفح لا يدعم الإشعارات",
+    "notSupportedLong": "هذا المتصفح لا يدعم إشعارات الهاتف",
+    "permissionRequired": "يجب الموافقة على الإذن لتفعيل الإشعارات",
+    "enableFailed": "فشل تفعيل الإشعارات",
+    "enabledSuccess": "تم تفعيل إشعارات الهاتف",
+    "disabledSuccess": "تم إيقاف إشعارات الهاتف",
+    "enabledBadge": "مفعّلة",
+    "enableButton": "فعّل",
+    "soundLabel": "صوت الإشعار",
+    "soundOn": "مفعّل",
+    "soundOff": "صامت",
+    "soundHint": "يصدر الصوت فقط عندما يكون التطبيق مغلقًا أو يعمل في الخلفية."
+  },
+  "app": {
+    "loading": "جارٍ التحميل...",
+    "instagramConnectFailed": "فشل ربط حساب انستجرام",
+    "instagramConnectSuccess": "تم ربط حساب انستجرام بنجاح"
+  },
+  "auth": {
+    "notInvited": "هذا الحساب غير مدعو لاستخدام النظام. يرجى التواصل مع المسؤول لإضافتك."
+  },
+  "countrySelect": {
+    "placeholder": "اختر الدولة",
+    "searchPlaceholder": "ابحث عن دولة...",
+    "clearSelection": "مسح الاختيار"
+  },
+  "emojis": {
+    "categories": {
+      "frequent": "الأكثر استخدامًا",
+      "smileys": "الضحك والمشاعر",
+      "sad": "الحزن والتعب",
+      "hearts": "القلوب",
+      "gestures": "الإشارات",
+      "symbols": "الرموز"
+    }
   }
 }

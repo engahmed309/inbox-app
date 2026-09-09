@@ -1,5 +1,6 @@
 import { Suspense, lazy, useEffect } from 'react'
 import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { useAuth } from './contexts/AuthContext'
 import { useToast } from './contexts/ToastContext'
 import { API_URL } from './lib/supabase'
@@ -22,12 +23,13 @@ function ScreenLoader() {
 }
 
 function PrivateRoute({ children }) {
+  const { t } = useTranslation()
   const { user, loading } = useAuth()
   if (loading) return (
     <div className="h-full flex items-center justify-center bg-surface">
       <div className="flex flex-col items-center gap-3">
         <div className="w-8 h-8 border-2 border-brand border-t-transparent rounded-full animate-spin" />
-        <span className="text-slate-400 text-sm">جاري التحميل...</span>
+        <span className="text-slate-400 text-sm">{t('app.loading')}</span>
       </div>
     </div>
   )
@@ -37,6 +39,7 @@ function PrivateRoute({ children }) {
 // انستجرام بيحوّل المستخدم كامل الصفحة (مش نافذة منبثقة) لموقعنا الجذر بعد الموافقة، ومعاه
 // ?code=... في الرابط — هنا بنمسكه أول ما التطبيق يفتح، أيًا كانت الشاشة اللي هيهبط عليها
 function InstagramOAuthHandler() {
+  const { t } = useTranslation()
   const navigate = useNavigate()
   const location = useLocation()
   const toast = useToast()
@@ -56,10 +59,10 @@ function InstagramOAuthHandler() {
     })
       .then(res => res.json().then(data => ({ ok: res.ok, data })))
       .then(({ ok, data }) => {
-        if (!ok) throw new Error(data.error || 'فشل ربط انستجرام')
-        toast.success('اترابط حساب انستجرام بنجاح')
+        if (!ok) throw new Error(data.error || t('app.instagramConnectFailed'))
+        toast.success(t('app.instagramConnectSuccess'))
       })
-      .catch(err => toast.error('خطأ: ' + err.message))
+      .catch(err => toast.error(t('settings.common.errorWithMessage', { message: err.message })))
       .finally(() => navigate('/settings', { replace: true }))
   }, [])
 

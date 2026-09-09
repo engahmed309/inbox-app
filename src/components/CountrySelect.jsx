@@ -1,9 +1,11 @@
 import { useState, useRef, useEffect } from 'react'
+import { useTranslation } from 'react-i18next'
 import { COUNTRIES, COUNTRY_MAP } from '../lib/countries'
 import { ChevronDown, Search } from 'lucide-react'
 
 // قايمة اختيار دولة قابلة للبحث — بديل عن مربع نص حر،   كود ISO2 (زي "EG") مش اسم حر
-export default function CountrySelect({ value, onChange, placeholder = 'اختار الدولة' }) {
+export default function CountrySelect({ value, onChange, placeholder }) {
+  const { t } = useTranslation()
   const [open, setOpen] = useState(false)
   const [search, setSearch] = useState('')
   const wrapRef = useRef(null)
@@ -29,7 +31,7 @@ export default function CountrySelect({ value, onChange, placeholder = 'اختا
             <span>{selected.name}</span>
           </span>
         ) : (
-          <span className="text-fg-subtle">{placeholder}</span>
+          <span className="text-fg-subtle">{placeholder || t('countrySelect.placeholder')}</span>
         )}
         <ChevronDown size={14} className={`text-fg-subtle transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
@@ -40,7 +42,7 @@ export default function CountrySelect({ value, onChange, placeholder = 'اختا
             <div className="relative">
               <Search size={12} className="absolute right-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input autoFocus value={search} onChange={e => setSearch(e.target.value)}
-                placeholder="دور على دولة..."
+                placeholder={t('countrySelect.searchPlaceholder')}
                 className="w-full bg-surface-3 rounded-lg py-1.5 px-3 pr-7 text-xs text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
             </div>
           </div>
@@ -48,7 +50,7 @@ export default function CountrySelect({ value, onChange, placeholder = 'اختا
             {value && (
               <button type="button" onClick={() => { onChange(null); setOpen(false); setSearch('') }}
                 className="flex items-center gap-2 w-full px-3 py-2 hover:bg-surface-3/60 text-xs text-danger text-right">
-                مسح الاختيار
+                {t('countrySelect.clearSelection')}
               </button>
             )}
             {filtered.map(c => (
@@ -59,7 +61,7 @@ export default function CountrySelect({ value, onChange, placeholder = 'اختا
               </button>
             ))}
             {filtered.length === 0 && (
-              <p className="text-center text-fg-subtle text-xs py-4">مفيش نتايج</p>
+              <p className="text-center text-fg-subtle text-xs py-4">{t('settings.common.noResults')}</p>
             )}
           </div>
         </div>

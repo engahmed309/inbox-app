@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { useTranslation } from 'react-i18next'
 import { supabase, API_URL } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
@@ -8,6 +9,7 @@ import { Bell, Check, X, UserPlus, Tag } from 'lucide-react'
 // جرس الإشعارات — ثابت فوق كل الشاشات بعد تسجيل الدخول. أول استخدام له طلبات نقل المحادثات
 // بين الموظفين، وممكن نضيفله أنواع تانية بعدين بنفس الشكل
 export default function NotificationBell() {
+  const { t } = useTranslation()
   const { agent } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
@@ -72,11 +74,11 @@ export default function NotificationBell() {
         body: JSON.stringify({ accept })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الرد على الطلب')
-      toast.success(accept ? 'اتحولتلّه المحادثة' : 'اترفض الطلب')
+      if (!res.ok) throw new Error(data.error || t('notificationBell.respondFailed'))
+      toast.success(accept ? t('notificationBell.transferAccepted') : t('notificationBell.requestRejected'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setBusyId(null)
     }
@@ -91,11 +93,11 @@ export default function NotificationBell() {
         body: JSON.stringify({ accept, admin_id: agent?.id })
       })
       const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'فشل الرد على الطلب')
-      toast.success(accept ? 'اتضاف بنجاح' : 'اترفض الطلب')
+      if (!res.ok) throw new Error(data.error || t('notificationBell.respondFailed'))
+      toast.success(accept ? t('notificationBell.addedSuccess') : t('notificationBell.requestRejected'))
       load()
     } catch (err) {
-      toast.error('خطأ: ' + err.message)
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setBusyId(null)
     }
@@ -105,7 +107,7 @@ export default function NotificationBell() {
 
   return (
     <div ref={wrapRef} className="fixed z-[60] left-3" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
-      <button onClick={() => setOpen(v => !v)} title="الإشعارات"
+      <button onClick={() => setOpen(v => !v)} title={t('notificationBell.title')}
         className="relative w-10 h-10 flex items-center justify-center bg-surface-2 border border-surface-3 rounded-full shadow-lg text-fg-muted hover:text-fg transition-colors">
         <Bell size={17} />
         {unreadCount > 0 && (
@@ -117,9 +119,9 @@ export default function NotificationBell() {
 
       {open && (
         <div className="absolute top-full left-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
-          <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">الإشعارات</div>
+          <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">{t('notificationBell.title')}</div>
           {items.length === 0 && (
-            <p className="text-center text-fg-subtle text-sm py-8">مفيش إشعارات</p>
+            <p className="text-center text-fg-subtle text-sm py-8">{t('notificationBell.noNotifications')}</p>
           )}
           {items.map(n => (
             <div key={n.id} onClick={() => openNotification(n)}
@@ -137,11 +139,11 @@ export default function NotificationBell() {
                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
                       <button onClick={() => respondTransfer(n, true)} disabled={busyId === n.id}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-success text-white disabled:opacity-50">
-                        <Check size={12} /> موافقة
+                        <Check size={12} /> {t('notificationBell.approve')}
                       </button>
                       <button onClick={() => respondTransfer(n, false)} disabled={busyId === n.id}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted disabled:opacity-50">
-                        <X size={12} /> رفض
+                        <X size={12} /> {t('notificationBell.reject')}
                       </button>
                     </div>
                   )}
@@ -149,22 +151,22 @@ export default function NotificationBell() {
                     <div className="flex gap-2 mt-2" onClick={e => e.stopPropagation()}>
                       <button onClick={() => respondAdminRequest(n, true)} disabled={busyId === n.id}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-success text-white disabled:opacity-50">
-                        <Check size={12} /> موافقة
+                        <Check size={12} /> {t('notificationBell.approve')}
                       </button>
                       <button onClick={() => respondAdminRequest(n, false)} disabled={busyId === n.id}
                         className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium bg-surface-3 text-fg-muted disabled:opacity-50">
-                        <X size={12} /> رفض
+                        <X size={12} /> {t('notificationBell.reject')}
                       </button>
                     </div>
                   )}
                   {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'accepted' && (
-                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">تمت الموافقة</span>
+                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">{t('notificationBell.approvedStatus')}</span>
                   )}
                   {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'approved' && (
-                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">تمت الموافقة</span>
+                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-success/15 text-success">{t('notificationBell.approvedStatus')}</span>
                   )}
                   {['transfer_request', 'admin_request'].includes(n.type) && n.action_status === 'rejected' && (
-                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-danger/15 text-danger">اترفض</span>
+                    <span className="inline-block mt-2 text-[10px] font-medium px-2 py-0.5 rounded-full bg-danger/15 text-danger">{t('notificationBell.rejectedStatus')}</span>
                   )}
                 </div>
               </div>

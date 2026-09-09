@@ -931,5 +931,84 @@
       "fieldChanged": "Changed {{field}} from \"{{oldVal}}\" to \"{{newVal}}\""
     },
     "saveButton": "Save changes"
+  },
+  "setPassword": {
+    "passwordTooShort": "Password must be at least 6 characters",
+    "passwordMismatch": "Passwords do not match",
+    "genericError": "An error occurred, please try again",
+    "invalidInviteLink": "This invitation link is invalid or has expired. Please request a new invitation from the admin.",
+    "welcomeTitle": "Welcome to the team",
+    "subtitle": "Set a password for your account to continue ({{email}})",
+    "confirmPasswordPlaceholder": "Confirm password",
+    "confirmAndLogin": "Confirm and sign in"
+  },
+  "requestAdminModal": {
+    "titles": {
+      "tag": "New tag request",
+      "lifecycle": "New Lifecycle stage request",
+      "quickReply": "New quick reply request"
+    },
+    "nameLabels": {
+      "tag": "Tag name",
+      "lifecycle": "Stage name",
+      "quickReply": "Name (used after / in the conversation)"
+    },
+    "nameRequired": "Please enter a name first",
+    "sendFailed": "Failed to send the request",
+    "sentSuccess": "Your request was sent to the admin, you'll be notified when they respond",
+    "textLabel": "Text (optional if attaching a file)",
+    "fileLabel": "Attached file (optional)",
+    "chooseFile": "Choose a file...",
+    "sendButton": "Send request"
+  },
+  "notificationBell": {
+    "title": "Notifications",
+    "noNotifications": "No notifications",
+    "respondFailed": "Failed to respond to the request",
+    "transferAccepted": "The conversation was transferred to them",
+    "requestRejected": "The request was rejected",
+    "addedSuccess": "Added successfully",
+    "approve": "Approve",
+    "reject": "Reject",
+    "approvedStatus": "Approved",
+    "rejectedStatus": "Rejected"
+  },
+  "pushToggle": {
+    "title": "Mobile notifications",
+    "notSupported": "This browser does not support notifications",
+    "notSupportedLong": "This browser does not support mobile notifications",
+    "permissionRequired": "You must grant permission for notifications to work",
+    "enableFailed": "Failed to enable notifications",
+    "enabledSuccess": "Mobile notifications enabled",
+    "disabledSuccess": "Mobile notifications disabled",
+    "enabledBadge": "Enabled",
+    "enableButton": "Enable",
+    "soundLabel": "Notification sound",
+    "soundOn": "On",
+    "soundOff": "Muted",
+    "soundHint": "The sound plays only when the app is closed or running in the background."
+  },
+  "app": {
+    "loading": "Loading...",
+    "instagramConnectFailed": "Failed to connect Instagram account",
+    "instagramConnectSuccess": "Instagram account connected successfully"
+  },
+  "auth": {
+    "notInvited": "This account is not invited to use the system. Please contact the admin to add you."
+  },
+  "countrySelect": {
+    "placeholder": "Select country",
+    "searchPlaceholder": "Search for a country...",
+    "clearSelection": "Clear selection"
+  },
+  "emojis": {
+    "categories": {
+      "frequent": "Frequently used",
+      "smileys": "Smileys & emotions",
+      "sad": "Sad & tired",
+      "hearts": "Hearts",
+      "gestures": "Gestures",
+      "symbols": "Symbols"
+    }
   }
 }
