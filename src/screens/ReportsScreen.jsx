@@ -2,7 +2,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import i18n from '../i18n'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
@@ -116,7 +116,7 @@ function AiReportsTab() {
     const priorHistory = history.filter(h => h.answer && !h.error).map(h => ({ question: h.question, answer: h.answer }))
     setHistory(prev => [...prev, { question: text, answer: null, loading: true, error: null }])
     try {
-      const res = await fetch(`${API_URL}/ai/reports-query`, {
+      const res = await apiFetch(`${API_URL}/ai/reports-query`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ question: text, history: priorHistory })
@@ -387,7 +387,7 @@ function CustomersTab() {
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
-    fetch(`${API_URL}/ads/campaigns`).then(r => r.json()).then(d => setCampaigns(d.campaigns || [])).catch(() => setCampaigns([]))
+    apiFetch(`${API_URL}/ads/campaigns`).then(r => r.json()).then(d => setCampaigns(d.campaigns || [])).catch(() => setCampaigns([]))
   }, [])
 
   useEffect(() => {
@@ -412,7 +412,7 @@ function CustomersTab() {
 
     let dayBuckets = [], apiTotal = 0
     try {
-      const res = await fetch(`${API_URL}/reports/customers-timeseries?${params}`)
+      const res = await apiFetch(`${API_URL}/reports/customers-timeseries?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       dayBuckets = data.buckets || []
@@ -541,7 +541,7 @@ function CountriesTab() {
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     try {
-      const res = await fetch(`${API_URL}/reports/countries?${params}`)
+      const res = await apiFetch(`${API_URL}/reports/countries?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setRows((data.rows || []).map(r => ({ country: r.country || t('reports.countries.none'), count: r.count })))
@@ -627,7 +627,7 @@ function OverviewTab() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/channels`)
+        const res = await apiFetch(`${API_URL}/channels`)
         const data = await res.json()
         setChannelsList((data.channels || []).filter(c => c.id))
       } catch { /* لو فشل، هنفضل نعرض التقرير بس من غير أسماء قنوات محددة */ }
@@ -663,7 +663,7 @@ function OverviewTab() {
     if (to) params.set('to', to)
     if (channel !== 'all') params.set('channel', channel)
     try {
-      const res = await fetch(`${API_URL}/reports/overview?${params}`)
+      const res = await apiFetch(`${API_URL}/reports/overview?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setByChannel(data.byChannel || [])
@@ -1176,7 +1176,7 @@ function TagsReportTab() {
   const loadReport = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/tags/report`)
+      const res = await apiFetch(`${API_URL}/tags/report`)
       const data = await res.json()
       setTags(data.tags || [])
     } catch {
@@ -1191,7 +1191,7 @@ function TagsReportTab() {
     if (!bulkText.trim() || !bulkTagId) return
     setSendingBulk(true)
     try {
-      const res = await fetch(`${API_URL}/tags/${bulkTagId}/bulk-message`, {
+      const res = await apiFetch(`${API_URL}/tags/${bulkTagId}/bulk-message`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: bulkText.trim(), agent_id: agent?.id })
@@ -1329,7 +1329,7 @@ function PerformanceTab() {
     if (from) params.set('from', from)
     if (to) params.set('to', to)
     try {
-      const res = await fetch(`${API_URL}/reports/performance?${params}`)
+      const res = await apiFetch(`${API_URL}/reports/performance?${params}`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setRows(data.rows || [])
@@ -1422,7 +1422,7 @@ function ChannelVolumeTab() {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`${API_URL}/channels`)
+        const res = await apiFetch(`${API_URL}/channels`)
         const data = await res.json()
         setChannelsList((data.channels || []).filter(c => c.id))
       } catch { /* هنعرض بالـ id بس لو فشل */ }

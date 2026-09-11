@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
+import { supabase, API_URL, apiFetch, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import i18n from '../i18n'
@@ -148,7 +148,7 @@ function AgentsTab() {
   const addAgent = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/admin/create-agent`, {
+      const res = await apiFetch(`${API_URL}/admin/create-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(form)
@@ -168,7 +168,7 @@ function AgentsTab() {
   const inviteAgent = async () => {
     setLoading(true)
     try {
-      const res = await fetch(`${API_URL}/admin/invite-agent`, {
+      const res = await apiFetch(`${API_URL}/admin/invite-agent`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(inviteForm)
@@ -195,7 +195,7 @@ function AgentsTab() {
   // لو مسحناه من جدول agents بس، إيميله فضل محجوز في نظام الدخول ولو حاولت تضيفه تاني (يدوي أو
   // بدعوة) هيرفض بـ "already been registered" حتى لو مش ظاهر في قايمة الموظفين خالص
   const deleteAgentFully = async (id) => {
-    const res = await fetch(`${API_URL}/admin/agent/${id}`, { method: 'DELETE' })
+    const res = await apiFetch(`${API_URL}/admin/agent/${id}`, { method: 'DELETE' })
     if (!res.ok) {
       const data = await res.json().catch(() => ({}))
       throw new Error(data.error || t('settings.agents.deleteAgentFailed'))
@@ -501,7 +501,7 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
     const password = prompt(t('settings.agents.resetPasswordPrompt', { name: agent.name }))
     if (!password) return
     try {
-      const res = await fetch(`${API_URL}/admin/reset-password`, {
+      const res = await apiFetch(`${API_URL}/admin/reset-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent.id, password })
@@ -642,7 +642,7 @@ function ConnectedChannelsList() {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${API_URL}/channels`)
+      const res = await apiFetch(`${API_URL}/channels`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.channels.loadFailed'))
       setChannels(data.channels || [])
@@ -657,7 +657,7 @@ function ConnectedChannelsList() {
     if (!confirm(t('settings.channels.disconnectConfirm', { name: ch.custom_name || ch.display_name || t(PLATFORM_META[ch.platform].labelKey) }))) return
     setDeletingId(ch.id)
     try {
-      const res = await fetch(`${API_URL}/channels/${ch.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/channels/${ch.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.channels.disconnectFailed'))
       toast.success(t('settings.channels.disconnected'))
@@ -678,7 +678,7 @@ function ConnectedChannelsList() {
   const saveEdit = async (ch) => {
     setSavingId(ch.id)
     try {
-      const res = await fetch(`${API_URL}/channels/${ch.id}`, {
+      const res = await apiFetch(`${API_URL}/channels/${ch.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ custom_name: editValue.trim() })
       })
@@ -832,7 +832,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
   const saveName = async () => {
     setSaving(true)
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}`, {
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}`, {
         method: 'PATCH', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ custom_name: name.trim() })
       })
@@ -851,7 +851,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
     if (!confirm(t('settings.channels.disconnectConfirm', { name: channel.custom_name || channel.display_name || metaLabel }))) return
     setDisconnecting(true)
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.channels.disconnectFailed'))
       toast.success(t('settings.channels.disconnected'))
@@ -870,7 +870,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
     if (!confirm(t('settings.channels.deleteForeverConfirm2'))) return
     setDeletingForever(true)
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}/permanent`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/permanent`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.common.deleteFailed'))
       toast.success(t('settings.channels.deletedForever'))
@@ -980,7 +980,7 @@ function ChannelTemplates({ channel }) {
     setLoading(true)
     setError('')
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}/templates`)
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/templates`)
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.templates.loadFailed'))
       setTemplates(data.templates || [])
@@ -995,7 +995,7 @@ function ChannelTemplates({ channel }) {
     if (!confirm(t('settings.templates.deleteConfirm', { name: tpl.name }))) return
     setDeleting(tpl.name)
     try {
-      const res = await fetch(`${API_URL}/channels/${channel.id}/templates/${encodeURIComponent(tpl.name)}`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/templates/${encodeURIComponent(tpl.name)}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.common.deleteFailed'))
       toast.success(t('settings.templates.deleted'))
@@ -1189,7 +1189,7 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
       if (upErr) throw new Error(t('settings.templates.uploadFileFailed'))
       const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
 
-      const res = await fetch(`${API_URL}/channels/${channel.id}/templates/sample-handle`, {
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/templates/sample-handle`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ media_url: urlData.publicUrl, mime_type: file.type, format: header.format })
       })
@@ -1565,7 +1565,7 @@ function ConnectNewChannel() {
 
   const finishFacebookConnect = async (userAccessToken) => {
     try {
-      const res = await fetch(`${API_URL}/channels/facebook/connect`, {
+      const res = await apiFetch(`${API_URL}/channels/facebook/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_access_token: userAccessToken, agent_id: agent?.id })
@@ -1620,7 +1620,7 @@ function ConnectNewChannel() {
   const connectWhatsappQr = async () => {
     setConnecting('whatsapp_qr')
     try {
-      const res = await fetch(`${API_URL}/channels/whatsapp-qr/connect`, {
+      const res = await apiFetch(`${API_URL}/channels/whatsapp-qr/connect`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent?.id })
       })
@@ -1639,7 +1639,7 @@ function ConnectNewChannel() {
     let cancelled = false
     const poll = setInterval(async () => {
       try {
-        const res = await fetch(`${API_URL}/channels/${qrModal.channelId}/qr`)
+        const res = await apiFetch(`${API_URL}/channels/${qrModal.channelId}/qr`)
         const data = await res.json()
         if (cancelled) return
         if (data.status === 'active') {
@@ -1655,7 +1655,7 @@ function ConnectNewChannel() {
 
   const finishWhatsAppConnect = async (code, sessionInfo) => {
     try {
-      const res = await fetch(`${API_URL}/channels/whatsapp/connect`, {
+      const res = await apiFetch(`${API_URL}/channels/whatsapp/connect`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -2416,7 +2416,7 @@ function AiAgentTab() {
     if (sourceForm.type === 'link' && !sourceForm.url.trim()) { toast.error(t('settings.ai.urlRequired')); return }
     setSavingSource(true)
     try {
-      const res = await fetch(`${API_URL}/ai/knowledge-sources`, {
+      const res = await apiFetch(`${API_URL}/ai/knowledge-sources`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(sourceForm)
@@ -2437,7 +2437,7 @@ function AiAgentTab() {
   const refreshSource = async (id) => {
     setRefreshingId(id)
     try {
-      const res = await fetch(`${API_URL}/ai/knowledge-sources/${id}/refresh`, { method: 'POST' })
+      const res = await apiFetch(`${API_URL}/ai/knowledge-sources/${id}/refresh`, { method: 'POST' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.ai.refreshSourceFailed'))
       toast.success(t('settings.ai.pageRefreshed'))

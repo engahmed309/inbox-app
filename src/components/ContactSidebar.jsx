@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
@@ -79,7 +79,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   // يبقى واضح إن المحادثة الواحدة دي بتجمّع كل الأرقام مع بعض بدل ما تتقسم لمحادثات منفصلة
   useEffect(() => {
     if (conv?.platform !== 'whatsapp' || !conv?.id) { setConnectedChannels([]); return }
-    fetch(`${API_URL}/conversations/${conv.id}/channels`)
+    apiFetch(`${API_URL}/conversations/${conv.id}/channels`)
       .then(r => r.json())
       .then(data => setConnectedChannels(data.channels || []))
       .catch(() => setConnectedChannels([]))
@@ -211,7 +211,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
     setDeleting(true)
     try {
-      const res = await fetch(`${API_URL}/contacts/${contact.id}`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/contacts/${contact.id}`, { method: 'DELETE' })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('contactSidebar.dangerZone.deleteError'))
       toast.success(t('contactSidebar.dangerZone.deleteSuccess'))

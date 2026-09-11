@@ -3,7 +3,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useTranslation } from 'react-i18next'
 import { useAuth } from './contexts/AuthContext'
 import { useToast } from './contexts/ToastContext'
-import { API_URL } from './lib/supabase'
+import { API_URL, apiFetch } from './lib/supabase'
 import LoginScreen from './screens/LoginScreen'
 import ConversationsScreen from './screens/ConversationsScreen'
 import ChatScreen from './screens/ChatScreen'
@@ -52,7 +52,7 @@ function InstagramOAuthHandler() {
     sessionStorage.removeItem('ig_connect_pending')
     window.history.replaceState({}, '', location.pathname) // شيل ?code= من الرابط فورًا
 
-    fetch(`${API_URL}/channels/instagram/connect`, {
+    apiFetch(`${API_URL}/channels/instagram/connect`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ code })

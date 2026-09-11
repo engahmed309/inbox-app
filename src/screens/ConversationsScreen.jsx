@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -413,7 +413,7 @@ export default function ConversationsScreen() {
     // كل القنوات المتربطة (ممكن يكون أكتر من واحدة لنفس المنصة) — عشان نعرض تاب منفصل لكل واحدة
     // بدل ما يترصوا فوق بعض، ونوري اسم القناة جوه كل كارت محادثة وجوه الشات نفسه
     try {
-      const res = await fetch(`${API_URL}/channels`)
+      const res = await apiFetch(`${API_URL}/channels`)
       const data = await res.json()
       const chs = (data.channels || []).filter(c => c.id && c.status === 'active')
       setAllChannels(chs); screenCache.allChannels = chs
@@ -423,7 +423,7 @@ export default function ConversationsScreen() {
     setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
 
     try {
-      const res = await fetch(`${API_URL}/ads/campaigns`)
+      const res = await apiFetch(`${API_URL}/ads/campaigns`)
       const data = await res.json()
       setCampaigns(data.campaigns || []); screenCache.campaigns = data.campaigns || []
     } catch { /* لو فشل، فلتر الحملات هيفضل فاضي بس باقي الفلاتر تفضل شغالة */ }
@@ -715,7 +715,7 @@ export default function ConversationsScreen() {
   // بيوصل إشعار لصاحب المحادثة وهو يقبل أو يرفض
   const requestTransfer = async (conv) => {
     try {
-      const res = await fetch(`${API_URL}/notifications/transfer-request`, {
+      const res = await apiFetch(`${API_URL}/notifications/transfer-request`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: conv.id, from_agent_id: agent?.id })
@@ -897,7 +897,7 @@ export default function ConversationsScreen() {
     let successCount = 0
     await Promise.all(eligible.map(async c => {
       try {
-        const res = await fetch(`${API_URL}/reply`, {
+        const res = await apiFetch(`${API_URL}/reply`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversation_id: c.id, content: text, content_type: 'text', agent_id: agent?.id })
@@ -1477,7 +1477,7 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
     }
     setSending(true)
     try {
-      const res = await fetch(`${API_URL}/conversations/start`, {
+      const res = await apiFetch(`${API_URL}/conversations/start`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: name.trim(), phone: phone.trim(), channel_id: channelId, agent_id: agentId })
       })

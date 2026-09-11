@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { X, Paperclip } from 'lucide-react'
@@ -39,7 +39,7 @@ export default function RequestAdminModal({ type, onClose }) {
           payload.file_type = fileType(file)
         }
       }
-      const res = await fetch(`${API_URL}/agent-requests`, {
+      const res = await apiFetch(`${API_URL}/agent-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent?.id, type, payload })

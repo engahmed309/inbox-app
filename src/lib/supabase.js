@@ -7,6 +7,16 @@ export const supabase = createClient(
 
 export const API_URL = 'https://inbox-api.sehawafeya.com'
 
+// نفس شكل fetch() بالظبط، بس بيحط توكن الجلسة الحقيقي (Authorization: Bearer ...) تلقائيًا —
+// السيرفر بقى بيتحقق منه على كل route محتاج موظف مسجّل دخول (بدل ما نبعت agent_id في الطلب
+// ونثق فيه من غير تحقق). أي نداء لـ API_URL لازم يستخدمها بدل fetch() العادي
+export async function apiFetch(url, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession()
+  const headers = { ...(options.headers || {}) }
+  if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
+  return fetch(url, { ...options, headers })
+}
+
 // معرفات عامة بتاعة تطبيق ميتا (مش سرية) — لازمة لتشغيل SDK بتاع فيسبوك وربط القنوات من جوه التطبيق
 export const FB_APP_ID = '1617615039978745'
 export const WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID = '1009143671730527'

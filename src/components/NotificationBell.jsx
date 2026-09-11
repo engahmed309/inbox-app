@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../lib/locale'
@@ -69,7 +69,7 @@ export default function NotificationBell() {
   const respondTransfer = async (n, accept) => {
     setBusyId(n.id)
     try {
-      const res = await fetch(`${API_URL}/notifications/${n.id}/respond-transfer`, {
+      const res = await apiFetch(`${API_URL}/notifications/${n.id}/respond-transfer`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accept })
@@ -88,7 +88,7 @@ export default function NotificationBell() {
   const respondAdminRequest = async (n, accept) => {
     setBusyId(n.id)
     try {
-      const res = await fetch(`${API_URL}/admin-requests/${n.request_id}/respond`, {
+      const res = await apiFetch(`${API_URL}/admin-requests/${n.request_id}/respond`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accept, admin_id: agent?.id })

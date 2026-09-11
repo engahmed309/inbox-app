@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
@@ -283,12 +283,12 @@ export default function ChatScreen() {
           .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
       }
       // إيصال قراءة فعلي على المنصة نفسها (تيك أزرق للعميل) — منفصل تمامًا عن القراءة الداخلية فوق
-      fetch(`${API_URL}/conversations/${id}/mark-seen`, { method: 'POST' }).catch(() => {})
+      apiFetch(`${API_URL}/conversations/${id}/mark-seen`, { method: 'POST' }).catch(() => {})
 
       // القنوات المتصلة بمحادثة الواتساب دي (كل رقم كلّم بيه العميل) — لتحديد رقم افتراضي وعرضها للموظف
       if (convData?.platform === 'whatsapp' || convData?.platform === 'whatsapp_qr') {
         try {
-          const chRes = await fetch(`${API_URL}/conversations/${id}/channels`)
+          const chRes = await apiFetch(`${API_URL}/conversations/${id}/channels`)
           const chData = await chRes.json()
           setConnectedChannels(chData.channels || [])
         } catch { setConnectedChannels([]) }
@@ -436,7 +436,7 @@ export default function ChatScreen() {
     let cancelled = false
     const checkChannel = async () => {
       try {
-        const res = await fetch(`${API_URL}/channels`)
+        const res = await apiFetch(`${API_URL}/channels`)
         const data = await res.json()
         if (cancelled) return
         // لو المحادثة دي مرتبطة برقم/قناة معينة، اتأكد من القناة دي بالظبط (مش أي قناة من نفس المنصة)
@@ -495,7 +495,7 @@ export default function ChatScreen() {
   }
 
   const sendOne = async (content, content_type, media_url, replyToId) => {
-    const res = await fetch(`${API_URL}/reply`, {
+    const res = await apiFetch(`${API_URL}/reply`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
@@ -587,7 +587,7 @@ export default function ChatScreen() {
     if (!noteContent || sendingNote) return
     setSendingNote(true)
     try {
-      const res = await fetch(`${API_URL}/notes`, {
+      const res = await apiFetch(`${API_URL}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: id, content: noteContent, agent_id: agent?.id })
@@ -625,7 +625,7 @@ export default function ChatScreen() {
     const newLabel = t(STATUS_OPTS.find(o => o.key === s)?.labelKey || s)
     if (oldLabel !== newLabel) logActivity(id, agent?.id, t('chat.activity.statusChanged', { from: oldLabel, to: newLabel }))
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
-    if (s === 'closed') fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+    if (s === 'closed') apiFetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
   }
 
   // بيحسب افتراضي معقول (بعد ساعة من دلوقتي) عشان يبقى فيه قيمة جاهزة في المودال بدل مربع فاضي
@@ -665,7 +665,7 @@ export default function ChatScreen() {
 
     if (followUpNote.trim()) {
       try {
-        const res = await fetch(`${API_URL}/notes`, {
+        const res = await apiFetch(`${API_URL}/notes`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ conversation_id: id, content: t('chat.followUpNote.prefix', { time: readableTime, note: followUpNote.trim() }), agent_id: agent?.id })
@@ -735,7 +735,7 @@ export default function ChatScreen() {
   const suggestReply = async () => {
     setSuggesting(true)
     try {
-      const res = await fetch(`${API_URL}/ai/suggest-reply`, {
+      const res = await apiFetch(`${API_URL}/ai/suggest-reply`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ conversation_id: id })
@@ -875,7 +875,7 @@ export default function ChatScreen() {
         ref.lastSentAt = now
         const label = agent?.name || t('chat.common.agentFallback')
         typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: true, label, agentId: agent?.id } })
-        fetch(`${API_URL}/conversations/${id}/typing`, {
+        apiFetch(`${API_URL}/conversations/${id}/typing`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: true })
         }).catch(() => {})
       }
@@ -884,7 +884,7 @@ export default function ChatScreen() {
       ref.lastSentAt = 0
       const label = agent?.name || t('chat.common.agentFallback')
       typingChannelRef.current?.send({ type: 'broadcast', event: 'typing', payload: { typing: false, label, agentId: agent?.id } })
-      fetch(`${API_URL}/conversations/${id}/typing`, {
+      apiFetch(`${API_URL}/conversations/${id}/typing`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ typing: false })
       }).catch(() => {})
     }
@@ -1738,7 +1738,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   // القوالب بتتعمل على مستوى كل رقم لوحده، فالموظف لازم يقدر يختار الرقم اللي هيبعت منه —
   // مش بس رقم المحادثة الحالي. بنجيب كل أرقام الواتساب النشطة مش اللي كلّمت العميل بس
   useEffect(() => {
-    fetch(`${API_URL}/channels`)
+    apiFetch(`${API_URL}/channels`)
       .then(r => r.json())
       .then(d => {
         const wa = (d.channels || []).filter(c => c.platform === 'whatsapp' && c.status === 'active')
@@ -1754,7 +1754,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
     setSelected(null)
     setParams([])
     setError('')
-    fetch(`${API_URL}/channels/${activeChannelId}/templates`)
+    apiFetch(`${API_URL}/channels/${activeChannelId}/templates`)
       .then(r => r.json())
       .then(d => {
         if (d.error) throw new Error(d.error)
@@ -1775,7 +1775,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
     }
     setSending(true)
     try {
-      const res = await fetch(`${API_URL}/reply-template`, {
+      const res = await apiFetch(`${API_URL}/reply-template`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversation_id: conversationId, template_name: selected.name,

@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, useRef } from 'react'
 import i18n from '../i18n'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
@@ -33,7 +33,7 @@ export function AuthProvider({ children }) {
     setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online', last_seen_at: now } : prev)
     // لما موظف يبقى متاح، حاول توزّع أي محادثات كانت مستنية موظف فاضي
     if (status === 'online') {
-      fetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+      apiFetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
     }
   }
 

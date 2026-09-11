@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { supabase, API_URL } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { Bell, BellOff, Volume2, VolumeX, X } from 'lucide-react'
@@ -54,7 +54,7 @@ export default function PushNotificationToggle() {
       setPermission(perm)
       if (perm !== 'granted') { toast.error(t('pushToggle.permissionRequired')); return }
 
-      const keyRes = await fetch(`${API_URL}/push/vapid-public-key`)
+      const keyRes = await apiFetch(`${API_URL}/push/vapid-public-key`)
       const keyData = await keyRes.json()
       if (!keyRes.ok) throw new Error(keyData.error || t('pushToggle.enableFailed'))
 
@@ -67,7 +67,7 @@ export default function PushNotificationToggle() {
         })
       }
 
-      const res = await fetch(`${API_URL}/push/subscribe`, {
+      const res = await apiFetch(`${API_URL}/push/subscribe`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ agent_id: agent.id, subscription: sub.toJSON() })
@@ -89,7 +89,7 @@ export default function PushNotificationToggle() {
       const reg = await navigator.serviceWorker.ready
       const sub = await reg.pushManager.getSubscription()
       if (sub) {
-        await fetch(`${API_URL}/push/unsubscribe`, {
+        await apiFetch(`${API_URL}/push/unsubscribe`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ endpoint: sub.endpoint })
