@@ -4,13 +4,6 @@ import { supabase, API_URL } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
-// حل مؤقت لعطل عند Supabase: الجلسات (session tokens) اللي بيصدرها تسجيل الدخول حاليًا بترجع
-// 401/406 في أي طلب بعدها، حتى لو الباسورد صح والبيانات والصلاحيات سليمة. الحل: نتحقق من الباسورد/جوجل
-// عادي زي المعتاد (ده لسه شغال 100% عند Supabase)، وبمجرد ما ينجح، نمسح الجلسة المكسورة على طول
-// ونكمل بمفتاح anon (اللي فتحنا له صلاحية مؤقتة في RLS) بدل الاعتماد على الجلسة نفسها. لازم نلغي
-// الحيلة دي (هي وصلاحية RLS المصاحبة لها) أول ما عطل Supabase يتصلح رسميًا.
-const ACTIVE_AGENT_KEY = 'active_agent_id'
-
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [agent, setAgent] = useState(null)
@@ -44,8 +37,8 @@ export function AuthProvider({ children }) {
     }
   }
 
-  // بيتنفذ بعد ما نتأكد إن authUser فعلاً اتحقق منه (باسورد صح أو جوجل)، وبعد ما نكون مسحنا
-  // الجلسة المكسورة بالفعل — فكل الاستعلامات هنا بتمشي بمفتاح anon
+  // بيتنفذ بعد ما نتأكد إن authUser فعلاً اتحقق منه (باسورد صح أو جوجل) — الجلسة الحقيقية شغالة
+  // من هنا، فكل الاستعلامات بتمشي بهوية الموظف الموثّقة (role: authenticated) مش anon
   async function finishLogin(authUser) {
     const ag = await loadAgent(authUser)
     if (!ag) {
@@ -70,7 +63,6 @@ export function AuthProvider({ children }) {
       if (updated) finalAgent = updated
     }
 
-    localStorage.setItem(ACTIVE_AGENT_KEY, finalAgent.id)
     setAuthError('')
     setUser({ id: authUser.id, email: authUser.email })
     setAgent(finalAgent)
@@ -87,30 +79,10 @@ export function AuthProvider({ children }) {
       setAgent(null)
       return
     }
-    const authUser = session.user
-    // نمسح الجلسة على طول — التحقق من الباسورد/جوجل نفسه اتأكد بنجاحه (وصلنا هنا أصلاً)، بس
-    // الجلسة دي هترفض في أي طلب بعدها لو استخدمناها، فبنعتمد بدالها على مفتاح anon
-    await supabase.auth.signOut()
-    await finishLogin(authUser)
+    await finishLogin(session.user)
   }
 
   useEffect(() => {
-    // لو عندنا موظف مسجل دخول محفوظ محليًا من قبل (بعد نجاح تحقق حقيقي)، رجّعه على طول من غير
-    // ما نمر على نظام الجلسات المكسور خالص
-    const savedAgentId = localStorage.getItem(ACTIVE_AGENT_KEY)
-    if (savedAgentId) {
-      supabase.from('agents').select('*').eq('id', savedAgentId).single().then(({ data, error }) => {
-        if (error || !data) {
-          localStorage.removeItem(ACTIVE_AGENT_KEY)
-        } else {
-          setUser({ id: data.auth_id || data.id, email: data.email })
-          setAgent(data)
-        }
-        setLoading(false)
-      })
-      return
-    }
-
     supabase.auth.getSession().then(async ({ data: { session } }) => {
       await handleSession(session)
       setLoading(false)
@@ -169,7 +141,6 @@ export function AuthProvider({ children }) {
 
   const signOut = async () => {
     if (agent) await setStatus(agent.id, 'offline')
-    localStorage.removeItem(ACTIVE_AGENT_KEY)
     setUser(null)
     setAgent(null)
     await supabase.auth.signOut()
