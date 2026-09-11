@@ -286,39 +286,8 @@ function DateRangeFilter({ range, setRange, customFrom, setCustomFrom, customTo,
 // تقريرين قريبين من بعض في تاب واحد بتبديلة: "عملاء جدد" = أول مرة يبقى ليهم contact في الداتابيز
 // خالص (contacts.created_at)، و"كل العملاء اللي كلموا" = أي عميل بعت رسالة في اليوم ده حتى لو
 // مش أول مرة (عدد مختلف كل يوم، من غير تكرار لو كلّم أكتر من مرة في نفس اليوم)
-// بتجيب مجموعة IDs العملاء اللي بيطابقوا كل الفلاتر المفعّلة مع بعض (AND بين الأنواع المختلفة).
-// null معناها مفيش فلتر خالص (كل العملاء). كل فلتر بيتحسب لوحده كـ Set وبعدين بنتقاطعهم مع بعض
-async function getFilteredContactIds({ lifecycle, tag, channel, campaign }, campaignsList) {
-  const sets = []
-  if (lifecycle) {
-    const rows = await fetchAllRows(() => supabase.from('contacts').select('id').eq('lifecycle_stage_id', lifecycle))
-    sets.push(new Set(rows.map(r => r.id)))
-  }
-  if (tag) {
-    const rows = await fetchAllRows(() => supabase.from('contact_tags').select('contact_id').eq('tag_id', tag))
-    sets.push(new Set(rows.map(r => r.contact_id)))
-  }
-  if (channel) {
-    const rows = await fetchAllRows(() => supabase.from('conversations').select('contact_id').eq('channel_id', channel))
-    sets.push(new Set(rows.map(r => r.contact_id)))
-  }
-  if (campaign) {
-    const [type, id] = campaign.split(':')
-    let rows
-    if (type === 'ad') {
-      rows = await fetchAllRows(() => supabase.from('conversations').select('contact_id').eq('ad_referral->>ad_id', id))
-    } else {
-      // فلتر حملة كاملة — نلاقي كل الإعلانات اللي تحتها من القايمة الجاية من ميتا، ونفلتر بيهم كلهم
-      const campaignAdIds = (campaignsList.find(c => c.id === id)?.ads || []).map(a => a.id)
-      rows = campaignAdIds.length
-        ? await fetchAllRows(() => supabase.from('conversations').select('contact_id').in('ad_referral->>ad_id', campaignAdIds))
-        : []
-    }
-    sets.push(new Set(rows.map(r => r.contact_id)))
-  }
-  if (!sets.length) return null
-  return sets.reduce((a, b) => new Set([...a].filter(x => b.has(x))))
-}
+// الفلاتر (لايف سايكل/تاج/قناة/حملة) بتتبعت للسيرفر وتتطبّق كـ SQL مباشر (endpoint
+// /reports/customers-timeseries) بدل ما نجيب كل الصفوف المطابقة هنا ونقاطعهم يدويًا
 
 // فلتر العملاء الإضافي — لايف سايكل، تاج، قناة، وحملة/إعلان ممول. بيتحط جنب فلتر المدة الزمنية
 // وينفع يتجمّع أكتر من فلتر مع بعض. قايمة الحملات جاية من حساب الإعلانات على ميتا نفسه
@@ -429,68 +398,34 @@ function CustomersTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    const allowedIds = await getFilteredContactIds(filters, campaigns)
-
-    let dayOf // (row) => Date لليوم اللي الصف ده بيتحسب عليه
-    let entries
-    if (metric === 'new') {
-      const buildQ = () => {
-        let q = supabase.from('contacts').select('id, created_at').order('created_at', { ascending: true })
-        if (from) q = q.gte('created_at', from)
-        if (to) q = q.lte('created_at', to)
-        if (allowedIds) q = q.in('id', allowedIds.size ? [...allowedIds] : ['00000000-0000-0000-0000-000000000000'])
-        return q
-      }
-      entries = await fetchAllRows(buildQ)
-      dayOf = (r) => new Date(r.created_at)
-    } else {
-      // Monthly Active Contacts بتقسيم يومي (زي respond.io): العميل بيتعدّ مرة واحدة بس في الشهر —
-      // يوم أول رسالة منه في الشهر ده، بغض النظر لو كان عميل قديم أو جديد أو كلّم قبل كده امتى.
-      // لو كلّم تاني في نفس الشهر مايتعدش تاني، ولو الشهر خلص وكلّم في اللي بعده بيتعد جديد فيه.
-      // عشان نحدد "أول رسالة في الشهر" صح حتى لو الفترة المختارة بادئة من نص الشهر، بنجيب الرسايل
-      // من أول الشهر اللي فيه بداية الفترة، ونعرض بس الأيام اللي جوه الفترة المطلوبة فعليًا
-      const rangeStart = from ? new Date(from) : null
-      const monthStart = rangeStart ? new Date(rangeStart.getFullYear(), rangeStart.getMonth(), 1) : null
-
-      const buildQ = () => {
-        let q = supabase.from('messages')
-          .select('created_at, conversations!inner(contact_id, channel_id)')
-          .eq('direction', 'inbound').neq('content_type', 'note')
-          .order('created_at', { ascending: true })
-        if (monthStart) q = q.gte('created_at', monthStart.toISOString())
-        if (to) q = q.lte('created_at', to)
-        if (filters.channel) q = q.eq('conversations.channel_id', filters.channel)
-        return q
-      }
-      const raw = await fetchAllRows(buildQ)
-      const filtered = allowedIds ? raw.filter(r => allowedIds.has(r.conversations?.contact_id)) : raw
-
-      const firstInMonth = {} // "contactId|YYYY-M" -> أقدم Date لرسالة العميل ده في الشهر ده
-      filtered.forEach(r => {
-        const contactId = r.conversations?.contact_id
-        if (!contactId) return
-        const d = new Date(r.created_at)
-        const mKey = `${contactId}|${d.getFullYear()}-${d.getMonth()}`
-        if (!firstInMonth[mKey] || d < firstInMonth[mKey]) firstInMonth[mKey] = d
-      })
-
-      const fromDate = from ? new Date(from) : null
-      const toDate = to ? new Date(to) : null
-      entries = Object.values(firstInMonth)
-        .filter(d => (!fromDate || d >= fromDate) && (!toDate || d <= toDate))
-        .map(d => ({ created_at: d.toISOString() }))
-      dayOf = (r) => new Date(r.created_at)
+    const params = new URLSearchParams({ metric })
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    if (filters.lifecycle) params.set('lifecycle', filters.lifecycle)
+    if (filters.tag) params.set('tag', filters.tag)
+    if (filters.channel) params.set('channel', filters.channel)
+    if (filters.campaign) {
+      const [ctype, cid] = filters.campaign.split(':')
+      const adIds = ctype === 'ad' ? [cid] : (campaigns.find(c => c.id === cid)?.ads || []).map(a => a.id)
+      if (adIds.length) params.set('campaignAdIds', adIds.join(','))
     }
 
-    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم تاريخ موجود في البيانات
-    const times = entries.map(r => dayOf(r).getTime())
+    let dayBuckets = [], apiTotal = 0
+    try {
+      const res = await fetch(`${API_URL}/reports/customers-timeseries?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      dayBuckets = data.buckets || []
+      apiTotal = data.total || 0
+    } catch { /* بنسيب dayBuckets فاضية، هيعرض "مفيش بيانات" */ }
+
+    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم يوم راجع من السيرفر
+    const times = dayBuckets.map(b => new Date(b.day).getTime())
     const startDate = from ? new Date(from) : new Date(times.length ? Math.min(...times) : Date.now())
     const endDate = to ? new Date(to) : new Date()
     const spanDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
     const granularity = spanDays > 45 ? 'week' : 'day'
 
-    // entries هنا دايمًا مجموعة "لحظة تُحسب" واحدة لكل عدّة (مش محتاجين dedup تاني هنا — الـ
-    // dedup الشهري لمتريك "active" اتعمل فوق قبل ما نوصل هنا)
     const buckets = []
     const bucketMap = {}
     if (granularity === 'day') {
@@ -513,15 +448,15 @@ function CustomersTab() {
       }
     }
 
-    entries.forEach(r => {
-      const d = dayOf(r)
+    dayBuckets.forEach(b => {
+      const d = new Date(b.day)
       const key = granularity === 'day' ? dayKey(d) : dayKey(mondayOf(d))
       const bucket = bucketMap[key]
-      if (bucket) bucket.count++
+      if (bucket) bucket.count += b.count
     })
 
     setChartData(buckets.map(({ key, label, count }) => ({ key, label, count })))
-    setTotal(entries.length)
+    setTotal(apiTotal)
     setLoading(false)
   }
 
@@ -602,19 +537,17 @@ function CountriesTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    const buildQ = () => {
-      let q = supabase.from('contacts').select('country, created_at')
-      if (from) q = q.gte('created_at', from)
-      if (to) q = q.lte('created_at', to)
-      return q
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    try {
+      const res = await fetch(`${API_URL}/reports/countries?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setRows((data.rows || []).map(r => ({ country: r.country || t('reports.countries.none'), count: r.count })))
+    } catch {
+      setRows([])
     }
-    const entries = await fetchAllRows(buildQ)
-    const map = {}
-    entries.forEach(r => {
-      const key = r.country?.trim() || t('reports.countries.none')
-      map[key] = (map[key] || 0) + 1
-    })
-    setRows(Object.entries(map).map(([country, count]) => ({ country, count })).sort((a, b) => b.count - a.count))
     setLoading(false)
   }
 
@@ -686,7 +619,9 @@ function OverviewTab() {
   const [customTo, setCustomTo] = useState('')
   const [channel, setChannel] = useState('all') // 'all' أو channel_id بعينه
   const [channelsList, setChannelsList] = useState([]) // القنوات المتربطة فعلياً، كل واحدة باسمها الحقيقي
-  const [rows, setRows] = useState([]) // بيانات العملاء الخام بعد الفلترة، عشان نجمّعها محلياً
+  const [byChannel, setByChannel] = useState([]) // [{day, channel_id, count}] من السيرفر
+  const [byLifecycle, setByLifecycle] = useState([]) // [{lifecycle_stage_id, name, color, count}] من السيرفر
+  const [apiTotal, setApiTotal] = useState(0)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -723,16 +658,20 @@ function OverviewTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = getDateBounds()
-    const buildQ = () => {
-      let q = supabase.from('conversations')
-        .select('id, platform, channel_id, created_at, contact_id, contacts(lifecycle_stage_id, lifecycle_stages(name, color))')
-        .order('id', { ascending: true })
-      if (channel !== 'all') q = q.eq('channel_id', channel)
-      if (from) q = q.gte('created_at', from)
-      if (to) q = q.lte('created_at', to)
-      return q
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    if (channel !== 'all') params.set('channel', channel)
+    try {
+      const res = await fetch(`${API_URL}/reports/overview?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setByChannel(data.byChannel || [])
+      setByLifecycle(data.byLifecycle || [])
+      setApiTotal(data.total || 0)
+    } catch {
+      setByChannel([]); setByLifecycle([]); setApiTotal(0)
     }
-    setRows(await fetchAllRows(buildQ))
     setLoading(false)
   }
 
@@ -743,12 +682,13 @@ function OverviewTab() {
     return list.map((c, i) => ({ key: c.id, label: getChannelLabel(c) || c.platform, color: CHANNEL_COLOR_PALETTE[i % CHANNEL_COLOR_PALETTE.length] }))
   }, [channelsList, channel])
 
-  // تجميع البيانات الخام: توزيع يومي/أسبوعي لكل قناة + توزيع الـ lifecycle — بيتحسب مرة واحدة لحد ما rows تتغير
+  // تجميع البيانات المجمّعة من السيرفر: توزيع يومي/أسبوعي لكل قناة + توزيع الـ lifecycle —
+  // بيتحسب مرة واحدة لحد ما byChannel/byLifecycle تتغيّر (مصفوفات صغيرة جاهزة من الـ endpoint)
   const { chartData, lifecycleData, total } = useMemo(() => {
     const { from, to } = getDateBounds()
 
-    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم تاريخ موجود في البيانات
-    const createdTimes = rows.map(r => new Date(r.created_at).getTime())
+    // حدود الفترة الفعلية: لو مفيش حد "من" (فترة "الكل")، بناخد أقدم يوم راجع من السيرفر
+    const createdTimes = byChannel.map(r => new Date(r.day).getTime())
     const startDate = from ? new Date(from) : new Date(createdTimes.length ? Math.min(...createdTimes) : Date.now())
     const endDate = to ? new Date(to) : new Date()
     const spanDays = Math.max(1, Math.round((endDate - startDate) / 86400000))
@@ -778,24 +718,26 @@ function OverviewTab() {
       }
     }
 
-    const lifecycleMap = {} // { stageId|'none': { name, color, count } }
-    rows.forEach(r => {
-      const key = granularity === 'day' ? dayKey(r.created_at) : dayKey(mondayOf(r.created_at))
+    byChannel.forEach(r => {
+      const d = new Date(r.day)
+      const key = granularity === 'day' ? dayKey(d) : dayKey(mondayOf(d))
       const bucket = bucketMap[key]
-      if (bucket && r.channel_id in bucket) bucket[r.channel_id]++
+      if (bucket && r.channel_id in bucket) bucket[r.channel_id] += r.count
+    })
 
-      const stage = r.contacts?.lifecycle_stages
-      const stageKey = r.contacts?.lifecycle_stage_id || 'none'
-      if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: stage?.name || t('reports.overview.noStage'), color: stage?.color || '#78716C', count: 0 }
-      lifecycleMap[stageKey].count++
+    const lifecycleMap = {} // { stageId|'none': { name, color, count } }
+    byLifecycle.forEach(r => {
+      const stageKey = r.lifecycle_stage_id || 'none'
+      if (!lifecycleMap[stageKey]) lifecycleMap[stageKey] = { name: r.name || t('reports.overview.noStage'), color: r.color || '#78716C', count: 0 }
+      lifecycleMap[stageKey].count += r.count
     })
 
     return {
       chartData: buckets,
       lifecycleData: Object.values(lifecycleMap).sort((a, b) => b.count - a.count),
-      total: rows.length,
+      total: apiTotal,
     }
-  }, [rows, activeChannels, range, customFrom, customTo])
+  }, [byChannel, byLifecycle, apiTotal, activeChannels, range, customFrom, customTo])
 
   const chartTheme = isDark
     ? { grid: '#2c2c2a', axis: '#71717a', tooltipBg: '#212127', tooltipBorder: '#36363e', text: '#f8f8fa' }
@@ -1383,51 +1325,28 @@ function PerformanceTab() {
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    const buildQ = () => {
-      let q = supabase.from('messages')
-        .select('conversation_id, direction, sent_by_agent_id, content_type, created_at')
-        .neq('content_type', 'note')
-        .order('created_at', { ascending: true })
-      if (from) q = q.gte('created_at', from)
-      if (to) q = q.lte('created_at', to)
-      return q
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    try {
+      const res = await fetch(`${API_URL}/reports/performance?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setRows(data.rows || [])
+    } catch {
+      setRows([])
     }
-    setRows(await fetchAllRows(buildQ))
     setLoading(false)
   }
 
   const stats = useMemo(() => {
-    // اجمع الرسايل حسب المحادثة عشان نمشي على كل محادثة لوحدها بترتيبها الزمني
-    const byConv = {}
-    rows.forEach(m => { (byConv[m.conversation_id] ||= []).push(m) })
-
-    const perAgent = {} // { agentId: { sent, received, replyTimes: [ms], customers: Set } }
-    const ensure = (id) => (perAgent[id] ||= { sent: 0, received: 0, replyTimes: [], customers: new Set() })
-
-    Object.entries(byConv).forEach(([convId, msgs]) => {
-      let lastInboundAt = null
-      msgs.forEach(m => {
-        if (m.direction === 'inbound') {
-          lastInboundAt = new Date(m.created_at)
-        } else if (m.direction === 'outbound' && m.sent_by_agent_id) {
-          const st = ensure(m.sent_by_agent_id)
-          st.sent++
-          st.customers.add(convId)
-          if (lastInboundAt) {
-            st.replyTimes.push(new Date(m.created_at) - lastInboundAt)
-            st.received++
-            lastInboundAt = null // الرد ده بيغطي رسالة العميل، من غير ما نعده تاني في رد جاي
-          }
-        }
-      })
-    })
-
+    const perAgent = Object.fromEntries(rows.map(r => [r.agent_id, r]))
     return agents.map(a => {
-      const st = perAgent[a.id] || { sent: 0, received: 0, replyTimes: [], customers: new Set() }
-      const avgReplyMs = st.replyTimes.length ? st.replyTimes.reduce((s, x) => s + x, 0) / st.replyTimes.length : null
+      const st = perAgent[a.id]
+      const avgReplyMs = st?.avg_reply_seconds != null ? Number(st.avg_reply_seconds) * 1000 : null
       return {
-        agent: a, sent: st.sent, received: st.received,
-        customers: st.customers.size, avgReplyMs
+        agent: a, sent: st?.sent || 0, received: st?.received || 0,
+        customers: st?.customers || 0, avgReplyMs
       }
     }).sort((a, b) => b.sent - a.sent)
   }, [rows, agents])
