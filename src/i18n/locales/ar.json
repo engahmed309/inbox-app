@@ -871,6 +871,7 @@
       "allStages": "كل المراحل"
     },
     "segments": {
+      "heading": "الشرائح",
       "builder": {
         "title": "شريحة جديدة",
         "editTitle": "تعديل الشريحة",

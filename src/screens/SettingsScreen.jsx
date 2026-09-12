@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
 import { formatNumber } from '../lib/locale'
-import SegmentBuilderModal from '../components/SegmentBuilderModal'
+import SegmentBuilder from '../components/SegmentBuilder'
 import TemplatePreview from '../components/TemplatePreview'
 import {
   Users, Tag, List, Settings2, Plus, Trash2,
@@ -1860,6 +1860,30 @@ function SegmentsTab() {
     }
   }
 
+  // شاشة ثابتة داخل نفس التاب (مش ديالوج عائم) — لما تبني/تعدّل شريحة، القايمة بتتخبى ومكانها
+  // بياخده الباني بعرض كامل، وترجع القايمة تاني لما تقفل أو تحفظ
+  if (showBuilder) {
+    return (
+      <div className="p-4">
+        <SegmentBuilder
+          segment={editingSegment}
+          lifecycles={lifecycles}
+          tagsList={tagsList}
+          allChannels={allChannels}
+          countryOptions={countryOptions}
+          onClose={() => setShowBuilder(false)}
+          onSaved={(saved) => {
+            setShowBuilder(false)
+            setSegments(prev => {
+              const exists = prev.some(s => s.id === saved.id)
+              return exists ? prev.map(s => s.id === saved.id ? saved : s) : [saved, ...prev]
+            })
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="p-4 space-y-3">
       <div className="flex items-center justify-between">
@@ -1880,24 +1904,6 @@ function SegmentsTab() {
       ))}
       {segments.length === 0 && (
         <p className="text-center text-fg-subtle text-sm py-6">{t('settings.segments.empty')}</p>
-      )}
-
-      {showBuilder && (
-        <SegmentBuilderModal
-          segment={editingSegment}
-          lifecycles={lifecycles}
-          tagsList={tagsList}
-          allChannels={allChannels}
-          countryOptions={countryOptions}
-          onClose={() => setShowBuilder(false)}
-          onSaved={(saved) => {
-            setShowBuilder(false)
-            setSegments(prev => {
-              const exists = prev.some(s => s.id === saved.id)
-              return exists ? prev.map(s => s.id === saved.id ? saved : s) : [saved, ...prev]
-            })
-          }}
-        />
       )}
     </div>
   )

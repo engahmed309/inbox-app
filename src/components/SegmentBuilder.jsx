@@ -29,7 +29,7 @@ function isValidCondition(c) {
 // موديال بناء/تعديل شريحة (segment) — لوحة جانبية (مش نافذة في النص) بتدعم أكتر من مجموعة شروط
 // (AND/OR بين المجموعات، وAND/OR داخل كل مجموعة لوحدها). دي مجرد أداة تعريف/إدارة شرائح — مش
 // بتعرض قائمة محادثات خلفها، بس عدد حي أثناء البناء عشان الأدمن يعرف حجم الشريحة قبل الحفظ
-export default function SegmentBuilderModal({ segment, lifecycles, tagsList, allChannels, countryOptions, onClose, onSaved }) {
+export default function SegmentBuilder({ segment, lifecycles, tagsList, allChannels, countryOptions, onClose, onSaved }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [name, setName] = useState(segment?.name || '')
@@ -157,15 +157,13 @@ export default function SegmentBuilderModal({ segment, lifecycles, tagsList, all
   }
 
   return (
-    <div className="absolute inset-0 z-50 flex justify-end">
-      <div className="absolute inset-0 bg-black/50" onClick={onClose} />
-      <div className="relative w-full sm:w-[420px] h-full bg-surface-1 flex flex-col shadow-2xl">
-        <div className="flex items-center justify-between p-4 border-b border-surface-3 flex-shrink-0">
+    <div className="bg-surface-2 rounded-2xl border border-surface-3 max-w-2xl">
+        <div className="flex items-center justify-between p-4 border-b border-surface-3">
           <h3 className="font-semibold text-fg">{segment ? t('conversations.segments.builder.editTitle') : t('conversations.segments.builder.title')}</h3>
           <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
         </div>
 
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="p-4 space-y-4">
           <input value={name} onChange={e => setName(e.target.value)} placeholder={t('conversations.segments.builder.namePlaceholder')}
             className="w-full bg-surface-3 rounded-xl py-2.5 px-4 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
 
@@ -231,14 +229,14 @@ export default function SegmentBuilderModal({ segment, lifecycles, tagsList, all
             <Plus size={14} /> {t('conversations.segments.builder.addGroup')}
           </button>
 
-          <div className="bg-surface-2 rounded-xl p-3 text-sm text-fg-muted sticky bottom-0">
+          <div className="bg-surface-3 rounded-xl p-3 text-sm text-fg-muted">
             {previewLoading ? t('conversations.segments.builder.counting')
               : previewCount === null ? t('conversations.segments.builder.noConditionsYet')
               : t('conversations.segments.builder.previewCount', { count: previewCount })}
           </div>
         </div>
 
-        <div className="flex gap-2 p-4 border-t border-surface-3 flex-shrink-0">
+        <div className="flex gap-2 p-4 border-t border-surface-3">
           <button onClick={resetFilter} className="px-4 py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium">
             {t('conversations.segments.builder.resetFilter')}
           </button>
@@ -246,7 +244,6 @@ export default function SegmentBuilderModal({ segment, lifecycles, tagsList, all
             {saving ? t('conversations.segments.builder.saving') : segment ? t('conversations.segments.builder.save') : t('conversations.segments.builder.saveAsNew')}
           </button>
         </div>
-      </div>
     </div>
   )
 }

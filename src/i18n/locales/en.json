@@ -871,6 +871,7 @@
       "allStages": "All stages"
     },
     "segments": {
+      "heading": "Segments",
       "builder": {
         "title": "New segment",
         "editTitle": "Edit segment",
