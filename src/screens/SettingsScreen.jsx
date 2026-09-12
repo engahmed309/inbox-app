@@ -7,12 +7,14 @@ import { useToast } from '../contexts/ToastContext'
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
 import { formatNumber } from '../lib/locale'
+import SegmentBuilderModal from '../components/SegmentBuilderModal'
+import TemplatePreview from '../components/TemplatePreview'
 import {
   Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode
+  QrCode, Filter
 } from 'lucide-react'
 
 const TABS = [
@@ -24,6 +26,7 @@ const TABS = [
   { key: 'quickreplies', labelKey: 'settings.tabs.quickReplies', icon: MessageSquareText },
   { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
+  { key: 'segments', labelKey: 'settings.tabs.segments', icon: Filter },
   { key: 'danger', labelKey: 'settings.tabs.danger', icon: AlertTriangle },
 ]
 
@@ -73,6 +76,7 @@ export default function SettingsScreen() {
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
         {tab === 'roundrobin' && <RoundRobinTab />}
         {tab === 'ai' && <AiAgentTab />}
+        {tab === 'segments' && <SegmentsTab />}
         {tab === 'danger' && <DangerZoneTab />}
       </div>
     </div>
@@ -1105,45 +1109,6 @@ const TEMPLATE_LANGS = [
   { code: 'en_US', labelKey: 'settings.templates.langs.enUs' },
 ]
 
-// معاينة شكل القالب في واتساب — بتتحدث مع الكتابة عشان الموظف يشوف الشكل النهائي قبل ما
-// يبعته لميتا للمراجعة (المتغيرات بتفضل ظاهرة زي ما هي لأن قيمتها بتتحدد وقت الإرسال)
-function TemplatePreview({ header, body, footer, buttons }) {
-  const { t } = useTranslation()
-  const empty = !body?.trim() && !header?.text?.trim() && !footer?.trim() && !buttons?.length
-  if (empty) {
-    return <p className="text-[11px] text-fg-subtle bg-surface-3/50 rounded-xl px-3 py-3 text-center">{t('settings.templates.preview.emptyHint')}</p>
-  }
-  return (
-    <div className="bg-[#0b141a] rounded-xl p-3">
-      <div className="bg-[#005c4b] rounded-lg rounded-se-none px-2.5 py-2 max-w-[85%] shadow">
-        {header?.enabled && header.format === 'TEXT' && header.text && (
-          <p className="text-[13px] font-bold text-white mb-1 whitespace-pre-wrap break-words">{header.text}</p>
-        )}
-        {header?.enabled && header.format === 'LOCATION' && (
-          <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 {t('settings.templates.mediaType.location')}</div>
-        )}
-        {header?.enabled && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) && (
-          <div className="bg-black/20 rounded-md px-2 py-5 mb-1 text-center text-[11px] text-white/70">
-            {header.format === 'IMAGE' ? `🖼️ ${t('settings.templates.mediaType.image')}` : header.format === 'VIDEO' ? `🎥 ${t('settings.templates.mediaType.video')}` : `📎 ${t('settings.templates.mediaType.document')}`}
-          </div>
-        )}
-        {body && <p className="text-[13px] text-white whitespace-pre-wrap break-words leading-relaxed">{body}</p>}
-        {footer && <p className="text-[11px] text-white/60 mt-1.5 whitespace-pre-wrap break-words">{footer}</p>}
-        <p className="text-[10px] text-white/50 text-end mt-1">{t('settings.templates.preview.mockTime')} ✓✓</p>
-      </div>
-      {buttons?.filter(b => b.text?.trim()).length > 0 && (
-        <div className="mt-1 space-y-1 max-w-[85%]">
-          {buttons.filter(b => b.text?.trim()).map((b, i) => (
-            <div key={i} className="bg-[#1f2c33] rounded-lg py-1.5 text-center text-[12px] text-[#53bdeb]">
-              {b.type === 'URL' ? '🔗 ' : b.type === 'PHONE_NUMBER' ? '📞 ' : ''}{b.text}
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
 // نفس النموذج بيستخدم للإنشاء وللتعديل — لو اتبعتله قالب موجود بيشتغل في وضع التعديل
 // (الاسم واللغة بيتقفلوا لأن ميتا مابتسمحش بتغييرهم بعد الإنشاء)
 function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
@@ -1854,6 +1819,90 @@ function LifecycleTab() {
 // ─── Tags Tab ────────────────────────────────────────────
 // التاجات بتتحط من هنا بس (الأدمن)، وبتظهر بعد كده كقايمة اختيار جوا ملف العميل — الموظفين
 // يقدروا يحطوا أي تاج موجود بس، مش يعملوا تاجات جديدة
+// ─── الشرائح (Segments) ────────────────────────────────────
+// إدارة الشرائح فقط: إنشاء/تعديل/حذف تعريف الفلتر — من غير عرض أي قائمة محادثات أو عملاء خلفها.
+// الشريحة نفسها بتُستخدم كهدف (target) في شاشة الإرسال الجماعي (Broadcast)
+function SegmentsTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [segments, setSegments] = useState([])
+  const [lifecycles, setLifecycles] = useState([])
+  const [tagsList, setTagsList] = useState([])
+  const [allChannels, setAllChannels] = useState([])
+  const [countryOptions, setCountryOptions] = useState([])
+  const [showBuilder, setShowBuilder] = useState(false)
+  const [editingSegment, setEditingSegment] = useState(null)
+
+  const loadSegments = async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/segments`)
+      const data = await res.json()
+      if (res.ok) setSegments(data.segments || [])
+    } catch { /* هتفضل القايمة زي ما هي */ }
+  }
+
+  useEffect(() => {
+    loadSegments()
+    supabase.from('lifecycle_stages').select('*').order('stage_order').then(({ data }) => setLifecycles(data || []))
+    supabase.from('tags').select('id, name, color').order('name').then(({ data }) => setTagsList(data || []))
+    apiFetch(`${API_URL}/channels`).then(r => r.json()).then(d => setAllChannels((d.channels || []).filter(c => c.id && c.status === 'active'))).catch(() => {})
+    apiFetch(`${API_URL}/reports/countries`).then(r => r.json()).then(d => setCountryOptions((d.rows || []).filter(r => r.country))).catch(() => {})
+  }, [])
+
+  const remove = async (seg) => {
+    if (!confirm(t('settings.segments.deleteConfirm', { name: seg.name }))) return
+    try {
+      const res = await apiFetch(`${API_URL}/segments/${seg.id}`, { method: 'DELETE' })
+      if (!res.ok) throw new Error()
+      setSegments(prev => prev.filter(s => s.id !== seg.id))
+    } catch {
+      toast.error(t('settings.segments.deleteError'))
+    }
+  }
+
+  return (
+    <div className="p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-fg">{t('settings.tabs.segments')}</h2>
+        <button onClick={() => { setEditingSegment(null); setShowBuilder(true) }}
+          className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
+          <Plus size={14} /> {t('settings.segments.newSegment')}
+        </button>
+      </div>
+
+      {segments.map(seg => (
+        <div key={seg.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
+          <Filter size={16} className="text-fg-subtle flex-shrink-0" />
+          <span className="flex-1 text-sm text-fg truncate">{seg.name}</span>
+          <button onClick={() => { setEditingSegment(seg); setShowBuilder(true) }} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+          <button onClick={() => remove(seg)} className="text-fg-muted hover:text-danger"><Trash2 size={14} /></button>
+        </div>
+      ))}
+      {segments.length === 0 && (
+        <p className="text-center text-fg-subtle text-sm py-6">{t('settings.segments.empty')}</p>
+      )}
+
+      {showBuilder && (
+        <SegmentBuilderModal
+          segment={editingSegment}
+          lifecycles={lifecycles}
+          tagsList={tagsList}
+          allChannels={allChannels}
+          countryOptions={countryOptions}
+          onClose={() => setShowBuilder(false)}
+          onSaved={(saved) => {
+            setShowBuilder(false)
+            setSegments(prev => {
+              const exists = prev.some(s => s.id === saved.id)
+              return exists ? prev.map(s => s.id === saved.id ? saved : s) : [saved, ...prev]
+            })
+          }}
+        />
+      )}
+    </div>
+  )
+}
+
 function TagsTab() {
   const { t } = useTranslation()
   const [tags, setTags] = useState([])

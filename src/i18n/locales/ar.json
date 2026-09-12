@@ -22,12 +22,19 @@
     },
     "detail": {
       "loading": "جاري التحميل...",
-      "recipientsHeading": "العملاء"
+      "recipientsHeading": "العملاء",
+      "replied": "ردّوا"
     },
     "wizard": {
       "selectPlaceholder": "اختر...",
       "segmentLabel": "الشريحة",
-      "channelLabel": "الرقم اللي هيبعت",
+      "channelLabel": "الرقم",
+      "channelUsedForTemplatesOnly": "الرقم ده هيُستخدم بس لعرض قوالبه — الإرسال الفعلي هيبقى من آخر رقم كل عميل كلّم بيه",
+      "channelModeLabel": "وضع الإرسال",
+      "channelModeFixed": "رقم محدد",
+      "channelModeLastContacted": "آخر رقم كلّم بيه العميل",
+      "channelModeFixedHint": "كل العملاء هيتبعتلهم من نفس الرقم المختار",
+      "channelModeLastContactedHint": "كل عميل هيتبعتله من آخر رقم واتساب كلّمنا بيه هو بالذات — بيزود عدد اللي شاتهم لسه مفتوح",
       "templateLabel": "القالب المعتمد",
       "noTemplates": "الرقم ده مالوش قوالب معتمدة لسه",
       "changeTemplate": "غيّر القالب",
@@ -42,11 +49,25 @@
       "previewClosed": "شات مقفول (قالب)",
       "previewBlocked": "محظورين (مُستبعدين)",
       "previewNoWhatsapp": "مفيش واتساب (مُستبعدين)",
+      "byChannelBreakdown": "تكسير بالرقم",
+      "byChannelTotal": "الإجمالي: {{count}}",
       "exceedsDailyLimit": "العدد ده أكبر من حد واتساب اليومي لهذا الرقم ({{limit}}) — هيتوزع تلقائيًا على حوالي {{days}} يوم",
       "willSendConfirm": "هيتم التواصل مع {{count}} عميل حقيقي، منهم {{templateCount}} هيتحاسبوا كقالب مدفوع",
       "confirmSend": "تأكيد الإرسال",
       "sending": "جاري الإرسال...",
-      "sent": "بدأ الإرسال"
+      "sent": "بدأ الإرسال",
+      "testBroadcastButton": "Test Broadcast",
+      "testModal": {
+        "title": "إرسال رسالة تجربة",
+        "channelLabel": "الرقم",
+        "fallbackHint": "هيتستخدم بس لو الرقم اللي هتكتبه معندوش محادثة واتساب سابقة معانا",
+        "targetsLabel": "الأرقام",
+        "addTarget": "+ إضافة رقم",
+        "missingFields": "اكتب رقم تليفون واحد على الأقل واختار رقم",
+        "sendButton": "إرسال تجربة",
+        "sent": "اتبعتت",
+        "failed": "فشلت"
+      }
     }
   },
   "login": {
@@ -76,6 +97,7 @@
       "quickReplies": "الردود السريعة",
       "roundRobin": "التوزيع",
       "ai": "AI Agent",
+      "segments": "الشرائح",
       "danger": "منطقة الخطر"
     },
     "common": {
@@ -310,6 +332,12 @@
       "duplicateOrError": "هذا الوسم موجود بالفعل أو حدث خطأ",
       "deleteConfirm": "هل تريد حذف هذا الوسم؟ سيُزال من جميع العملاء الذين يحملونه.",
       "empty": "لا توجد وسوم بعد، اضغط \"إضافة\" لإنشاء واحد"
+    },
+    "segments": {
+      "newSegment": "شريحة جديدة",
+      "empty": "لا توجد شرائح بعد، اضغط \"شريحة جديدة\" لإنشاء واحدة",
+      "deleteConfirm": "هل تريد حذف الشريحة \"{{name}}\"؟",
+      "deleteError": "فشل حذف الشريحة"
     },
     "fields": {
       "title": "الحقول الإضافية",
@@ -843,12 +871,6 @@
       "allStages": "كل المراحل"
     },
     "segments": {
-      "heading": "الشرائح",
-      "newSegment": "+ شريحة جديدة",
-      "deleteConfirm": "متأكد إنك عايز تحذف الشريحة دي؟",
-      "deleteError": "فشل حذف الشريحة",
-      "loadError": "فشل تحميل الشرائح",
-      "matchCount": "{{count}} عميل",
       "builder": {
         "title": "شريحة جديدة",
         "editTitle": "تعديل الشريحة",

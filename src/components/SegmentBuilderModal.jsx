@@ -26,9 +26,10 @@ function isValidCondition(c) {
   return Array.isArray(c.value) && c.value.length > 0
 }
 
-// موديال بناء/تعديل شريحة (segment) — لوحة جانبية (مش نافذة في النص) بتفلتر لحظيًا وبتدعم أكتر من
-// مجموعة شروط (AND بين المجموعات، وAND/OR داخل كل مجموعة لوحدها) — بنفس فكرة respond.io بالظبط
-export default function SegmentBuilderModal({ segment, lifecycles, tagsList, allChannels, countryOptions, onClose, onSaved, onLivePreview }) {
+// موديال بناء/تعديل شريحة (segment) — لوحة جانبية (مش نافذة في النص) بتدعم أكتر من مجموعة شروط
+// (AND/OR بين المجموعات، وAND/OR داخل كل مجموعة لوحدها). دي مجرد أداة تعريف/إدارة شرائح — مش
+// بتعرض قائمة محادثات خلفها، بس عدد حي أثناء البناء عشان الأدمن يعرف حجم الشريحة قبل الحفظ
+export default function SegmentBuilderModal({ segment, lifecycles, tagsList, allChannels, countryOptions, onClose, onSaved }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [name, setName] = useState(segment?.name || '')
@@ -48,38 +49,29 @@ export default function SegmentBuilderModal({ segment, lifecycles, tagsList, all
       .filter(g => g.conditions.length)
   }), [groups, topOperator])
 
-  // فلترة لحظية — كل تغيير في الشروط بيحدّث المعاينة (العدد) وكمان قائمة المحادثات وراء اللوحة
-  // مباشرة (onLivePreview)، بالظبط زي ما respond.io بيعمل، من غير ما تحتاج تحفظ الأول.
-  // requestSeqRef بيحل نفس مشكلة الـ race condition اللي اتصلحت قبل كده في fetchConversations:
-  // لو المستخدم غيّر شرط تاني قبل ما رد الطلب القديم يوصل، بنتجاهل الرد القديم لو وصل متأخر
+  // عدّ حي بس (من غير أي قائمة محادثات) — كل تغيير في الشروط بيحدّث العدد بعد فترة قصيرة من التوقف
+  // عن الكتابة. requestSeqRef بيحل مشكلة الـ race condition لو المستخدم غيّر شرط تاني قبل ما رد
+  // الطلب القديم يوصل: بنتجاهل أي رد قديم يوصل متأخر بدل ما يكتب فوق العدد الصحيح الحالي
   useEffect(() => {
     clearTimeout(debounceRef.current)
     const filterDefinition = buildFilterDefinition()
     const seq = ++requestSeqRef.current
-    if (!filterDefinition.groups.length) { setPreviewCount(null); onLivePreview?.(null); return }
+    if (!filterDefinition.groups.length) { setPreviewCount(null); return }
     debounceRef.current = setTimeout(async () => {
       setPreviewLoading(true)
       try {
         const res = await apiFetch(`${API_URL}/segments/preview`, {
           method: 'POST', headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ filter_definition: filterDefinition, limit: 30 })
+          body: JSON.stringify({ filter_definition: filterDefinition })
         })
         const data = await res.json()
         if (seq !== requestSeqRef.current) return
-        if (res.ok) {
-          setPreviewCount(data.count)
-          onLivePreview?.({ count: data.count, conversations: data.conversations })
-        } else {
-          setPreviewCount(null)
-        }
+        setPreviewCount(res.ok ? data.count : null)
       } catch { if (seq === requestSeqRef.current) setPreviewCount(null) }
       if (seq === requestSeqRef.current) setPreviewLoading(false)
     }, 450)
     return () => clearTimeout(debounceRef.current)
-  }, [groups, buildFilterDefinition, onLivePreview])
-
-  // بنشيل المعاينة الحية لما اللوحة تتقفل عشان القائمة الأصلية ترجع تظهر
-  useEffect(() => () => onLivePreview?.(null), [onLivePreview])
+  }, [groups, buildFilterDefinition])
 
   const updateCondition = (gIdx, cIdx, patch) => {
     setGroups(prev => prev.map((g, i) => {

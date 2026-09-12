@@ -22,12 +22,19 @@
     },
     "detail": {
       "loading": "Loading...",
-      "recipientsHeading": "Customers"
+      "recipientsHeading": "Customers",
+      "replied": "Replied"
     },
     "wizard": {
       "selectPlaceholder": "Select...",
       "segmentLabel": "Segment",
-      "channelLabel": "Send from number",
+      "channelLabel": "Number",
+      "channelUsedForTemplatesOnly": "This number is only used to browse its templates — actual sending will use each customer's own last-contacted number",
+      "channelModeLabel": "Send mode",
+      "channelModeFixed": "Specific number",
+      "channelModeLastContacted": "Customer's last-contacted number",
+      "channelModeFixedHint": "Every customer will be messaged from the same selected number",
+      "channelModeLastContactedHint": "Each customer will be messaged from the actual WhatsApp number they last talked to us on — this increases how many still have an open chat window",
       "templateLabel": "Approved template",
       "noTemplates": "This number has no approved templates yet",
       "changeTemplate": "Change template",
@@ -42,11 +49,25 @@
       "previewClosed": "Closed chat (template)",
       "previewBlocked": "Blocked (excluded)",
       "previewNoWhatsapp": "No WhatsApp (excluded)",
+      "byChannelBreakdown": "Breakdown by number",
+      "byChannelTotal": "Total: {{count}}",
       "exceedsDailyLimit": "This exceeds this number's daily WhatsApp limit ({{limit}}) — it will automatically spread over about {{days}} days",
       "willSendConfirm": "This will reach {{count}} real customers, {{templateCount}} of them billed as a paid template",
       "confirmSend": "Confirm send",
       "sending": "Sending...",
-      "sent": "Sending started"
+      "sent": "Sending started",
+      "testBroadcastButton": "Test Broadcast",
+      "testModal": {
+        "title": "Send a test message",
+        "channelLabel": "Number",
+        "fallbackHint": "Used only if the number you enter has no prior WhatsApp conversation with us",
+        "targetsLabel": "Numbers",
+        "addTarget": "+ Add number",
+        "missingFields": "Enter at least one phone number and pick a number",
+        "sendButton": "Send test",
+        "sent": "Sent",
+        "failed": "Failed"
+      }
     }
   },
   "login": {
@@ -76,6 +97,7 @@
       "quickReplies": "Quick Replies",
       "roundRobin": "Distribution",
       "ai": "AI Agent",
+      "segments": "Segments",
       "danger": "Danger Zone"
     },
     "common": {
@@ -310,6 +332,12 @@
       "duplicateOrError": "This tag already exists, or an error occurred",
       "deleteConfirm": "Delete this tag? It will be removed from all customers who have it.",
       "empty": "No tags yet — tap \"Add\" to create one"
+    },
+    "segments": {
+      "newSegment": "New segment",
+      "empty": "No segments yet — tap \"New segment\" to create one",
+      "deleteConfirm": "Delete segment \"{{name}}\"?",
+      "deleteError": "Failed to delete the segment"
     },
     "fields": {
       "title": "Custom Fields",
@@ -843,12 +871,6 @@
       "allStages": "All stages"
     },
     "segments": {
-      "heading": "Segments",
-      "newSegment": "+ New segment",
-      "deleteConfirm": "Are you sure you want to delete this segment?",
-      "deleteError": "Failed to delete the segment",
-      "loadError": "Failed to load segments",
-      "matchCount": "{{count}} contacts",
       "builder": {
         "title": "New segment",
         "editTitle": "Edit segment",
