@@ -1713,7 +1713,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
         <span className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${
           msg.status === 'failed' ? 'text-danger' : msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
           {isTemp ? <span className="animate-pulse">...</span>
-            : msg.status === 'failed' ? <><Ban size={11} className="inline" /> {t('chat.bubble.sendFailedStatus')}</>
+            : msg.status === 'failed' ? <><Ban size={11} className="inline shrink-0" /> <span>{t('chat.bubble.sendFailedStatus')}{msg.status_reason ? `: ${msg.status_reason}` : ''}</span></>
             : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
             : <Check size={12} className="inline" />}
         </span>
