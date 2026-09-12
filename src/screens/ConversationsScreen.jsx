@@ -261,6 +261,23 @@ function displayName(contact) {
   return i18n.t('chat.displayName.unknown')
 }
 
+// كود الدولة عندنا متخزن ISO حرفين (SA/EG/DZ...) — بنحوّله لعلم بترجمة كل حرف لـ Regional Indicator.
+// في صفوف قديمة قليلة القيمة متكتوبة بالعربي ("مصر") أو فاضية، فبنرجّع null وقتها بدل ما نطلّع رموز غريبة.
+function countryFlag(code) {
+  if (!code || !/^[A-Za-z]{2}$/.test(code)) return null
+  return String.fromCodePoint(...code.toUpperCase().split('').map(c => 0x1f1e6 + c.charCodeAt(0) - 65))
+}
+
+// اسم الدولة بلغة الواجهة (السعودية / Saudi Arabia) للـ tooltip — Intl.DisplayNames مدعومة في كل
+// المتصفحات اللي بنستهدفها، بس بنلفّها في try عشان أي قيمة غير متوقعة ماتكسرش الكارت
+function countryName(code, lang) {
+  if (!code) return ''
+  if (!/^[A-Za-z]{2}$/.test(code)) return code
+  try {
+    return new Intl.DisplayNames([lang || 'en'], { type: 'region' }).of(code.toUpperCase()) || code
+  } catch { return code }
+}
+
 // كروم بيطلق حدث beforeinstallprompt مرة واحدة بس لكل تحميل صفحة، مش في كل مرة. المشكلة إن شاشة
 // المحادثات دي بتتشال من الـ DOM وتتبني من الأول كل مرة نروح لشات ونرجع (React Router بيعمل unmount/mount)،
 // فلو الحدث اتخزن جوه state الكومبوننت كان بيضيع أول ما نرجع للشاشة، وزرار التثبيت يختفي فجأة من غير رجعة.
@@ -638,8 +655,8 @@ export default function ConversationsScreen() {
 
     // Conversations query — بنجيب أول visibleLimit بس مش كل المحادثات دفعة واحدة (يزيد بـ"تحميل المزيد")
     const contactsEmbed = selectedLifecycle
-      ? 'contacts!inner(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
-      : 'contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
+      ? 'contacts!inner(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
+      : 'contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
     let query = applyScope(supabase
       .from('conversations')
       .select(`*, ${contactsEmbed}`)
@@ -712,7 +729,7 @@ export default function ConversationsScreen() {
           .limit(300)
         const contactIds = [...new Set((contactRows || []).map(c => c.id))]
         query = supabase.from('conversations')
-          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
+          .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .in('contact_id', contactIds.length ? contactIds : ['00000000-0000-0000-0000-000000000000'])
       } else {
         let msgQuery = supabase.from('messages').select('conversation_id').ilike('content', `%${q}%`).limit(300)
@@ -720,7 +737,7 @@ export default function ConversationsScreen() {
         const { data: msgs } = await msgQuery
         const convIds = [...new Set((msgs || []).map(m => m.conversation_id))]
         query = supabase.from('conversations')
-          .select('*, contacts(id, name, profile_pic, platform_id, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
+          .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .in('id', convIds.length ? convIds : ['00000000-0000-0000-0000-000000000000'])
       }
 
@@ -1537,6 +1554,14 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
         <div className="flex items-baseline justify-between gap-2">
           <span className="flex items-center gap-1.5 min-w-0">
             <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
+            {contact?.country?.trim() && (
+              <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-muted"
+                title={countryName(contact.country, i18n.language)}>
+                {countryFlag(contact.country)
+                  ? `${countryFlag(contact.country)} ${contact.country.toUpperCase()}`
+                  : contact.country}
+              </span>
+            )}
             {contact?.lifecycle_stages && (
               <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full text-white"
                 style={{ background: contact.lifecycle_stages.color }}>
