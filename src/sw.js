@@ -9,6 +9,9 @@ registerRoute(
   ({ url }) => url.hostname === 'qqrztdowbtjzjlpfuyig.supabase.co',
   new NetworkFirst({
     cacheName: 'supabase-cache',
+    // من غيرها الاستراتيجية دي بتستنى الشبكة "للأبد" — لو شبكة الموظف شغالة بس بطيئة (مش واقفة
+    // تمامًا)، بيحس إن البرنامج علّق بدل ما يرجع فورًا لنسخة محفوظة ويكمل التحديث في الخلفية
+    networkTimeoutSeconds: 3,
     plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })]
   })
 )

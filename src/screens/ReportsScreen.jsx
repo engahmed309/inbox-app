@@ -1395,7 +1395,7 @@ function PerformanceTab() {
 function AgentAvatar({ agent, size = 22 }) {
   const [broken, setBroken] = useState(false)
   if (agent?.avatar_url && !broken) {
-    return <img src={agent.avatar_url} onError={() => setBroken(true)} alt=""
+    return <img src={agent.avatar_url} onError={() => setBroken(true)} alt="" loading="lazy"
       style={{ width: size, height: size }} className="rounded-full object-cover flex-shrink-0" />
   }
   return (

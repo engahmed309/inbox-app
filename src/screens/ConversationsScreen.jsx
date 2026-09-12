@@ -92,6 +92,7 @@ function AgentAvatar({ agent, size = 22 }) {
       <img
         src={src}
         alt={name}
+        loading="lazy"
         style={{ width: size, height: size }}
         className="rounded-full object-cover flex-shrink-0 bg-surface-3"
         onError={() => setBroken(true)}
@@ -372,6 +373,9 @@ export default function ConversationsScreen() {
   const navigate = useNavigate()
   const { t } = useTranslation()
   const realtimeRef = useRef(null)
+  // متفائلين بالـ Realtime لحد ما .subscribe() تحت يقول عكس كده — بيتحكم في معدل الـ polling
+  // الاحتياطي بنفس فكرة ChatScreen
+  const realtimeHealthyRef = useRef(true)
   const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
@@ -799,14 +803,26 @@ export default function ConversationsScreen() {
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
         if (!searchActiveRef.current) fetchConversations() // تحديث آخر رسالة
       })
-      .subscribe()
+      .subscribe((status) => {
+        if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          realtimeHealthyRef.current = false
+          if (!searchActiveRef.current) fetchConversations()
+        } else if (status === 'SUBSCRIBED') {
+          realtimeHealthyRef.current = true
+        }
+      })
 
-    // Realtime هو المصدر الأساسي دلوقتي — الـ polling ده بقى بس شبكة أمان بطيئة (كل ٧٥ ثانية)
-    // لو حصل انقطاع في الـ Realtime لأي سبب، بدل ما كان بيجري كل ٥ ثواني ويستهلك بيانات زيادة عن اللزوم
+    // Realtime هو المصدر الأساسي دلوقتي — الـ polling ده بقى بس شبكة أمان: كل ٧٥ ثانية لو
+    // الـ Realtime فعلاً معطّل، وكل ٥ دقايق بعيدة حتى لو شكله شغال (تحسبًا لحدث فاتنا بصمت)
     const handleVisibility = () => { if (!searchActiveRef.current) fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
-    const pollInterval = setInterval(() => { if (!searchActiveRef.current) fetchConversations() }, 75000)
+    let ticks = 0
+    const pollInterval = setInterval(() => {
+      ticks++
+      if (searchActiveRef.current) return
+      if (!realtimeHealthyRef.current || ticks % 4 === 0) fetchConversations()
+    }, 75000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
@@ -1361,7 +1377,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
       <div className="w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3">
         <div className="relative flex-shrink-0 opacity-60">
           {contact?.profile_pic ? (
-            <img src={contact.profile_pic} alt="" className="w-12 h-12 rounded-full object-cover bg-surface-3" />
+            <img src={contact.profile_pic} alt="" loading="lazy" className="w-12 h-12 rounded-full object-cover bg-surface-3" />
           ) : (
             <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center text-fg font-semibold text-lg">
               {contact?.name?.[0]?.toUpperCase() || '?'}
@@ -1391,7 +1407,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
       {/* Avatar */}
       <div className="relative flex-shrink-0">
         {contact?.profile_pic ? (
-          <img src={contact.profile_pic} alt=""
+          <img src={contact.profile_pic} alt="" loading="lazy"
             className="w-12 h-12 rounded-full object-cover bg-surface-3"
             onError={e => { e.target.onerror = null; e.target.style.display = 'none' }} />
         ) : (

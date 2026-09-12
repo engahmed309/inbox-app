@@ -67,6 +67,7 @@ function AgentAvatar({ agent, size = 20 }) {
       <img
         src={src}
         alt={name}
+        loading="lazy"
         style={{ width: size, height: size }}
         className="rounded-full object-cover flex-shrink-0 bg-surface-3"
         onError={() => setBroken(true)}
@@ -177,6 +178,9 @@ export default function ChatScreen() {
   const messagesCountRef = useRef(0)
   const firstLoadDoneRef = useRef(false)
   const realtimeRef = useRef(null)
+  // متفائلين بالـ Realtime لحد ما نتأكد عكس كده — بيتحدث في .subscribe() تحت، وبيتحكم في
+  // معدل الـ polling الاحتياطي (شبكة أمان أسرع لما الاتصال يبقى معطّل، وأبطأ لما يكون شغال تمام)
+  const realtimeHealthyRef = useRef(true)
   const fileInputRef = useRef(null)
   const tempIdRef = useRef(null)
   const mediaRecorderRef = useRef(null)
@@ -373,7 +377,10 @@ export default function ChatScreen() {
         // الـ Realtime أحياناً بيقفل الاتصال بصمت (شبكة موبايل، الجهاز نام، إلخ) من غير ما
         // React يعرف — لو حصل كده نجيب أي رسايل فاتت فوراً بدل ما نستنى الـ polling البطيء
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+          realtimeHealthyRef.current = false
           fetchMessages(false)
+        } else if (status === 'SUBSCRIBED') {
+          realtimeHealthyRef.current = true
         }
       })
 
@@ -412,10 +419,15 @@ export default function ChatScreen() {
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
-    // شبكة الضمان جوه محادثة مفتوحة: تحديث كل ٦ ثواني (مش زي شاشة القائمة اللي كل ٧٥ ثانية)،
-    // لأن استعلام رسايل محادثة واحدة رخيص جداً، وده بيغطي أي مرة الـ Realtime يفشل بصمت من غير
-    // ما نضطر ننتظر معاه — الموظف واقف فعلياً بيقرا في الشات دي دلوقتي فلازم يكون سريع
-    const pollInterval = setInterval(() => { fetchMessages(false) }, 6000)
+    // شبكة الضمان جوه محادثة مفتوحة: كانت بتحدّث كل ٦ ثواين دايمًا حتى لو الـ Realtime شغال
+    // تمام، يعني بيانات وبطارية بتتاكل من غير داعي على أي شبكة الاتصال الدائم فيها بطيء أو
+    // متقطع. دلوقتي: كل ٦ ثواني بس لو الـ Realtime فعلاً معطّل (.subscribe فوق بيحدّث
+    // realtimeHealthyRef)، وكل ٤٥ ثانية كشبكة أمان بعيدة حتى لو شكله شغال (تحسبًا لحدث فاتنا بصمت)
+    let ticks = 0
+    const pollInterval = setInterval(() => {
+      ticks++
+      if (!realtimeHealthyRef.current || ticks % 8 === 0) fetchMessages(false)
+    }, 6000)
 
     return () => {
       realtimeRef.current?.unsubscribe()
@@ -973,7 +985,7 @@ export default function ChatScreen() {
 
           <div onClick={() => setShowSidebar(true)} className="flex items-center gap-2 flex-1 min-w-0 text-start cursor-pointer">
             {contact?.profile_pic ? (
-              <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt=""
+              <img src={contact.profile_pic} className="w-9 h-9 rounded-full object-cover flex-shrink-0" alt="" loading="lazy"
                 onError={e => e.target.style.display = 'none'} />
             ) : (
               <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
@@ -1442,7 +1454,7 @@ export default function ChatScreen() {
                 <button key={item.id} onClick={() => pickFromLibrary(item)}
                   className="flex flex-col items-center gap-1.5 p-2 rounded-xl hover:bg-surface-3 transition-colors">
                   {item.file_type === 'image' ? (
-                    <img src={item.file_url} className="w-full aspect-square rounded-lg object-cover bg-surface-3" alt="" />
+                    <img src={item.file_url} loading="lazy" className="w-full aspect-square rounded-lg object-cover bg-surface-3" alt="" />
                   ) : (
                     <div className="w-full aspect-square rounded-lg bg-surface-3 flex items-center justify-center text-2xl">
                       {item.file_type === 'video' ? '🎥' : '📎'}
@@ -1677,13 +1689,13 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             </div>
           )}
           {msg.content_type === 'image' && msg.media_url ? (
-            <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+            <img src={msg.media_url} alt="" loading="lazy" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
               className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
           ) : msg.content_type === 'sticker' && msg.media_url ? (
-            <img src={msg.media_url} alt="" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+            <img src={msg.media_url} alt="" loading="lazy" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
               className="max-w-[100px] max-h-[100px] object-contain cursor-pointer" />
           ) : msg.content_type === 'video' && msg.media_url ? (
-            <video src={msg.media_url} controls onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
+            <video src={msg.media_url} controls preload="none" onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
               className="rounded-lg max-w-full max-h-48 cursor-pointer" />
           ) : msg.content_type === 'audio' && msg.media_url ? (
             <audio src={msg.media_url} controls className="max-w-full" style={{ height: 36 }} />

@@ -719,7 +719,7 @@ function ConnectedChannelsList() {
           <div key={ch?.id || `${platform}-${i}`} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
             <div className="flex items-center gap-3">
               {ch?.avatar_url ? (
-                <img src={ch.avatar_url} alt="" className="w-12 h-12 rounded-full object-cover bg-surface-3"
+                <img src={ch.avatar_url} alt="" loading="lazy" className="w-12 h-12 rounded-full object-cover bg-surface-3"
                   onError={e => { e.target.style.display = 'none' }} />
               ) : (
                 <div className="w-12 h-12 rounded-full bg-surface-3 flex items-center justify-center">
