@@ -317,7 +317,7 @@ const screenCache = {
   selectedLifecycle: null, unrepliedOnly: false, sidebarOpen: true,
   conversations: null, agentsMap: {}, lastMessages: {}, contactTagsMap: {},
   statusCounts: { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 },
-  lifecycleCounts: {}, lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
+  lifecycles: [], agentsList: [], visibleLimit: CONVERSATIONS_PAGE_SIZE,
   agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
   aiEnabled: false, aiOpenCount: 0,
   selectedTagIds: [], selectedAdIds: [], dateFrom: '', dateTo: '', tagsList: [], campaigns: [],
@@ -343,7 +343,6 @@ export default function ConversationsScreen() {
   const [unrepliedOnly, setUnrepliedOnly] = useState(screenCache.unrepliedOnly)
   const [contactTagsMap, setContactTagsMap] = useState(screenCache.contactTagsMap) // { contact_id: [tag,...] }
   const [lifecycles, setLifecycles] = useState(screenCache.lifecycles)
-  const [lifecycleCounts, setLifecycleCounts] = useState(screenCache.lifecycleCounts) // { stage_id: عدد المحادثات المفتوحة }
   const [agentOpenCounts, setAgentOpenCounts] = useState(screenCache.agentOpenCounts) // { agent_id: عدد المحادثات المفتوحة المعينة له }
   const [unassignedOpenCount, setUnassignedOpenCount] = useState(screenCache.unassignedOpenCount)
   const [aiEnabled, setAiEnabled] = useState(screenCache.aiEnabled || false)
@@ -563,12 +562,11 @@ export default function ConversationsScreen() {
       return all
     }
 
-    // الكويريز التلاتة دي مستقلة عن بعض تمامًا — بنجيبهم بالتوازي بدل ما نستنى واحد يخلص قبل ما نبدأ التاني
-    const [lcCountData, agentCountData, countsData] = await Promise.all([
-      // عدد المحادثات المفتوحة لكل مرحلة lifecycle (بنفس نطاق القناة/الموظف، من غير فلتر التاج/المرحلة نفسها)
-      fetchAllPaged(() => applyBaseScope(
-        supabase.from('conversations').select('id, contact_id, contacts(lifecycle_stage_id)', { count: 'exact' }).eq('status', 'open')
-      )),
+    // عدّاد "الكل/متابعة/مغلقة" وعدّاد كل مرحلة lifecycle اتشالوا — مكررين مع شاشة التقارير أصلاً،
+    // ومكانوش يستاهلوا تكلفة جلب كل جدول المحادثات (٦٣ ألف صف) بس عشان يتعدوا. لسه محتفظين بـ"مفتوحة"
+    // (غير مقروءة) وعدّاد كل موظف — الاتنين أصلاً بيتفلتروا على status='open' بس، يعني نطاقهم صغير
+    // جدًا (عشرات مش آلاف)، فمفيش داعي لأي pagination تقيلة عشانهم
+    const [agentCountData, countsData] = await Promise.all([
       // كام محادثة مفتوحة معينة لكل موظف (وكام لسه من غير تعيين) — بنفس نطاق القناة بس
       canSeeAll ? fetchAllPaged(() => {
         let q = supabase.from('conversations').select('assigned_agent_id, ai_active', { count: 'exact' }).eq('status', 'open')
@@ -579,24 +577,17 @@ export default function ConversationsScreen() {
         }
         return q
       }) : Promise.resolve([]),
-      // عدادات التابات (مفتوحة/متابعة/مغلقة) بنفس نطاق الفلترة الحالي — !inner لما فيه فلتر مرحلة
-      // عشان نستبعد المحادثات اللي عميلها مش في المرحلة دي فعليًا، مش بس نستبعد بيانات الـ join
+      // بس المحادثات المفتوحة (بنفس نطاق الفلترة الحالي) — لازمة لعدّاد "مفتوحة" غير المقروءة
+      // ولتحديد أي محادثة في القائمة نفسها غير مقروءة ليّا (isUnreadForMe تحت)
       fetchAllPaged(() => {
         let q = supabase.from('conversations')
           .select(selectedLifecycle ? 'id, status, unread_count, last_inbound_at, contacts!inner(id)' : 'id, status, unread_count, last_inbound_at', { count: 'exact' })
+          .eq('status', 'open')
         q = applyScope(q)
         if (selectedLifecycle) q = q.eq('contacts.lifecycle_stage_id', selectedLifecycle)
         return q
       })
     ])
-
-    const lcCounts = {}
-    lcCountData?.forEach(c => {
-      const sid = c.contacts?.lifecycle_stage_id
-      if (!sid) return
-      lcCounts[sid] = (lcCounts[sid] || 0) + 1
-    })
-    setLifecycleCounts(lcCounts); screenCache.lifecycleCounts = lcCounts
 
     if (canSeeAll) {
       const aCounts = {}
@@ -636,12 +627,12 @@ export default function ConversationsScreen() {
       return new Date(myReadAt) < new Date(c.last_inbound_at)
     }
 
+    // عدّاد "الكل/متابعة/مغلقة" مش متحسوب هنا (متاح أصلاً في شاشة التقارير) — countsData كله
+    // status='open' من الأصل، فبنعدّ منه "مفتوحة" وغير المقروءة بس
     const counts = { all: 0, open: 0, openUnread: 0, follow_up: 0, closed: 0 }
     countsData?.forEach(c => {
-      counts.all++
-      if (c.status === 'open') { counts.open++; if (isUnreadForMe(c)) counts.openUnread++ }
-      else if (c.status === 'follow_up') counts.follow_up++
-      else if (c.status === 'closed') counts.closed++
+      counts.open++
+      if (isUnreadForMe(c)) counts.openUnread++
     })
     setStatusCounts(counts); screenCache.statusCounts = counts
 
@@ -1233,11 +1224,6 @@ export default function ConversationsScreen() {
                   className={`w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] ${selectedLifecycle === l.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
                   <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: l.color }} />
                   <span className="flex-1 text-start truncate">{l.icon && `${l.icon} `}{l.name}</span>
-                  {lifecycleCounts[l.id] > 0 && (
-                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">
-                      {lifecycleCounts[l.id]}
-                    </span>
-                  )}
                 </button>
               ))}
             </div>
