@@ -112,21 +112,17 @@ function AgentsTab() {
     setAiAgentRow((data || []).find(a => a.role === 'ai') || null)
   }
 
+  // كان بيجيب كل جدول المحادثات (٦٣ ألف+ صف) للمتصفح عشان يحسب العدادات دي — غير بطيء بس، Supabase
+  // بيوقف عند ١٠٠٠ صف افتراضيًا فكانت الأرقام غلط فعليًا. استعلام GROUP BY واحد على السيرفر بدل كده
   const loadCounts = async () => {
-    const { data } = await supabase.from('conversations').select('assigned_agent_id, status, ai_active')
-    const map = {}
-    const t = { open: 0, follow_up: 0, closed: 0 }
-    const ai = { open: 0, follow_up: 0, closed: 0 }
-    data?.forEach(c => {
-      if (c.ai_active && ai[c.status] !== undefined) ai[c.status]++
-      if (!c.assigned_agent_id) return
-      if (!map[c.assigned_agent_id]) map[c.assigned_agent_id] = { open: 0, follow_up: 0, closed: 0 }
-      if (map[c.assigned_agent_id][c.status] !== undefined) map[c.assigned_agent_id][c.status]++
-      if (t[c.status] !== undefined) t[c.status]++
-    })
-    setCounts(map)
-    setTotals(t)
-    setAiCounts(ai)
+    try {
+      const res = await apiFetch(`${API_URL}/agents/status-counts`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setCounts(data.byAgent || {})
+      setTotals(data.totals || { open: 0, follow_up: 0, closed: 0 })
+      setAiCounts(data.ai || { open: 0, follow_up: 0, closed: 0 })
+    } catch { /* هتفضل الأرقام صفر بدل ما تكسر الشاشة */ }
   }
 
   // حالة تفعيل الـ AI + توزيع lifecycle للعملاء اللي الـ AI شغال معاهم دلوقتي
