@@ -10,13 +10,17 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true)
   const [authError, setAuthError] = useState('')
 
+  // بنفرّق بين "مفيش صف للموظف ده فعلاً" (يعني مش مدعو) و"الاستعلام نفسه فشل" (شبكة/سيرفر) —
+  // قبل كده الاتنين كانوا بيرجعوا null، فالموظف الشرعي كان ممكن يتقاله "غير مدعو" غلط لمجرد
+  // إن الشبكة تعثرت لحظة
   async function loadAgent(authUser) {
     if (!authUser) return null
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('agents')
       .select('*')
       .eq('auth_id', authUser.id)
-      .single()
+      .maybeSingle()
+    if (error) throw error
     return data
   }
 
@@ -83,22 +87,37 @@ export function AuthProvider({ children }) {
   }
 
   useEffect(() => {
-    supabase.auth.getSession().then(async ({ data: { session } }) => {
-      await handleSession(session)
-      setLoading(false)
-    })
+    // أي فشل أو تعليق في تحميل الجلسة (شبكة وحشة، أو السيرفر متعّب لحظيًا) كان بيسيب التطبيق واقف
+    // على "جارٍ التحميل..." للأبد، لأن setLoading(false) كانت بعد await من غير catch ولا مهلة —
+    // يعني عطل لحظي واحد كان بيقفل التطبيق على الموظف لحد ما يمسح بيانات الموقع بإيده. دلوقتي
+    // بنضمن إننا نطلع من شاشة التحميل مهما حصل (أسوأ حالة: شاشة تسجيل الدخول ويجرّب تاني)
+    let settled = false
+    const finish = () => { if (!settled) { settled = true; setLoading(false) } }
+    const timeout = setTimeout(finish, 12000)
+
+    supabase.auth.getSession()
+      .then(({ data }) => handleSession(data?.session))
+      .catch(err => console.error('Session load failed:', err?.message))
+      .finally(() => { clearTimeout(timeout); finish() })
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        await handleSession(session)
-      } else {
-        if (agentRef.current) setStatus(agentRef.current.id, 'offline')
-        setUser(null)
-        setAgent(null)
+      try {
+        if (session?.user) {
+          await handleSession(session)
+        } else {
+          if (agentRef.current) setStatus(agentRef.current.id, 'offline')
+          setUser(null)
+          setAgent(null)
+        }
+      } catch (err) {
+        console.error('Auth state change failed:', err?.message)
+      } finally {
+        finish()
       }
     })
 
     return () => {
+      clearTimeout(timeout)
       subscription.unsubscribe()
     }
   }, [])
