@@ -859,13 +859,19 @@
         "matchAll": "All conditions (AND)",
         "matchAny": "Any condition (OR)",
         "addCondition": "Add condition",
+        "addGroup": "Add filter group",
+        "combineGroupsLabel": "Combine groups:",
+        "matchAllGroups": "All groups (AND)",
+        "matchAnyGroups": "Any group (OR)",
         "selectValue": "Select a value",
         "valuePlaceholder": "Value",
         "counting": "Counting...",
         "noConditionsYet": "Add a condition with a value to see the matching customer count",
         "previewCount": "{{count}} matching customers",
         "cancel": "Cancel",
+        "resetFilter": "Reset filter",
         "save": "Save",
+        "saveAsNew": "Save as new segment",
         "saving": "Saving...",
         "saved": "Segment saved",
         "saveError": "Failed to save the segment"
@@ -883,6 +889,7 @@
       "ops": {
         "eq": "equals",
         "in": "any of",
+        "not_in": "none of",
         "between": "between",
         "gte": "on or after",
         "lte": "on or before"

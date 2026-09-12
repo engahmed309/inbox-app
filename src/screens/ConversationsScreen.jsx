@@ -363,6 +363,8 @@ export default function ConversationsScreen() {
   const [segmentCount, setSegmentCount] = useState(screenCache.segmentCount)
   const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
   const [editingSegment, setEditingSegment] = useState(null)
+  const [countryOptions, setCountryOptions] = useState([])
+  const [draftPreview, setDraftPreview] = useState(null) // معاينة حية أثناء بناء/تعديل شريحة، قبل الحفظ
   const [showAdvFilter, setShowAdvFilter] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
@@ -445,6 +447,14 @@ export default function ConversationsScreen() {
       const data = await res.json()
       if (res.ok) { setSegments(data.segments || []); screenCache.segments = data.segments || [] }
     } catch { /* مش أدمن أو فشل الجلب — القسم هيفضل مش ظاهر أصلاً */ }
+
+    // كل الدول المسجّلة فعليًا في بيانات العملاء — عشان فلتر الدولة في بانى الشرائح يبقى اختيار
+    // من قايمة حقيقية بدل ما الموظف يكتبها بإيده ويغلط في الكود
+    try {
+      const res = await apiFetch(`${API_URL}/reports/countries`)
+      const data = await res.json()
+      if (res.ok) setCountryOptions((data.rows || []).filter(r => r.country))
+    } catch { /* هتفضل قايمة فاضية، مش حاجة حرجة */ }
 
     try {
       const res = await apiFetch(`${API_URL}/ads/campaigns`)
@@ -1002,8 +1012,10 @@ export default function ConversationsScreen() {
     fetchConversations()
   }
 
-  // البحث بقى بيتم من الداتا بيز مباشرة (searchConversations)، فـ conversations بالفعل النتيجة النهائية
-  const filtered = conversations
+  // البحث بقى بيتم من الداتا بيز مباشرة (searchConversations)، فـ conversations بالفعل النتيجة النهائية.
+  // لو لوحة بناء شريحة مفتوحة دلوقتي وبتعمل معاينة حية، نوري نتيجتها بدل القائمة العادية مؤقتًا —
+  // من غير ما نلمس conversations نفسها، عشان لما اللوحة تتقفل القائمة الأصلية ترجع زي ما كانت فورًا
+  const filtered = draftPreview ? draftPreview.conversations : conversations
 
   const agentStatusBtn = agent?.status || 'online'
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
@@ -1469,8 +1481,11 @@ export default function ConversationsScreen() {
           lifecycles={lifecycles}
           tagsList={tagsList}
           allChannels={allChannels}
-          onClose={() => setShowSegmentBuilder(false)}
+          countryOptions={countryOptions}
+          onLivePreview={setDraftPreview}
+          onClose={() => { setDraftPreview(null); setShowSegmentBuilder(false) }}
           onSaved={(saved) => {
+            setDraftPreview(null)
             setShowSegmentBuilder(false)
             setSegments(prev => {
               const exists = prev.some(s => s.id === saved.id)
@@ -1478,6 +1493,7 @@ export default function ConversationsScreen() {
               screenCache.segments = next
               return next
             })
+            setSelectedSegmentId(saved.id)
           }}
         />
       )}

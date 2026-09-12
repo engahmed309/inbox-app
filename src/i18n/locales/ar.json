@@ -859,13 +859,19 @@
         "matchAll": "كل الشروط (AND)",
         "matchAny": "أي شرط (OR)",
         "addCondition": "إضافة شرط",
+        "addGroup": "إضافة مجموعة شروط",
+        "combineGroupsLabel": "دمج المجموعات:",
+        "matchAllGroups": "كل المجموعات (AND)",
+        "matchAnyGroups": "أي مجموعة (OR)",
         "selectValue": "اختر قيمة",
         "valuePlaceholder": "القيمة",
         "counting": "جاري الحساب...",
         "noConditionsYet": "أضف شرط بقيمة عشان تشوف عدد العملاء المطابقين",
         "previewCount": "{{count}} عميل مطابق للشروط دي",
         "cancel": "إلغاء",
+        "resetFilter": "إعادة تعيين",
         "save": "حفظ",
+        "saveAsNew": "حفظ كشريحة جديدة",
         "saving": "جاري الحفظ...",
         "saved": "تم حفظ الشريحة",
         "saveError": "فشل حفظ الشريحة"
@@ -883,6 +889,7 @@
       "ops": {
         "eq": "يساوي",
         "in": "أي من",
+        "not_in": "ولا واحد منهم",
         "between": "بين",
         "gte": "بعد أو يساوي",
         "lte": "قبل أو يساوي"
