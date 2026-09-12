@@ -1,24 +1,21 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { X, Plus, Trash2, Layers } from 'lucide-react'
+import { X, Plus, Trash2, Search } from 'lucide-react'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 
 // كل حقل مع نوعه (بيحدد شكل مدخل القيمة) — لازم يتطابق مع SEGMENT_FIELDS في الباك إند. الحقول
-// كلها (غير التاريخ) بقت multi-select دايمًا بعمليتين بس: "أي من" (in) و"ولا واحد منهم" (not_in) —
-// بالظبط زي respond.io، بدل ما يبقى فيه وضع منفصل لاختيار قيمة واحدة بس
+// كلها (غير التاريخ) multi-select دايمًا بعمليتين بس: "أي من" (in) و"ولا واحد منهم" (not_in)
 const MULTI_FIELDS = new Set(['lifecycle_stage_id', 'tag_id', 'channel_id', 'platform', 'conversation_status', 'country'])
 const DATE_FIELDS = new Set(['lifecycle_stage_entered_at', 'contact_created_at'])
 const MULTI_OPS = ['in', 'not_in']
 const DATE_OPS = ['between', 'gte', 'lte']
+// لو عدد الخيارات أكتر من كده بنضيف مربع بحث فوق قايمة الاختيار (الدول مثلاً ممكن توصل لمية دولة)
+const SEARCH_THRESHOLD = 8
 
-function emptyCondition() {
-  return { field: 'lifecycle_stage_id', op: 'in', value: [] }
+function emptyCondition(connector) {
+  return { field: 'lifecycle_stage_id', op: 'in', value: [], connector }
 }
-function emptyGroup() {
-  return { operator: 'AND', conditions: [emptyCondition()] }
-}
-
 function isValidCondition(c) {
   if (DATE_FIELDS.has(c.field)) {
     return c.op === 'between' ? Array.isArray(c.value) && c.value[0] && c.value[1] : !!c.value
@@ -26,28 +23,57 @@ function isValidCondition(c) {
   return Array.isArray(c.value) && c.value.length > 0
 }
 
-// موديال بناء/تعديل شريحة (segment) — لوحة جانبية (مش نافذة في النص) بتدعم أكتر من مجموعة شروط
-// (AND/OR بين المجموعات، وAND/OR داخل كل مجموعة لوحدها). دي مجرد أداة تعريف/إدارة شرائح — مش
-// بتعرض قائمة محادثات خلفها، بس عدد حي أثناء البناء عشان الأدمن يعرف حجم الشريحة قبل الحفظ
+// شرط + مجموعة شروط (AND/OR بين المجموعات، وAND/OR داخل كل مجموعة) هو الشكل اللي الباك إند بيفهمه،
+// بس مش شكل سهل يتعرض للمستخدم كواجهة (مجموعات متداخلة). بدل كده بنعرض قايمة شروط مسطّحة، وكل شرط
+// (غير الأول) ليه رابط (و / أو) بيوصله بالشرط اللي قبله — بالظبط زي ما بيتقال بالعربي "شرط كذا وكذا
+// أو شرط كذا". أي سلسلة من "و" متتالية بتتلم في مجموعة واحدة تتقارن كـ AND، وكل "أو" بيبدأ مجموعة
+// جديدة تتقارن بالمجموعات اللي قبلها بـ OR — وده بالظبط أولوية AND/OR الرياضية العادية (AND بيتنفذ
+// الأول)، فمينفعش حد يتلخبط فيه
+function conditionsToFilterDefinition(conditions) {
+  const valid = conditions.filter(isValidCondition)
+  if (!valid.length) return { operator: 'AND', groups: [] }
+  const groups = [{ operator: 'AND', conditions: [valid[0]] }]
+  for (let i = 1; i < valid.length; i++) {
+    const { connector, ...cond } = valid[i]
+    if (connector === 'OR') groups.push({ operator: 'AND', conditions: [cond] })
+    else groups[groups.length - 1].conditions.push(cond)
+  }
+  return {
+    operator: groups.length > 1 ? 'OR' : 'AND',
+    groups: groups.map(g => ({ operator: 'AND', conditions: g.conditions.map(({ connector, ...c }) => c) }))
+  }
+}
+
+// عكس التحويل فوق — لفتح شريحة محفوظة قبل كده للتعديل. أول شرط في كل مجموعة رابطه = عامل الدمج بين
+// المجموعات، والباقي في نفس المجموعة رابطهم = عامل المجموعة نفسها
+function filterDefinitionToConditions(filterDefinition) {
+  const groups = filterDefinition?.groups || []
+  if (!groups.length) return [emptyCondition()]
+  const flat = []
+  groups.forEach((g, gi) => {
+    (g.conditions || []).forEach((c, ci) => {
+      const connector = flat.length === 0 ? undefined : (ci === 0 ? (filterDefinition.operator === 'OR' ? 'OR' : 'AND') : (g.operator === 'OR' ? 'OR' : 'AND'))
+      flat.push({ ...c, connector })
+    })
+  })
+  return flat.length ? flat : [emptyCondition()]
+}
+
+// أداة بناء/تعديل شريحة (segment) — قسم عادي داخل صفحة الإعدادات (مش ديالوج عائم)، بياخد عرض
+// الصفحة كامل زي أي تاب تاني. بيعرض عدد حي أثناء البناء بس، من غير أي قائمة محادثات خلفه
 export default function SegmentBuilder({ segment, lifecycles, tagsList, allChannels, countryOptions, onClose, onSaved }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [name, setName] = useState(segment?.name || '')
-  const [groups, setGroups] = useState(
-    segment?.filter_definition?.groups?.length ? segment.filter_definition.groups : [emptyGroup()]
-  )
-  const [topOperator, setTopOperator] = useState(segment?.filter_definition?.operator || 'AND')
+  const [conditions, setConditions] = useState(filterDefinitionToConditions(segment?.filter_definition))
+  const [valueSearch, setValueSearch] = useState({}) // { [conditionIndex]: 'نص البحث' } — مش بيتحفظ، للعرض بس
   const [previewCount, setPreviewCount] = useState(null)
   const [previewLoading, setPreviewLoading] = useState(false)
   const [saving, setSaving] = useState(false)
   const debounceRef = useRef(null)
   const requestSeqRef = useRef(0)
 
-  const buildFilterDefinition = useCallback(() => ({
-    operator: topOperator,
-    groups: groups.map(g => ({ operator: g.operator, conditions: g.conditions.filter(isValidCondition) }))
-      .filter(g => g.conditions.length)
-  }), [groups, topOperator])
+  const buildFilterDefinition = useCallback(() => conditionsToFilterDefinition(conditions), [conditions])
 
   // عدّ حي بس (من غير أي قائمة محادثات) — كل تغيير في الشروط بيحدّث العدد بعد فترة قصيرة من التوقف
   // عن الكتابة. requestSeqRef بيحل مشكلة الـ race condition لو المستخدم غيّر شرط تاني قبل ما رد
@@ -71,30 +97,27 @@ export default function SegmentBuilder({ segment, lifecycles, tagsList, allChann
       if (seq === requestSeqRef.current) setPreviewLoading(false)
     }, 450)
     return () => clearTimeout(debounceRef.current)
-  }, [groups, buildFilterDefinition])
+  }, [conditions, buildFilterDefinition])
 
-  const updateCondition = (gIdx, cIdx, patch) => {
-    setGroups(prev => prev.map((g, i) => {
-      if (i !== gIdx) return g
-      return {
-        ...g, conditions: g.conditions.map((c, j) => {
-          if (j !== cIdx) return c
-          const next = { ...c, ...patch }
-          if (patch.field && patch.field !== c.field) {
-            next.op = DATE_FIELDS.has(patch.field) ? 'between' : 'in'
-            next.value = DATE_FIELDS.has(patch.field) ? ['', ''] : []
-          }
-          return next
-        })
+  const updateCondition = (idx, patch) => {
+    setConditions(prev => prev.map((c, i) => {
+      if (i !== idx) return c
+      const next = { ...c, ...patch }
+      if (patch.field && patch.field !== c.field) {
+        next.op = DATE_FIELDS.has(patch.field) ? 'between' : 'in'
+        next.value = DATE_FIELDS.has(patch.field) ? ['', ''] : []
       }
+      return next
     }))
   }
-  const addCondition = (gIdx) => setGroups(prev => prev.map((g, i) => i === gIdx ? { ...g, conditions: [...g.conditions, emptyCondition()] } : g))
-  const removeCondition = (gIdx, cIdx) => setGroups(prev => prev.map((g, i) => i === gIdx ? { ...g, conditions: g.conditions.filter((_, j) => j !== cIdx) } : g).filter(g => g.conditions.length))
-  const addGroup = () => setGroups(prev => [...prev, emptyGroup()])
-  const removeGroup = (gIdx) => setGroups(prev => prev.filter((_, i) => i !== gIdx))
-  const setGroupOperator = (gIdx, operator) => setGroups(prev => prev.map((g, i) => i === gIdx ? { ...g, operator } : g))
-  const resetFilter = () => { setGroups([emptyGroup()]); setTopOperator('AND') }
+  const addCondition = () => setConditions(prev => [...prev, emptyCondition('AND')])
+  const removeCondition = (idx) => setConditions(prev => {
+    const next = prev.filter((_, i) => i !== idx)
+    // أول شرط في القايمة مالوش رابط أبدًا (مفيش حاجة قبله يتوصل بيها)
+    if (next.length) next[0] = { ...next[0], connector: undefined }
+    return next.length ? next : [emptyCondition()]
+  })
+  const resetFilter = () => setConditions([emptyCondition()])
 
   const save = async () => {
     if (!name.trim()) { toast.error(t('conversations.segments.builder.nameRequired')); return }
@@ -129,121 +152,126 @@ export default function SegmentBuilder({ segment, lifecycles, tagsList, allChann
     return []
   }
 
-  const renderValueInput = (cond, gIdx, cIdx) => {
+  const renderValueInput = (cond, idx) => {
     if (MULTI_FIELDS.has(cond.field)) {
       const options = optionsFor(cond.field)
       const selected = Array.isArray(cond.value) ? cond.value : []
+      const search = valueSearch[idx] || ''
+      const visible = search.trim()
+        ? options.filter(o => o.label.toLowerCase().includes(search.trim().toLowerCase()))
+        : options
+      const toggleValue = (v) => updateCondition(idx, { value: selected.includes(v) ? selected.filter(x => x !== v) : [...selected, v] })
       return (
-        <select multiple value={selected}
-          onChange={e => updateCondition(gIdx, cIdx, { value: Array.from(e.target.selectedOptions, o => o.value) })}
-          className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0 h-[74px]">
-          {options.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
-        </select>
+        <div>
+          {options.length > SEARCH_THRESHOLD && (
+            <div className="relative mb-1.5">
+              <Search size={13} className="absolute start-2.5 top-1/2 -translate-y-1/2 text-fg-subtle" />
+              <input value={search} onChange={e => setValueSearch(prev => ({ ...prev, [idx]: e.target.value }))}
+                placeholder={t('conversations.segments.builder.searchValues')}
+                className="w-full bg-surface-3 rounded-lg ps-8 pe-2 py-1.5 text-sm text-fg placeholder-fg-subtle" />
+            </div>
+          )}
+          <div className="bg-surface-3 rounded-lg p-1.5 max-h-48 overflow-y-auto space-y-0.5">
+            {visible.length === 0 && <p className="text-xs text-fg-subtle text-center py-2">{t('conversations.segments.builder.noOptionsMatch')}</p>}
+            {visible.map(o => (
+              <label key={o.value} className="flex items-center gap-2 px-1.5 py-1 rounded-md hover:bg-surface-2 cursor-pointer text-sm">
+                <input type="checkbox" checked={selected.includes(o.value)} onChange={() => toggleValue(o.value)} className="accent-brand w-3.5 h-3.5 flex-shrink-0" />
+                <span className="text-fg truncate">{o.label}</span>
+              </label>
+            ))}
+          </div>
+          {selected.length > 0 && (
+            <p className="text-[11px] text-fg-subtle mt-1">{t('conversations.segments.builder.selectedCount', { count: selected.length })}</p>
+          )}
+        </div>
       )
     }
     if (cond.op === 'between') {
       const [from, to] = Array.isArray(cond.value) ? cond.value : ['', '']
       return (
-        <div className="flex gap-1.5 flex-1 min-w-0">
-          <input type="date" value={from || ''} onChange={e => updateCondition(gIdx, cIdx, { value: [e.target.value, to || ''] })}
+        <div className="flex gap-1.5">
+          <input type="date" value={from || ''} onChange={e => updateCondition(idx, { value: [e.target.value, to || ''] })}
             className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0" />
-          <input type="date" value={to || ''} onChange={e => updateCondition(gIdx, cIdx, { value: [from || '', e.target.value] })}
+          <input type="date" value={to || ''} onChange={e => updateCondition(idx, { value: [from || '', e.target.value] })}
             className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0" />
         </div>
       )
     }
-    return <input type="date" value={cond.value || ''} onChange={e => updateCondition(gIdx, cIdx, { value: e.target.value })}
-      className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0" />
+    return <input type="date" value={cond.value || ''} onChange={e => updateCondition(idx, { value: e.target.value })}
+      className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg w-full" />
   }
 
   return (
-    <div className="bg-surface-2 rounded-2xl border border-surface-3 max-w-2xl">
-        <div className="flex items-center justify-between p-4 border-b border-surface-3">
-          <h3 className="font-semibold text-fg">{segment ? t('conversations.segments.builder.editTitle') : t('conversations.segments.builder.title')}</h3>
-          <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
-        </div>
+    <div className="space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-fg">{segment ? t('conversations.segments.builder.editTitle') : t('conversations.segments.builder.title')}</h2>
+        <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
+      </div>
 
-        <div className="p-4 space-y-4">
-          <input value={name} onChange={e => setName(e.target.value)} placeholder={t('conversations.segments.builder.namePlaceholder')}
-            className="w-full bg-surface-3 rounded-xl py-2.5 px-4 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
+      <input value={name} onChange={e => setName(e.target.value)} placeholder={t('conversations.segments.builder.namePlaceholder')}
+        className="w-full bg-surface-2 border border-surface-3 rounded-xl py-2.5 px-4 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-1 focus:ring-brand" />
 
-          {groups.map((group, gIdx) => (
-            <div key={gIdx}>
-              {gIdx > 0 && (
-                <div className="flex items-center gap-1.5 text-xs py-1.5">
-                  <span className="text-fg-subtle">{t('conversations.segments.builder.combineGroupsLabel')}</span>
-                  <button onClick={() => setTopOperator('AND')} className={`px-2.5 py-1 rounded-lg font-medium ${topOperator === 'AND' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {t('conversations.segments.builder.matchAllGroups')}
-                  </button>
-                  <button onClick={() => setTopOperator('OR')} className={`px-2.5 py-1 rounded-lg font-medium ${topOperator === 'OR' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {t('conversations.segments.builder.matchAnyGroups')}
-                  </button>
-                </div>
-              )}
-            <div className="rounded-xl border border-surface-3 p-3 space-y-2.5">
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-1.5 text-xs">
-                  <Layers size={12} className="text-fg-subtle" />
-                  <span className="text-fg-muted">{t('conversations.segments.builder.matchLabel')}</span>
-                  <button onClick={() => setGroupOperator(gIdx, 'AND')} className={`px-2.5 py-1 rounded-lg font-medium ${group.operator === 'AND' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {t('conversations.segments.builder.matchAll')}
-                  </button>
-                  <button onClick={() => setGroupOperator(gIdx, 'OR')} className={`px-2.5 py-1 rounded-lg font-medium ${group.operator === 'OR' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
-                    {t('conversations.segments.builder.matchAny')}
-                  </button>
-                </div>
-                {groups.length > 1 && (
-                  <button onClick={() => removeGroup(gIdx)} className="text-fg-subtle hover:text-danger p-1"><Trash2 size={13} /></button>
-                )}
+      <div className="space-y-2">
+        {conditions.map((cond, idx) => (
+          <div key={idx}>
+            {idx > 0 && (
+              <div className="flex items-center gap-1.5 py-1.5">
+                <div className="h-px bg-surface-3 flex-1" />
+                <button onClick={() => updateCondition(idx, { connector: 'AND' })}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium ${cond.connector !== 'OR' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                  {t('conversations.segments.builder.connectorAnd')}
+                </button>
+                <button onClick={() => updateCondition(idx, { connector: 'OR' })}
+                  className={`px-3 py-1 rounded-lg text-xs font-medium ${cond.connector === 'OR' ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                  {t('conversations.segments.builder.connectorOr')}
+                </button>
+                <div className="h-px bg-surface-3 flex-1" />
               </div>
-
-              {group.conditions.map((cond, cIdx) => (
-                <div key={cIdx} className="flex items-start gap-1.5">
-                  <div className="flex-1 min-w-0 space-y-1.5">
-                    <div className="flex gap-1.5">
-                      <select value={cond.field} onChange={e => updateCondition(gIdx, cIdx, { field: e.target.value })}
-                        className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0">
-                        {[...MULTI_FIELDS, ...DATE_FIELDS].map(f => <option key={f} value={f}>{t(`conversations.segments.fields.${f}`)}</option>)}
-                      </select>
-                      <select value={cond.op} onChange={e => updateCondition(gIdx, cIdx, { op: e.target.value })}
-                        className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg w-32 flex-shrink-0">
-                        {(DATE_FIELDS.has(cond.field) ? DATE_OPS : MULTI_OPS).map(op => <option key={op} value={op}>{t(`conversations.segments.ops.${op}`)}</option>)}
-                      </select>
-                    </div>
-                    {renderValueInput(cond, gIdx, cIdx)}
+            )}
+            <div className="bg-surface-2 border border-surface-3 rounded-xl p-3 space-y-2">
+              <div className="flex items-start gap-1.5">
+                <div className="flex-1 min-w-0 space-y-1.5">
+                  <div className="flex gap-1.5">
+                    <select value={cond.field} onChange={e => updateCondition(idx, { field: e.target.value })}
+                      className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg flex-1 min-w-0">
+                      {[...MULTI_FIELDS, ...DATE_FIELDS].map(f => <option key={f} value={f}>{t(`conversations.segments.fields.${f}`)}</option>)}
+                    </select>
+                    <select value={cond.op} onChange={e => updateCondition(idx, { op: e.target.value })}
+                      className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg w-32 flex-shrink-0">
+                      {(DATE_FIELDS.has(cond.field) ? DATE_OPS : MULTI_OPS).map(op => <option key={op} value={op}>{t(`conversations.segments.ops.${op}`)}</option>)}
+                    </select>
                   </div>
-                  <button onClick={() => removeCondition(gIdx, cIdx)} className="text-fg-subtle hover:text-danger flex-shrink-0 p-1 mt-1.5">
+                  {renderValueInput(cond, idx)}
+                </div>
+                {conditions.length > 1 && (
+                  <button onClick={() => removeCondition(idx)} className="text-fg-subtle hover:text-danger flex-shrink-0 p-1">
                     <Trash2 size={14} />
                   </button>
-                </div>
-              ))}
-
-              <button onClick={() => addCondition(gIdx)} className="flex items-center gap-1 text-xs text-brand hover:underline">
-                <Plus size={13} /> {t('conversations.segments.builder.addCondition')}
-              </button>
+                )}
+              </div>
             </div>
-            </div>
-          ))}
-
-          <button onClick={addGroup} className="flex items-center gap-1 text-sm text-brand hover:underline">
-            <Plus size={14} /> {t('conversations.segments.builder.addGroup')}
-          </button>
-
-          <div className="bg-surface-3 rounded-xl p-3 text-sm text-fg-muted">
-            {previewLoading ? t('conversations.segments.builder.counting')
-              : previewCount === null ? t('conversations.segments.builder.noConditionsYet')
-              : t('conversations.segments.builder.previewCount', { count: previewCount })}
           </div>
-        </div>
+        ))}
+      </div>
 
-        <div className="flex gap-2 p-4 border-t border-surface-3">
-          <button onClick={resetFilter} className="px-4 py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium">
-            {t('conversations.segments.builder.resetFilter')}
-          </button>
-          <button onClick={save} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-medium disabled:opacity-50">
-            {saving ? t('conversations.segments.builder.saving') : segment ? t('conversations.segments.builder.save') : t('conversations.segments.builder.saveAsNew')}
-          </button>
-        </div>
+      <button onClick={addCondition} className="flex items-center gap-1 text-sm text-brand hover:underline">
+        <Plus size={14} /> {t('conversations.segments.builder.addCondition')}
+      </button>
+
+      <div className="bg-surface-2 border border-surface-3 rounded-xl p-3 text-sm text-fg-muted">
+        {previewLoading ? t('conversations.segments.builder.counting')
+          : previewCount === null ? t('conversations.segments.builder.noConditionsYet')
+          : t('conversations.segments.builder.previewCount', { count: previewCount })}
+      </div>
+
+      <div className="flex gap-2 pt-1">
+        <button onClick={resetFilter} className="px-4 py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium">
+          {t('conversations.segments.builder.resetFilter')}
+        </button>
+        <button onClick={save} disabled={saving} className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-medium disabled:opacity-50">
+          {saving ? t('conversations.segments.builder.saving') : segment ? t('conversations.segments.builder.save') : t('conversations.segments.builder.saveAsNew')}
+        </button>
+      </div>
     </div>
   )
 }
