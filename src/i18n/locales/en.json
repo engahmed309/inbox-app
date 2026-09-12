@@ -791,6 +791,62 @@
       "heading": "Lifecycle stages",
       "allStages": "All stages"
     },
+    "segments": {
+      "heading": "Segments",
+      "newSegment": "+ New segment",
+      "deleteConfirm": "Are you sure you want to delete this segment?",
+      "deleteError": "Failed to delete the segment",
+      "loadError": "Failed to load segments",
+      "matchCount": "{{count}} contacts",
+      "builder": {
+        "title": "New segment",
+        "editTitle": "Edit segment",
+        "namePlaceholder": "Segment name",
+        "nameRequired": "Enter a name for the segment",
+        "conditionRequired": "Add at least one condition with a value",
+        "matchLabel": "Match:",
+        "matchAll": "All conditions (AND)",
+        "matchAny": "Any condition (OR)",
+        "addCondition": "Add condition",
+        "selectValue": "Select a value",
+        "valuePlaceholder": "Value",
+        "counting": "Counting...",
+        "noConditionsYet": "Add a condition with a value to see the matching customer count",
+        "previewCount": "{{count}} matching customers",
+        "cancel": "Cancel",
+        "save": "Save",
+        "saving": "Saving...",
+        "saved": "Segment saved",
+        "saveError": "Failed to save the segment"
+      },
+      "fields": {
+        "lifecycle_stage_id": "Lifecycle stage",
+        "lifecycle_stage_entered_at": "Stage entry date",
+        "country": "Country",
+        "tag_id": "Tag",
+        "channel_id": "Channel/number",
+        "platform": "Platform",
+        "conversation_status": "Conversation status",
+        "contact_created_at": "Contact creation date"
+      },
+      "ops": {
+        "eq": "equals",
+        "in": "any of",
+        "between": "between",
+        "gte": "on or after",
+        "lte": "on or before"
+      },
+      "values": {
+        "open": "Open",
+        "follow_up": "Follow-up",
+        "closed": "Closed",
+        "whatsapp": "WhatsApp",
+        "whatsapp_qr": "WhatsApp (quick link)",
+        "facebook": "Facebook",
+        "instagram": "Instagram",
+        "tiktok": "TikTok"
+      }
+    },
     "list": {
       "empty": "No conversations",
       "loadMore": "Load more",

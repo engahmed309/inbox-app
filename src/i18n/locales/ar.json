@@ -791,6 +791,62 @@
       "heading": "مراحل الـ Lifecycle",
       "allStages": "كل المراحل"
     },
+    "segments": {
+      "heading": "الشرائح",
+      "newSegment": "+ شريحة جديدة",
+      "deleteConfirm": "متأكد إنك عايز تحذف الشريحة دي؟",
+      "deleteError": "فشل حذف الشريحة",
+      "loadError": "فشل تحميل الشرائح",
+      "matchCount": "{{count}} عميل",
+      "builder": {
+        "title": "شريحة جديدة",
+        "editTitle": "تعديل الشريحة",
+        "namePlaceholder": "اسم الشريحة",
+        "nameRequired": "اكتب اسم للشريحة",
+        "conditionRequired": "أضف شرط واحد على الأقل بقيمة",
+        "matchLabel": "تطابق:",
+        "matchAll": "كل الشروط (AND)",
+        "matchAny": "أي شرط (OR)",
+        "addCondition": "إضافة شرط",
+        "selectValue": "اختر قيمة",
+        "valuePlaceholder": "القيمة",
+        "counting": "جاري الحساب...",
+        "noConditionsYet": "أضف شرط بقيمة عشان تشوف عدد العملاء المطابقين",
+        "previewCount": "{{count}} عميل مطابق للشروط دي",
+        "cancel": "إلغاء",
+        "save": "حفظ",
+        "saving": "جاري الحفظ...",
+        "saved": "تم حفظ الشريحة",
+        "saveError": "فشل حفظ الشريحة"
+      },
+      "fields": {
+        "lifecycle_stage_id": "مرحلة الـ Lifecycle",
+        "lifecycle_stage_entered_at": "تاريخ دخول المرحلة",
+        "country": "الدولة",
+        "tag_id": "الوسم (Tag)",
+        "channel_id": "القناة/الرقم",
+        "platform": "المنصة",
+        "conversation_status": "حالة المحادثة",
+        "contact_created_at": "تاريخ إنشاء جهة الاتصال"
+      },
+      "ops": {
+        "eq": "يساوي",
+        "in": "أي من",
+        "between": "بين",
+        "gte": "بعد أو يساوي",
+        "lte": "قبل أو يساوي"
+      },
+      "values": {
+        "open": "مفتوحة",
+        "follow_up": "متابعة",
+        "closed": "مغلقة",
+        "whatsapp": "واتساب",
+        "whatsapp_qr": "واتساب (ربط سريع)",
+        "facebook": "فيسبوك",
+        "instagram": "إنستجرام",
+        "tiktok": "تيك توك"
+      }
+    },
     "list": {
       "empty": "لا توجد محادثات",
       "loadMore": "تحميل المزيد",

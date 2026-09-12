@@ -9,6 +9,7 @@ import { useToast } from '../contexts/ToastContext'
 import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
+import SegmentBuilderModal from '../components/SegmentBuilderModal'
 import i18n from '../i18n'
 
 const AGENT_STATUS_OPTS = [
@@ -321,6 +322,7 @@ const screenCache = {
   agentOpenCounts: {}, unassignedOpenCount: 0, allChannels: [],
   aiEnabled: false, aiOpenCount: 0,
   selectedTagIds: [], selectedAdIds: [], dateFrom: '', dateTo: '', tagsList: [], campaigns: [],
+  segments: [], selectedSegmentId: null, segmentCount: null,
 }
 
 export default function ConversationsScreen() {
@@ -356,6 +358,11 @@ export default function ConversationsScreen() {
   const [selectedAdIds, setSelectedAdIds] = useState(screenCache.selectedAdIds)
   const [dateFrom, setDateFrom] = useState(screenCache.dateFrom)
   const [dateTo, setDateTo] = useState(screenCache.dateTo)
+  const [segments, setSegments] = useState(screenCache.segments)
+  const [selectedSegmentId, setSelectedSegmentId] = useState(screenCache.selectedSegmentId)
+  const [segmentCount, setSegmentCount] = useState(screenCache.segmentCount)
+  const [showSegmentBuilder, setShowSegmentBuilder] = useState(false)
+  const [editingSegment, setEditingSegment] = useState(null)
   const [showAdvFilter, setShowAdvFilter] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [showIosHelp, setShowIosHelp] = useState(false)
@@ -376,6 +383,12 @@ export default function ConversationsScreen() {
   // متفائلين بالـ Realtime لحد ما .subscribe() تحت يقول عكس كده — بيتحكم في معدل الـ polling
   // الاحتياطي بنفس فكرة ChatScreen
   const realtimeHealthyRef = useRef(true)
+  // مرجع (مش state) بيعكس آخر قيمة لـ selectedSegmentId لحظيًا — محتاجينه عشان طلبات الشبكة القديمة
+  // (من قبل تغيير الفلتر) ممكن توصل ردودها متأخرة بعد ما المستخدم يختار/يشيل شريحة، والـ closure
+  // القديم بيفضل شايل القيمة القديمة لـ selectedSegmentId مهما حصل — الـ ref بس بيديني القيمة الحقيقية
+  // دلوقتي وقت وصول الرد، عشان أرفض أي نتيجة قديمة بدل ما تكتب فوق العرض الصح
+  const selectedSegmentIdRef = useRef(selectedSegmentId)
+  useEffect(() => { selectedSegmentIdRef.current = selectedSegmentId }, [selectedSegmentId])
   const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
@@ -426,6 +439,13 @@ export default function ConversationsScreen() {
     const { data: tagRows } = await supabase.from('tags').select('id, name, color').order('name')
     setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
 
+    // الشرائح أدمن بس — لو الموظف مش أدمن الباك إند بيرجع 403 وبنسيب القايمة فاضية بهدوء
+    try {
+      const res = await apiFetch(`${API_URL}/segments`)
+      const data = await res.json()
+      if (res.ok) { setSegments(data.segments || []); screenCache.segments = data.segments || [] }
+    } catch { /* مش أدمن أو فشل الجلب — القسم هيفضل مش ظاهر أصلاً */ }
+
     try {
       const res = await apiFetch(`${API_URL}/ads/campaigns`)
       const data = await res.json()
@@ -434,6 +454,50 @@ export default function ConversationsScreen() {
   }, [])
 
   const fetchConversations = useCallback(async () => {
+    // لو فيه شريحة (segment) مختارة، الباك إند هو اللي بيحل الفلتر (AND/OR على أكتر من جدول) ويرجّع
+    // صفحة محادثات جاهزة — مش سلسلة فلاتر Supabase العادية تحت. باقي الشاشة (فتح شات، رد، إلخ)
+    // بيشتغل بالظبط زي أي محادثة عادية لأن الشكل الراجع مطابق لشكل conversations العادي
+    if (selectedSegmentId) {
+      const requestedSegmentId = selectedSegmentId
+      try {
+        const params = new URLSearchParams({ limit: String(visibleLimit) })
+        if (status !== 'all') params.set('status', status)
+        const res = await apiFetch(`${API_URL}/segments/${requestedSegmentId}/conversations?${params}`)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || t('conversations.list.loadError'))
+        // الطلب ده ممكن ياخد وقت والمستخدم يكون غيّر الشريحة أو شالها خلال ده — لو كده تجاهل
+        // الرد القديم ده تمامًا، مش هيكتب فوق العرض الصح الحالي
+        if (selectedSegmentIdRef.current !== requestedSegmentId) return
+        // مفيش حساب دقيق لـ"غير مقروءة ليا أنا بالذات" هنا (ده محتاج readsMap اللي بيتحسب تحت
+        // للمسار العادي بس) — نفس التبسيط المستخدم في مسار البحث (searchConversations) تحت
+        const convs = (data.conversations || []).map(c => ({ ...c, myUnread: false }))
+        setConversations(convs); screenCache.conversations = convs
+        setSegmentCount(data.count); screenCache.segmentCount = data.count
+        setLoading(false)
+
+        if (convs.length > 0) {
+          const ids = convs.map(c => c.id)
+          const { data: msgs } = await supabase
+            .from('messages').select('conversation_id, content, content_type, direction, created_at')
+            .in('conversation_id', ids).neq('content_type', 'note').order('created_at', { ascending: false })
+          const lastMap = {}
+          msgs?.forEach(m => { if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m })
+          setLastMessages(lastMap); screenCache.lastMessages = lastMap
+
+          const contactIds = convs.map(c => c.contact_id).filter(Boolean)
+          if (contactIds.length) {
+            const { data: ctRows } = await supabase.from('contact_tags').select('contact_id, tags(id, name, color)').in('contact_id', contactIds)
+            const ctMap = {}
+            ctRows?.forEach(r => { if (!ctMap[r.contact_id]) ctMap[r.contact_id] = []; if (r.tags) ctMap[r.contact_id].push(r.tags) })
+            setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
+          }
+        }
+      } catch (err) {
+        console.error(err); toast.error(err.message || t('conversations.list.loadError')); setLoading(false)
+      }
+      return
+    }
+
     // فلتر المرحلة بيتطبّق بـ join على contacts (مش بجلب كل معرّفات العملاء وبعتها في .in())، عشان
     // مراحل زي "تم ارسال الباقات" فيها أكتر من ١١ ألف عميل — .in() بقايمة بالحجم ده كان بيعدّي حد
     // طول الرابط المسموح به ويرجّع 400 من غير أي سبب واضح في الواجهة. فلتر التاج لسه بنفس الطريقة
@@ -591,6 +655,9 @@ export default function ConversationsScreen() {
 
     const { data, error } = await query
     if (error) { console.error(error); toast.error(t('conversations.list.loadError')); setLoading(false); return }
+    // نداء قديم من قبل ما شريحة تتختار ممكن يكون لسه طاير من الـ Realtime ويرجع رده متأخر — لو
+    // فيه شريحة مختارة دلوقتي فعليًا، تجاهل الرد القديم ده تمامًا (مش هيكتب فوق عرض الشريحة الصح)
+    if (selectedSegmentIdRef.current) return
 
     const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
     setConversations(convs); screenCache.conversations = convs
@@ -625,7 +692,7 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
-  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo])
+  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
 
   // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
   // فلاتر القناة/الموظف/الحالة الحالية. searchType بيحدد نبحث فين: اسم العميل، محتوى رسالة حقيقية،
@@ -752,7 +819,7 @@ export default function ConversationsScreen() {
   useEffect(() => {
     if (!filtersMountedRef.current) { filtersMountedRef.current = true; return }
     setVisibleLimit(CONVERSATIONS_PAGE_SIZE)
-  }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, selectedTagIds, selectedAdIds, dateFrom, dateTo])
+  }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
 
   // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
   useEffect(() => {
@@ -770,7 +837,8 @@ export default function ConversationsScreen() {
     screenCache.selectedAdIds = selectedAdIds
     screenCache.dateFrom = dateFrom
     screenCache.dateTo = dateTo
-  }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo])
+    screenCache.selectedSegmentId = selectedSegmentId
+  }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
 
   // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل دقيقتين بس
   useEffect(() => {
@@ -1152,6 +1220,40 @@ export default function ConversationsScreen() {
               ))}
             </div>
           )}
+
+          {/* الشرائح (Segments) — فلتر محفوظ بشروط AND/OR، أدمن بس */}
+          {agent?.role === 'admin' && expanded && (
+            <div className="border-t border-surface-3 py-2">
+              <div className="flex items-center justify-between px-3 pb-1.5 pt-1">
+                <p className="text-[11px] font-semibold text-fg-subtle">{t('conversations.segments.heading')}</p>
+                <button onClick={() => { setEditingSegment(null); setShowSegmentBuilder(true) }} className="text-[11px] text-brand hover:underline">
+                  {t('conversations.segments.newSegment')}
+                </button>
+              </div>
+              {selectedSegmentId && (
+                <button onClick={() => { setSelectedSegmentId(null); setMobileMenuOpen(false) }}
+                  className="w-full flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg mx-auto max-w-[calc(100%-1rem)] text-fg-muted hover:bg-surface-3/60">
+                  <span className="flex-1 text-start">{t('conversations.lifecycle.allStages')}</span>
+                </button>
+              )}
+              {segments.map(seg => (
+                <div key={seg.id} className="group flex items-center gap-1 mx-auto max-w-[calc(100%-1rem)]">
+                  <button onClick={() => { setSelectedSegmentId(prev => prev === seg.id ? null : seg.id); setMobileMenuOpen(false) }}
+                    className={`flex-1 min-w-0 flex items-center gap-2 px-3 py-2 text-sm transition-colors rounded-lg ${selectedSegmentId === seg.id ? 'bg-surface-3 text-fg' : 'text-fg-muted hover:bg-surface-3/60'}`}>
+                    <Filter size={13} className="flex-shrink-0" />
+                    <span className="flex-1 text-start truncate">{seg.name}</span>
+                    {selectedSegmentId === seg.id && segmentCount != null && (
+                      <span className="text-[10px] font-bold px-1.5 py-0.5 rounded-full bg-surface-2 text-fg-muted">{segmentCount}</span>
+                    )}
+                  </button>
+                  <button onClick={() => { setEditingSegment(seg); setShowSegmentBuilder(true) }}
+                    className="opacity-0 group-hover:opacity-100 text-fg-subtle hover:text-fg p-1 flex-shrink-0">
+                    <Settings size={13} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
 
@@ -1352,6 +1454,26 @@ export default function ConversationsScreen() {
             </button>
           </div>
         </div>
+      )}
+
+      {/* بناء/تعديل شريحة (segment) */}
+      {showSegmentBuilder && (
+        <SegmentBuilderModal
+          segment={editingSegment}
+          lifecycles={lifecycles}
+          tagsList={tagsList}
+          allChannels={allChannels}
+          onClose={() => setShowSegmentBuilder(false)}
+          onSaved={(saved) => {
+            setShowSegmentBuilder(false)
+            setSegments(prev => {
+              const exists = prev.some(s => s.id === saved.id)
+              const next = exists ? prev.map(s => s.id === saved.id ? saved : s) : [saved, ...prev]
+              screenCache.segments = next
+              return next
+            })
+          }}
+        />
       )}
     </div>
   )
