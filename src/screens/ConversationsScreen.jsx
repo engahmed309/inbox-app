@@ -1080,6 +1080,12 @@ export default function ConversationsScreen() {
             </button>
             <PushNotificationToggle />
             {agent?.role === 'admin' && (
+              <button onClick={() => navigate('/broadcast')} title={t('conversations.sidebar.broadcastTitle')}
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+                <Megaphone size={15} />
+              </button>
+            )}
+            {agent?.role === 'admin' && (
               <button onClick={() => navigate('/reports')} title={t('conversations.sidebar.reportsTitle')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
                 <BarChart3 size={15} />

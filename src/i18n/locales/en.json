@@ -1,4 +1,54 @@
 {
+  "broadcast": {
+    "title": "Broadcast",
+    "newButton": "New",
+    "list": {
+      "empty": "No broadcasts yet — tap \"New\" to start",
+      "templateAndCount": "Template: {{template}} — {{count}} customers"
+    },
+    "status": {
+      "draft": "Draft",
+      "previewed": "Previewed",
+      "sending": "Sending",
+      "completed": "Completed"
+    },
+    "recipientStatus": {
+      "pending": "Pending",
+      "sent": "Sent",
+      "delivered": "Delivered",
+      "read": "Read",
+      "failed": "Failed",
+      "skipped_blocked": "Skipped (blocked)"
+    },
+    "detail": {
+      "loading": "Loading...",
+      "recipientsHeading": "Customers"
+    },
+    "wizard": {
+      "selectPlaceholder": "Select...",
+      "segmentLabel": "Segment",
+      "channelLabel": "Send from number",
+      "templateLabel": "Approved template",
+      "noTemplates": "This number has no approved templates yet",
+      "changeTemplate": "Change template",
+      "variablePlaceholder": "Variable {{n}}",
+      "fillVariablesFirst": "Fill in all template variables first",
+      "openMessageLabel": "Message for open-chat customers (cheaper than a template)",
+      "openMessageHint": "A plain message (no template cost) goes to customers whose chat has been active in the last 24 hours — you can edit it",
+      "openMessageRequired": "Write a message for open-chat customers",
+      "previewButton": "Calculate count",
+      "previewing": "Calculating...",
+      "previewOpen": "Open chat (plain message)",
+      "previewClosed": "Closed chat (template)",
+      "previewBlocked": "Blocked (excluded)",
+      "previewNoWhatsapp": "No WhatsApp (excluded)",
+      "exceedsDailyLimit": "This exceeds this number's daily WhatsApp limit ({{limit}}) — it will automatically spread over about {{days}} days",
+      "willSendConfirm": "This will reach {{count}} real customers, {{templateCount}} of them billed as a paid template",
+      "confirmSend": "Confirm send",
+      "sending": "Sending...",
+      "sent": "Sending started"
+    }
+  },
   "login": {
     "brand": "Seha Wa Afeya",
     "tagline": "Customer Service Platform",
@@ -728,6 +778,7 @@
       "collapseTitle": "Collapse menu",
       "expandTitle": "Expand menu",
       "languageTitle": "Switch language",
+      "broadcastTitle": "Broadcast",
       "reportsTitle": "Reports",
       "installButton": "Install app on phone"
     },

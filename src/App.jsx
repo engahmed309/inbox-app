@@ -13,6 +13,7 @@ import SetPasswordScreen from './screens/SetPasswordScreen'
 // عشان الموظفين العاديين ميحملوش الحجم ده كله كل مرة يفتحوا التطبيق
 const SettingsScreen = lazy(() => import('./screens/SettingsScreen'))
 const ReportsScreen = lazy(() => import('./screens/ReportsScreen'))
+const BroadcastScreen = lazy(() => import('./screens/BroadcastScreen'))
 
 function ScreenLoader() {
   return (
@@ -80,6 +81,7 @@ export default function App() {
         <Route path="/chat/:id" element={<PrivateRoute><ChatScreen /></PrivateRoute>} />
         <Route path="/settings/*" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><SettingsScreen /></Suspense></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><ReportsScreen /></Suspense></PrivateRoute>} />
+        <Route path="/broadcast" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><BroadcastScreen /></Suspense></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

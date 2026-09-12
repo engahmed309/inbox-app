@@ -1,4 +1,54 @@
 {
+  "broadcast": {
+    "title": "الإرسال الجماعي",
+    "newButton": "جديد",
+    "list": {
+      "empty": "مفيش إرسال جماعي لسه — دوس \"جديد\" عشان تبدأ",
+      "templateAndCount": "قالب: {{template}} — {{count}} عميل"
+    },
+    "status": {
+      "draft": "مسودة",
+      "previewed": "معاينة",
+      "sending": "جاري الإرسال",
+      "completed": "خلص"
+    },
+    "recipientStatus": {
+      "pending": "في الانتظار",
+      "sent": "اتبعتت",
+      "delivered": "وصلت",
+      "read": "اتقرت",
+      "failed": "فشلت",
+      "skipped_blocked": "متجاهلة (محظور)"
+    },
+    "detail": {
+      "loading": "جاري التحميل...",
+      "recipientsHeading": "العملاء"
+    },
+    "wizard": {
+      "selectPlaceholder": "اختر...",
+      "segmentLabel": "الشريحة",
+      "channelLabel": "الرقم اللي هيبعت",
+      "templateLabel": "القالب المعتمد",
+      "noTemplates": "الرقم ده مالوش قوالب معتمدة لسه",
+      "changeTemplate": "غيّر القالب",
+      "variablePlaceholder": "المتغيّر {{n}}",
+      "fillVariablesFirst": "املا كل متغيّرات القالب الأول",
+      "openMessageLabel": "الرسالة لأصحاب الشات المفتوح (أرخص من القالب)",
+      "openMessageHint": "بتتبعت رسالة عادية (من غير تكلفة قالب) للعملاء اللي شاتهم لسه مفتوح خلال آخر ٢٤ ساعة — تقدر تعدّلها زي ما تحب",
+      "openMessageRequired": "اكتب رسالة لأصحاب الشات المفتوح",
+      "previewButton": "احسب العدد",
+      "previewing": "جاري الحساب...",
+      "previewOpen": "شات مفتوح (رسالة عادية)",
+      "previewClosed": "شات مقفول (قالب)",
+      "previewBlocked": "محظورين (مُستبعدين)",
+      "previewNoWhatsapp": "مفيش واتساب (مُستبعدين)",
+      "exceedsDailyLimit": "العدد ده أكبر من حد واتساب اليومي لهذا الرقم ({{limit}}) — هيتوزع تلقائيًا على حوالي {{days}} يوم",
+      "willSendConfirm": "هيتم التواصل مع {{count}} عميل حقيقي، منهم {{templateCount}} هيتحاسبوا كقالب مدفوع",
+      "confirmSend": "تأكيد الإرسال",
+      "sending": "جاري الإرسال...",
+      "sent": "بدأ الإرسال"
+    }
+  },
   "login": {
     "brand": "صحة وعافية",
     "tagline": "منصة خدمة العملاء",
@@ -728,6 +778,7 @@
       "collapseTitle": "أغلق القائمة",
       "expandTitle": "افتح القائمة",
       "languageTitle": "تبديل اللغة",
+      "broadcastTitle": "الإرسال الجماعي",
       "reportsTitle": "التقارير",
       "installButton": "ثبّت التطبيق على الهاتف"
     },
