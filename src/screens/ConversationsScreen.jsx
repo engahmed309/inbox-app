@@ -540,19 +540,25 @@ export default function ConversationsScreen() {
       return q
     }
 
-    // بيجيب كل صفوف كويري معينة بصفحات من ١٠٠٠ (سوبابيز بيوقف عند الحد ده افتراضيًا)، بس بالتوازي
-    // مش بالتتابع — أول صفحة بتحدد لو فيه صفحات تانية، والباقي بيتجابوا مع بعض دفعة واحدة، عشان
-    // منعملش عشرات الـ round trips المتتالية على قاعدة بيانات فيها آلاف الصفوف
+    // بيجيب كل صفوف كويري معينة بصفحات من ١٠٠٠ (سوبابيز بيوقف عند الحد ده افتراضيًا). القاعدة بقى
+    // فيها أكتر من ٦٣ ألف محادثة، يعني ده ممكن يبقى ٦٣+ صفحة — لو كلهم اتبعتوا مرة واحدة بالتوازي
+    // (زي ما كان قبل كده) بيبقى عندنا عشرات الطلبات المتزامنة ع القاعدة (ده كان بيتكرر مع كل ٣
+    // نداءات فوق كمان)، وده سبب رئيسي في البطء العام. هنا بنحدد حد أقصى (٨) للطلبات المتزامنة
+    // في نفس اللحظة بدل ما نفتحهم كلهم مرة واحدة
     const fetchAllPaged = async (buildQuery) => {
       const PAGE = 1000
+      const CONCURRENCY = 8
       const { data: first, count } = await buildQuery().range(0, PAGE - 1)
       let all = first || []
       const total = count ?? all.length
       if (total > PAGE) {
         const pageIdxs = []
         for (let offset = PAGE; offset < total; offset += PAGE) pageIdxs.push(offset)
-        const rest = await Promise.all(pageIdxs.map(offset => buildQuery().range(offset, offset + PAGE - 1).then(r => r.data || [])))
-        rest.forEach(page => { all = all.concat(page) })
+        for (let i = 0; i < pageIdxs.length; i += CONCURRENCY) {
+          const batch = pageIdxs.slice(i, i + CONCURRENCY)
+          const results = await Promise.all(batch.map(offset => buildQuery().range(offset, offset + PAGE - 1).then(r => r.data || [])))
+          results.forEach(page => { all = all.concat(page) })
+        }
       }
       return all
     }
@@ -859,17 +865,25 @@ export default function ConversationsScreen() {
     if (screenCache.conversations === null) setLoading(true)
     if (!searchActiveRef.current) fetchConversations()
 
+    // كل تغيير في conversations (حتى تحديث last_message_at من رسالة واحدة) كان بيعمل fetchConversations()
+    // فوري — وده بيعيد حساب عدادات التابات/الـ lifecycle من الصفر (fetchAllPaged بتجيب آلاف
+    // الصفوف بصفحات متوازية). مع رسايل كتير واردة في نفس الوقت (طبيعي مع قاعدة عملاء بالحجم ده)،
+    // ده كان بيسبب عشرات نداءات fetchConversations المتكدسة فوق بعض كل ثانية = بطء حقيقي وواضح.
+    // الحل: نجمع أي عدد أحداث توصل خلال نافذة قصيرة (١.٥ ثانية) ونعمل fetch واحد بس بعد ما تهدأ
+    const debounceTimerRef = { current: null }
+    const debouncedFetch = () => {
+      if (searchActiveRef.current) return
+      clearTimeout(debounceTimerRef.current)
+      debounceTimerRef.current = setTimeout(fetchConversations, 1500)
+    }
+
     // Realtime على conversations — لو فيه بحث شغال دلوقتي منعملش تحديث تلقائي، عشان منقاطعش
     // نتايج البحث الحالية؛ البحث نفسه هيتحدّث لوحده لما نص البحث يتغيّر
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
     realtimeRef.current = supabase
       .channel(`convs-list-${Date.now()}`)
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, () => {
-        if (!searchActiveRef.current) fetchConversations()
-      })
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, () => {
-        if (!searchActiveRef.current) fetchConversations() // تحديث آخر رسالة
-      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, debouncedFetch)
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch) // تحديث آخر رسالة
       .subscribe((status) => {
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           realtimeHealthyRef.current = false
@@ -896,6 +910,7 @@ export default function ConversationsScreen() {
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
       clearInterval(pollInterval)
+      clearTimeout(debounceTimerRef.current)
     }
   }, [fetchConversations, agent])
 
