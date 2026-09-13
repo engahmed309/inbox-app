@@ -1860,8 +1860,7 @@ function SegmentsTab() {
 
   const loadSegments = async () => {
     try {
-      // with_counts: شاشة إدارة الشرائح هي الوحيدة اللي محتاجة العدد، فبتدفع تكلفة حسابه لوحدها
-      const res = await apiFetch(`${API_URL}/segments?with_counts=1`)
+      const res = await apiFetch(`${API_URL}/segments`)
       const data = await res.json()
       if (res.ok) setSegments(data.segments || [])
     } catch { /* هتفضل القايمة زي ما هي */ }
@@ -1923,14 +1922,7 @@ function SegmentsTab() {
       {segments.map(seg => (
         <div key={seg.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
           <Filter size={16} className="text-fg-subtle flex-shrink-0" />
-          <div className="flex-1 min-w-0">
-            <p className="text-sm text-fg truncate">{seg.name}</p>
-            <p className="text-[11px] text-fg-subtle">
-              {seg.contact_count == null
-                ? t('settings.segments.countUnknown')
-                : t('settings.segments.contactCount', { count: seg.contact_count })}
-            </p>
-          </div>
+          <span className="flex-1 text-sm text-fg truncate">{seg.name}</span>
           <button onClick={() => { setEditingSegment(seg); setShowBuilder(true) }} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
           <button onClick={() => remove(seg)} className="text-fg-muted hover:text-danger"><Trash2 size={14} /></button>
         </div>
