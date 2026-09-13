@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
+import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch } from '../lib/supabase'
@@ -339,6 +339,10 @@ const screenCache = {
   aiEnabled: false, aiOpenCount: 0,
   selectedTagIds: [], selectedAdIds: [], dateFrom: '', dateTo: '', tagsList: [], campaigns: [],
   segments: [], selectedSegmentId: null, segmentCount: null,
+  // { convId, delta, top } — مش رقم تمرير مجرد: المحادثات بتترتب بآخر رسالة، فأي رسالة جديدة
+  // بتزحزح القايمة كلها وانت في الشات. فبنحفظ أنهي محادثة كانت أول القايمة وبعدها بكام بكسل،
+  // ونرجّع نفس المنظر لما ترجع مهما اتغير فوقها
+  scrollAnchor: null,
 }
 
 export default function ConversationsScreen() {
@@ -829,7 +833,49 @@ export default function ConversationsScreen() {
   useEffect(() => {
     if (!filtersMountedRef.current) { filtersMountedRef.current = true; return }
     setVisibleLimit(CONVERSATIONS_PAGE_SIZE)
+    screenCache.scrollAnchor = null // نتيجة مختلفة تمامًا — المفروض تبدأ من فوق
+    if (listRef.current) listRef.current.scrollTop = 0
   }, [status, channel, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
+
+  // ─── حفظ/استرجاع مكان القراءة في القايمة ──────────────────
+  const listRef = useRef(null)
+  // بنسجّل أول محادثة ظاهرة (مش رقم التمرير بس) كل ما تمرر، بـrAF عشان منحسبش مع كل حدث تمرير
+  const scrollRafRef = useRef(0)
+  const rememberScroll = () => {
+    if (scrollRafRef.current) return
+    scrollRafRef.current = requestAnimationFrame(() => {
+      scrollRafRef.current = 0
+      const el = listRef.current
+      if (!el) return
+      if (el.scrollTop <= 0) { screenCache.scrollAnchor = null; return }
+      const rows = el.querySelectorAll('[data-conv-id]')
+      for (const row of rows) {
+        // أول صف لسه ظاهر (آخره تحت حافة القايمة) — هو اللي بنثبّت عليه
+        if (row.offsetTop + row.offsetHeight > el.scrollTop) {
+          screenCache.scrollAnchor = { convId: row.dataset.convId, delta: row.offsetTop - el.scrollTop, top: el.scrollTop }
+          return
+        }
+      }
+      screenCache.scrollAnchor = { convId: null, delta: 0, top: el.scrollTop }
+    })
+  }
+
+  // useLayoutEffect عشان نظبط المكان قبل ما الشاشة ترسم — القايمة بتترسم من الكاش فورًا، فالمستخدم
+  // مايشوفش قفزة من فوق لتحت
+  // مرة واحدة بس عند الدخول للشاشة. لو فضلنا نظبّطه مع كل تحديث للقايمة كنا هنشد الشاشة من تحت
+  // إيد الموظف وهو بيمرر لما رسالة جديدة توصل
+  const restoredRef = useRef(false)
+  useLayoutEffect(() => {
+    if (restoredRef.current) return
+    const el = listRef.current
+    const anchor = screenCache.scrollAnchor
+    if (!el || loading || !conversations.length) return
+    restoredRef.current = true
+    if (!anchor) return
+    const row = anchor.convId && el.querySelector(`[data-conv-id="${anchor.convId}"]`)
+    // المحادثة اتقفلت أو خرجت من الفلتر؟ نرجع لآخر رقم تمرير كأحسن تقدير متاح
+    el.scrollTop = row ? Math.max(0, row.offsetTop - anchor.delta) : anchor.top
+  }, [loading, conversations.length])
 
   // بنسجّل الفلاتر الحالية في الكاش بردة، عشان لو رجعت للشاشة دي تاني تلاقيها زي ما سيبتها بالظبط
   useEffect(() => {
@@ -1354,7 +1400,8 @@ export default function ConversationsScreen() {
         )}
 
         {/* List */}
-        <div className={`flex-1 overflow-y-auto transition-opacity ${fetching && !loading ? 'opacity-50' : ''}`}>
+        <div ref={listRef} onScroll={rememberScroll}
+          className={`flex-1 overflow-y-auto transition-opacity ${fetching && !loading ? 'opacity-50' : ''}`}>
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -1369,6 +1416,7 @@ export default function ConversationsScreen() {
               {filtered.map(conv => (
                 <ConvCard
                   key={conv.id}
+                  rowId={conv.id}
                   conv={conv}
                   assignedAgent={agentsMap[conv.assigned_agent_id]}
                   lastMsg={lastMessages[conv.id]}
@@ -1487,7 +1535,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer }) {
+function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer }) {
   const { t } = useTranslation()
   const contact = conv.contacts
 
@@ -1504,7 +1552,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
   // المحادثة دي مش بتاعة الموظف الحالي — ظهرت في نتايج البحث بس، مش هيقدر يفتحها، بس يقدر يطلب نقلها له
   if (isForeign) {
     return (
-      <div className="w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3">
+      <div data-conv-id={rowId} className="w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3">
         <div className="relative flex-shrink-0 opacity-60">
           {contact?.profile_pic ? (
             <img src={contact.profile_pic} alt="" loading="lazy" className="w-12 h-12 rounded-full object-cover bg-surface-3" />
@@ -1527,7 +1575,7 @@ function ConvCard({ conv, assignedAgent, lastMsg, tags, selectionMode, selected,
   }
 
   return (
-    <button onClick={onClick}
+    <button onClick={onClick} data-conv-id={rowId}
       className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-start ${selected ? 'bg-brand/10' : ''}`}>
       {selectionMode && (
         <span onClick={e => { e.stopPropagation(); onToggleSelect?.() }} className="flex-shrink-0 text-brand">
