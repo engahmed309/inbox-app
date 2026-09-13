@@ -399,7 +399,9 @@
       "newSegment": "New segment",
       "empty": "No segments yet — tap \"New segment\" to create one",
       "deleteConfirm": "Delete segment \"{{name}}\"?",
-      "deleteError": "Failed to delete the segment"
+      "deleteError": "Failed to delete the segment",
+      "contactCount": "{{count}} contacts",
+      "countUnknown": "Count unavailable"
     },
     "fields": {
       "title": "Custom Fields",

@@ -399,7 +399,9 @@
       "newSegment": "شريحة جديدة",
       "empty": "لا توجد شرائح بعد، اضغط \"شريحة جديدة\" لإنشاء واحدة",
       "deleteConfirm": "هل تريد حذف الشريحة \"{{name}}\"؟",
-      "deleteError": "فشل حذف الشريحة"
+      "deleteError": "فشل حذف الشريحة",
+      "contactCount": "{{count}} عميل",
+      "countUnknown": "تعذّر حساب العدد"
     },
     "fields": {
       "title": "الحقول الإضافية",
