@@ -1,7 +1,7 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
-import { API_URL, apiFetch } from '../lib/supabase'
+import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { Plus, Megaphone, AlertTriangle, Send, X } from 'lucide-react'
@@ -22,18 +22,25 @@ function templateDisplayName(b, t) {
 // شكل ميتا الخام للقالب (components: [{type, format, text, buttons}]) مش نفس شكل TemplatePreview
 // ({header, body, footer, buttons}) — مابر بسيط لتحويل واحد للتاني، مع تمرير النص بعد استبدال
 // المتغيرات الحقيقية بدل {{n}} الخام
-function templateToPreviewProps(tpl, resolvedBody) {
+function templateToPreviewProps(tpl, resolvedBody, mediaUrl) {
   const comps = tpl?.components || []
   const headerComp = comps.find(c => c.type === 'HEADER')
   const footerComp = comps.find(c => c.type === 'FOOTER')
   const buttonsComp = comps.find(c => c.type === 'BUTTONS')
   return {
-    header: headerComp ? { enabled: true, format: headerComp.format, text: headerComp.text } : null,
+    header: headerComp ? { enabled: true, format: headerComp.format, text: headerComp.text, mediaUrl: mediaUrl || null } : null,
     body: resolvedBody,
     footer: footerComp?.text || '',
     buttons: buttonsComp?.buttons || []
   }
 }
+
+// الصورة/الفيديو اللي اترفعوا وقت إنشاء القالب كانوا عيّنة لمراجعة ميتا بس — ميتا بتطلب الملف
+// الفعلي مع كل رسالة بتتبعت. فأي قالب هيدره من الأنواع دي لازم نرفعله ملف هنا قبل الإرسال
+const MEDIA_HEADER_FORMATS = ['IMAGE', 'VIDEO', 'DOCUMENT']
+const headerFormatOf = (tpl) => tpl?.components?.find(c => c.type === 'HEADER')?.format || null
+const needsHeaderMedia = (tpl) => MEDIA_HEADER_FORMATS.includes(headerFormatOf(tpl))
+const ACCEPT_BY_FORMAT = { IMAGE: 'image/*', VIDEO: 'video/*', DOCUMENT: '.pdf,.doc,.docx' }
 
 export default function BroadcastScreen() {
   const { t } = useTranslation()
@@ -180,6 +187,54 @@ function channelLabel(channels, id) {
   return c ? (c.custom_name || c.display_name || c.external_id) : id
 }
 
+// بيرفع ملف الهيدر على تخزيننا وبيرجّع رابط عام — ميتا بتحمّل الرابط ده وقت إرسال كل رسالة،
+// فلازم يفضل متاح طول مدة البرودكاست (نفس البكت المستخدم في مرفقات الشات وعيّنات القوالب)
+function HeaderMediaPicker({ format, value, fileName, onChange, disabled }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [uploading, setUploading] = useState(false)
+  const inputRef = useRef(null)
+
+  const pick = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setUploading(true)
+    try {
+      const safeName = file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+      const path = `broadcast-headers/${Date.now()}_${safeName}`
+      const { error } = await supabase.storage.from('inbox-media').upload(path, file)
+      if (error) throw new Error(t('broadcast.wizard.headerUploadFailed'))
+      const { data } = supabase.storage.from('inbox-media').getPublicUrl(path)
+      onChange(data.publicUrl, file.name)
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setUploading(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface-3 rounded-lg p-2.5 space-y-1.5">
+      <p className="text-[11px] font-semibold text-fg">{t(`broadcast.wizard.headerMediaLabel.${format}`)}</p>
+      <input type="file" ref={inputRef} onChange={pick} className="hidden" accept={ACCEPT_BY_FORMAT[format]} />
+      {value ? (
+        <div className="flex items-center gap-2">
+          <span className="flex-1 min-w-0 truncate text-xs text-success">✓ {fileName || t('broadcast.wizard.headerMediaReady')}</span>
+          <button onClick={() => onChange(null, null)} disabled={disabled}
+            className="text-xs text-brand flex-shrink-0">{t('broadcast.wizard.headerMediaChange')}</button>
+        </div>
+      ) : (
+        <button onClick={() => inputRef.current?.click()} disabled={uploading || disabled}
+          className="w-full py-1.5 rounded-lg bg-surface-2 border border-dashed border-surface-3 text-xs text-fg-muted hover:border-brand/50 disabled:opacity-50">
+          {uploading ? t('broadcast.wizard.headerMediaUploading') : t('broadcast.wizard.headerMediaUpload')}
+        </button>
+      )}
+      <p className="text-[10px] text-fg-subtle">{t('broadcast.wizard.headerMediaHint')}</p>
+    </div>
+  )
+}
+
 const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
 const varCountOf = (tpl) => (bodyOf(tpl).match(/\{\{\d+\}\}/g) || []).length
 const resolvedBodyOf = (tpl, prms) => bodyOf(tpl).replace(/\{\{(\d+)\}\}/g, (_, n) => prms?.[Number(n) - 1] || `{{${n}}}`)
@@ -204,6 +259,10 @@ function BroadcastWizard({ onDone }) {
   // وضع "آخر رقم كلّم بيه العميل": قالب مستقل لكل رقم ظهر في تكسير الشريحة
   const [channelTemplates, setChannelTemplates] = useState({}) // { [channel_id]: templates[] | 'loading' }
   const [channelSelections, setChannelSelections] = useState({}) // { [channel_id]: { template, params } }
+
+  // ملف الهيدر واحد للحملة كلها — نفس الصورة بتتبعت من كل الأرقام، فمفيش داعي نرفعها لكل رقم
+  const [headerMediaUrl, setHeaderMediaUrl] = useState(null)
+  const [headerMediaName, setHeaderMediaName] = useState(null)
 
   const [openMessage, setOpenMessage] = useState('')
   const [preview, setPreview] = useState(null)
@@ -290,6 +349,15 @@ function BroadcastWizard({ onDone }) {
   const readyToSend = channelMode === 'fixed' ? !!selectedTemplate : !!preview?.byChannel?.length
   const allChannelsHaveTemplate = channelMode !== 'last_contacted' || (preview?.byChannel || []).every(row => channelSelections[row.channel_id]?.template)
 
+  // القوالب المختارة اللي هيدرها ميديا — لو فيه واحد على الأقل، لازم نرفع الملف قبل الإرسال.
+  // (لو الأرقام اختارت أنواع هيدر مختلفة بنمشي على أول نوع ونحذّر، وده نادر جدًا في حملة واحدة)
+  const selectedTemplates = channelMode === 'fixed'
+    ? (selectedTemplate ? [selectedTemplate] : [])
+    : Object.values(channelSelections).map(s => s?.template).filter(Boolean)
+  const mediaHeaderFormats = [...new Set(selectedTemplates.filter(needsHeaderMedia).map(headerFormatOf))]
+  const headerMediaFormat = mediaHeaderFormats[0] || null
+  const headerMediaMissing = !!headerMediaFormat && !headerMediaUrl
+
   const send = async () => {
     if (channelMode === 'fixed') {
       if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
@@ -306,6 +374,7 @@ function BroadcastWizard({ onDone }) {
       if (!allChannelsHaveTemplate && !confirm(t('broadcast.wizard.someChannelsSkippedConfirm'))) return
     }
     if (!openMessage.trim()) { toast.error(t('broadcast.wizard.openMessageRequired')); return }
+    if (headerMediaMissing) { toast.error(t('broadcast.wizard.headerMediaRequired')); return }
     setSending(true)
     try {
       const body = { segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim() }
@@ -314,13 +383,15 @@ function BroadcastWizard({ onDone }) {
         body.template_name = selectedTemplate.name
         body.template_language = selectedTemplate.language
         body.template_params = params.slice(0, varCount)
+        if (needsHeaderMedia(selectedTemplate)) body.header_media_url = headerMediaUrl
       } else {
         const templatesByChannel = {}
         Object.entries(channelSelections).forEach(([chId, sel]) => {
           if (!sel.template) return
           templatesByChannel[chId] = {
             template_name: sel.template.name, template_language: sel.template.language,
-            template_params: (sel.params || []).slice(0, varCountOf(sel.template))
+            template_params: (sel.params || []).slice(0, varCountOf(sel.template)),
+            header_media_url: needsHeaderMedia(sel.template) ? headerMediaUrl : null
           }
         })
         body.templates_by_channel = templatesByChannel
@@ -410,8 +481,14 @@ function BroadcastWizard({ onDone }) {
               placeholder={t('broadcast.wizard.variablePlaceholder', { n: i + 1 })}
               className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg mt-2" />
           ))}
+          {needsHeaderMedia(selectedTemplate) && (
+            <div className="mt-2">
+              <HeaderMediaPicker format={headerFormatOf(selectedTemplate)} value={headerMediaUrl} fileName={headerMediaName}
+                onChange={(url, name) => { setHeaderMediaUrl(url); setHeaderMediaName(name) }} disabled={sending} />
+            </div>
+          )}
           <div className="mt-3">
-            <TemplatePreview {...templateToPreviewProps(selectedTemplate, resolvedPreview)} />
+            <TemplatePreview {...templateToPreviewProps(selectedTemplate, resolvedPreview, headerMediaUrl)} />
           </div>
         </div>
       )}
@@ -430,9 +507,19 @@ function BroadcastWizard({ onDone }) {
             <ChannelTemplateBlock key={row.channel_id} row={row} channels={channels}
               templates={channelTemplates[row.channel_id]}
               selection={channelSelections[row.channel_id]}
+              headerMediaUrl={headerMediaUrl}
               onSelectTemplate={tpl => selectChannelTemplate(row.channel_id, tpl)}
               onParamChange={(i, v) => updateChannelParam(row.channel_id, i, v)} />
           ))}
+          {/* ملف واحد للحملة كلها — نفس الصورة هتتبعت من كل رقم، فبنرفعها مرة واحدة برّه الكروت
+              بدل ما الدكتور يرفع نفس الصورة ٦ مرات */}
+          {headerMediaFormat && (
+            <HeaderMediaPicker format={headerMediaFormat} value={headerMediaUrl} fileName={headerMediaName}
+              onChange={(url, name) => { setHeaderMediaUrl(url); setHeaderMediaName(name) }} disabled={sending} />
+          )}
+          {mediaHeaderFormats.length > 1 && (
+            <p className="text-[11px] text-warning">{t('broadcast.wizard.headerMediaMixedFormats')}</p>
+          )}
         </div>
       )}
 
@@ -493,7 +580,7 @@ function BroadcastWizard({ onDone }) {
             </p>
           )}
 
-          <button onClick={send} disabled={sending || (channelMode === 'fixed' ? !preview || preview.willSend === 0 : !preview?.byChannel?.some(r => channelSelections[r.channel_id]?.template))}
+          <button onClick={send} disabled={sending || headerMediaMissing || (channelMode === 'fixed' ? !preview || preview.willSend === 0 : !preview?.byChannel?.some(r => channelSelections[r.channel_id]?.template))}
             className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
             <Send size={15} /> {sending ? t('broadcast.wizard.sending') : t('broadcast.wizard.confirmSend')}
           </button>
@@ -504,10 +591,12 @@ function BroadcastWizard({ onDone }) {
               defaultChannelId={channelMode === 'fixed' ? channelId : preview?.byChannel?.[0]?.channel_id}
               templateName={selectedTemplate?.name} templateLanguage={selectedTemplate?.language}
               templateParams={params.slice(0, varCount)}
+              headerMediaUrl={channelMode === 'fixed' && !needsHeaderMedia(selectedTemplate) ? null : headerMediaUrl}
               templatesByChannel={channelMode === 'last_contacted' ? Object.fromEntries(
                 Object.entries(channelSelections).filter(([, sel]) => sel.template).map(([chId, sel]) => [chId, {
                   template_name: sel.template.name, template_language: sel.template.language,
-                  template_params: (sel.params || []).slice(0, varCountOf(sel.template))
+                  template_params: (sel.params || []).slice(0, varCountOf(sel.template)),
+                  header_media_url: needsHeaderMedia(sel.template) ? headerMediaUrl : null
                 }])
               ) : null}
               onClose={() => setShowTestModal(false)}
@@ -522,7 +611,7 @@ function BroadcastWizard({ onDone }) {
 // كارت رقم واحد في تكسير وضع "آخر رقم كلّم بيه العميل" — كل رقم له قوالبه المعتمدة الخاصة بيه
 // (القوالب متسجلة لكل رقم/WABA على حدة عند ميتا، مش مشتركة بين كل الأرقام)، فلازم يتختار قالب
 // مستقل لكل واحد منهم بدل ما نفرض نفس القالب على الكل ويفشل على الأرقام اللي مالهاش نفس القالب
-function ChannelTemplateBlock({ row, channels, templates, selection, onSelectTemplate, onParamChange }) {
+function ChannelTemplateBlock({ row, channels, templates, selection, headerMediaUrl, onSelectTemplate, onParamChange }) {
   const { t } = useTranslation()
   const varCount = selection?.template ? varCountOf(selection.template) : 0
   const resolvedPreview = selection?.template ? resolvedBodyOf(selection.template, selection.params) : ''
@@ -565,7 +654,7 @@ function ChannelTemplateBlock({ row, channels, templates, selection, onSelectTem
               placeholder={t('broadcast.wizard.variablePlaceholder', { n: i + 1 })}
               className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg" />
           ))}
-          <TemplatePreview {...templateToPreviewProps(selection.template, resolvedPreview)} />
+          <TemplatePreview {...templateToPreviewProps(selection.template, resolvedPreview, headerMediaUrl)} />
         </div>
       )}
     </div>
@@ -574,7 +663,7 @@ function ChannelTemplateBlock({ row, channels, templates, selection, onSelectTem
 
 // إرسال تجربة فورية لعدد من الأرقام (موجودين كعملاء أو لأ) قبل بدء التنفيذ الفعلي على الشريحة —
 // نفس شكل حقول بدء محادثة جديدة (اسم + رقم) بالظبط، بس بيسمح بأكتر من صف
-function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, templateLanguage, templateParams, templatesByChannel, onClose }) {
+function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, templateLanguage, templateParams, templatesByChannel, headerMediaUrl, onClose }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [channelId, setChannelId] = useState(defaultChannelId)
@@ -594,7 +683,7 @@ function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, te
     try {
       const body = mode === 'last_contacted'
         ? { mode, channel_id: channelId, templates_by_channel: templatesByChannel, targets: validTargets }
-        : { mode, channel_id: channelId, template_name: templateName, template_language: templateLanguage, template_params: templateParams, targets: validTargets }
+        : { mode, channel_id: channelId, template_name: templateName, template_language: templateLanguage, template_params: templateParams, header_media_url: headerMediaUrl || null, targets: validTargets }
       const res = await apiFetch(`${API_URL}/broadcasts/test`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body)

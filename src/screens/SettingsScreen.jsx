@@ -14,7 +14,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter
+  QrCode, Filter, Send
 } from 'lucide-react'
 
 const TABS = [
@@ -715,7 +715,12 @@ function ConnectedChannelsList() {
         // فيسبوك وانستجرام لسه رقم واحد بس، بس الواتساب ممكن يكون فيه أكتر من رقم مربوط
         const rows = channels.filter(c => c.platform === platform)
         const list = rows.length > 0 ? rows : [null]
-        return list.map((ch, i) => (
+        return list.map((ch, i) => {
+          // الرقم الحقيقي زي ما ميتا بترجعه (+966 5x xxx xxxx) — بنشيل منه أي حاجة غير الأرقام
+          // عشان رابط wa.me، وبنسيب الشكل الأصلي للعرض
+          const waPhone = ch?.platform === 'whatsapp' ? ch?.metadata?.display_phone_number || null : null
+          const waDigits = waPhone ? waPhone.replace(/\D/g, '') : ''
+          return (
           <div key={ch?.id || `${platform}-${i}`} className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
             <div className="flex items-center gap-3">
               {ch?.avatar_url ? (
@@ -755,13 +760,25 @@ function ConnectedChannelsList() {
                     <Icon size={12} className={meta.color} /> {ch?.custom_name || metaLabel}
                   </p>
                 )}
-                <p className="text-xs text-fg-muted truncate">{ch?.display_name || t('settings.channels.notLinked')}</p>
-                {ch?.platform === 'whatsapp' && ch?.metadata?.messaging_limit_tier && (
-                  <div className="flex items-center gap-1.5 mt-1">
+                <p className="text-xs text-fg-muted truncate">
+                  {ch?.display_name || t('settings.channels.notLinked')}
+                  {waPhone && waPhone !== ch?.display_name && (
+                    <span dir="ltr" className="ms-1.5 text-fg-subtle">{waPhone}</span>
+                  )}
+                </p>
+                {/* الحد اليومي بيحدد أقصى عدد عملاء نقدر نبدأ معاهم محادثة في ٢٤ ساعة — ده اللي
+                    بيقرر البرودكاست هيتبعت في يوم ولا على أيام، فلازم يبان دايمًا مش بس لما ييجي */}
+                {ch?.platform === 'whatsapp' && ch?.status === 'active' && (
+                  <div className="flex flex-wrap items-center gap-1.5 mt-1">
                     <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-muted">
-                      {MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier] ? t(MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier]) : ch.metadata.messaging_limit_tier}
+                      {t('settings.channels.dailyLimitPrefix')}{' '}
+                      {ch.metadata?.messaging_limit_tier
+                        ? (MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier]
+                            ? t(MESSAGING_TIER_KEYS[ch.metadata.messaging_limit_tier])
+                            : ch.metadata.messaging_limit_tier)
+                        : t('settings.channels.messagingTier.unknown')}
                     </span>
-                    {ch.metadata.quality_rating && QUALITY_RATING[ch.metadata.quality_rating] && (
+                    {ch.metadata?.quality_rating && QUALITY_RATING[ch.metadata.quality_rating] && (
                       <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${QUALITY_RATING[ch.metadata.quality_rating].cls}`}>
                         {t('settings.channels.qualityPrefix')} {t(QUALITY_RATING[ch.metadata.quality_rating].labelKey)}
                       </span>
@@ -788,6 +805,15 @@ function ConnectedChannelsList() {
                       {t('settings.channels.notLinked')}
                     </span>
                   )}
+                  {/* بيفتح واتساب عندك على محادثة مع الرقم ده — تبعتله رسالة وتشوف هل وصلت
+                      للبرنامج ولا لأ. أسرع طريقة تتأكد إن الويب هوك شغال على الرقم فعلاً */}
+                  {waDigits && (
+                    <a href={`https://wa.me/${waDigits}?text=${encodeURIComponent(t('settings.channels.testInboxMessage'))}`}
+                      target="_blank" rel="noopener noreferrer" title={t('settings.channels.testInboxHint')}
+                      className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20 transition-colors flex-shrink-0">
+                      <Send size={12} /> {t('settings.channels.testInboxButton')}
+                    </a>
+                  )}
                   {ch?.id && (
                     <button onClick={() => setSettingsChannel(ch)} title={t('settings.channels.settingsTitle')}
                       className="w-8 h-8 flex items-center justify-center text-fg-subtle hover:text-fg rounded-lg hover:bg-surface-3 flex-shrink-0">
@@ -801,7 +827,8 @@ function ConnectedChannelsList() {
               <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
             )}
           </div>
-        ))
+          )
+        })
       })}
 
       {settingsChannel && (

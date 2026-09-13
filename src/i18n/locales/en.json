@@ -73,7 +73,20 @@
         "sendButton": "Send test",
         "sent": "Sent",
         "failed": "Failed"
-      }
+      },
+      "headerMediaLabel": {
+        "IMAGE": "Message image",
+        "VIDEO": "Message video",
+        "DOCUMENT": "Message file"
+      },
+      "headerMediaUpload": "Upload file",
+      "headerMediaUploading": "Uploading…",
+      "headerMediaReady": "File ready",
+      "headerMediaChange": "Change",
+      "headerMediaHint": "This template has media at the top, and WhatsApp requires the file with every message. The same file goes to every customer.",
+      "headerMediaRequired": "Upload the template file before sending",
+      "headerMediaMixedFormats": "The numbers picked templates with different media types — the same file will be used for all, make sure it fits.",
+      "headerUploadFailed": "Could not upload the file"
     }
   },
   "login": {
@@ -228,7 +241,8 @@
         "tier1k": "1,000 customers / 24 hours",
         "tier10k": "10K customers / 24 hours",
         "tier100k": "100K customers / 24 hours",
-        "unlimited": "Unlimited"
+        "unlimited": "Unlimited",
+        "unknown": "unknown"
       },
       "quality": {
         "high": "High",
@@ -241,7 +255,11 @@
         "whatsapp": "WhatsApp",
         "tiktok": "TikTok",
         "whatsapp_qr": "WhatsApp (Quick Pairing)"
-      }
+      },
+      "dailyLimitPrefix": "Daily limit:",
+      "testInboxButton": "Test inbox",
+      "testInboxHint": "Opens WhatsApp on a chat with this number — send a message and check it reaches the app",
+      "testInboxMessage": "Inbox delivery test"
     },
     "templates": {
       "title": "Templates",

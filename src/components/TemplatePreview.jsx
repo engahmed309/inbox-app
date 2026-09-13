@@ -17,11 +17,17 @@ export default function TemplatePreview({ header, body, footer, buttons }) {
         {header?.enabled && header.format === 'LOCATION' && (
           <div className="bg-black/20 rounded-md px-2 py-3 mb-1 text-center text-[11px] text-white/70">📍 {t('settings.templates.mediaType.location')}</div>
         )}
-        {header?.enabled && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) && (
+        {/* لو اترفع الملف الفعلي اللي هيتبعت (في البرودكاست)، بنعرضه زي ما العميل هيشوفه بالظبط
+            بدل المربع النائب — وقت إنشاء القالب لسه مفيش ملف، فبيفضل المربع زي ما هو */}
+        {header?.enabled && header.format === 'IMAGE' && header.mediaUrl ? (
+          <img src={header.mediaUrl} alt="" className="rounded-md mb-1 w-full object-cover max-h-56" />
+        ) : header?.enabled && header.format === 'VIDEO' && header.mediaUrl ? (
+          <video src={header.mediaUrl} controls className="rounded-md mb-1 w-full max-h-56" />
+        ) : header?.enabled && ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(header.format) ? (
           <div className="bg-black/20 rounded-md px-2 py-5 mb-1 text-center text-[11px] text-white/70">
             {header.format === 'IMAGE' ? `🖼️ ${t('settings.templates.mediaType.image')}` : header.format === 'VIDEO' ? `🎥 ${t('settings.templates.mediaType.video')}` : `📎 ${t('settings.templates.mediaType.document')}`}
           </div>
-        )}
+        ) : null}
         {body && <p className="text-[13px] text-white whitespace-pre-wrap break-words leading-relaxed">{body}</p>}
         {footer && <p className="text-[11px] text-white/60 mt-1.5 whitespace-pre-wrap break-words">{footer}</p>}
         <p className="text-[10px] text-white/50 text-end mt-1">{t('settings.templates.preview.mockTime')} ✓✓</p>

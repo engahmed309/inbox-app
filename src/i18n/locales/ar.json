@@ -73,7 +73,20 @@
         "sendButton": "إرسال تجربة",
         "sent": "اتبعتت",
         "failed": "فشلت"
-      }
+      },
+      "headerMediaLabel": {
+        "IMAGE": "صورة الرسالة",
+        "VIDEO": "فيديو الرسالة",
+        "DOCUMENT": "ملف الرسالة"
+      },
+      "headerMediaUpload": "ارفع الملف",
+      "headerMediaUploading": "جارٍ الرفع…",
+      "headerMediaReady": "الملف جاهز",
+      "headerMediaChange": "تغيير",
+      "headerMediaHint": "هذا القالب يحتوي على وسائط في الأعلى، وواتساب يطلب إرسال الملف مع كل رسالة. سيُرسل نفس الملف لجميع العملاء.",
+      "headerMediaRequired": "ارفع ملف القالب أولًا قبل الإرسال",
+      "headerMediaMixedFormats": "الأرقام اختارت قوالب بأنواع وسائط مختلفة — سيُستخدم نفس الملف للجميع، تأكد من ملاءمته.",
+      "headerUploadFailed": "تعذّر رفع الملف"
     }
   },
   "login": {
@@ -228,7 +241,8 @@
         "tier1k": "١٠٠٠ عميل / ٢٤ ساعة",
         "tier10k": "١٠ آلاف / ٢٤ ساعة",
         "tier100k": "١٠٠ ألف / ٢٤ ساعة",
-        "unlimited": "بدون حد"
+        "unlimited": "بدون حد",
+        "unknown": "غير معروف"
       },
       "quality": {
         "high": "عالية",
@@ -241,7 +255,11 @@
         "whatsapp": "واتساب",
         "tiktok": "تيك توك",
         "whatsapp_qr": "واتساب (ربط سريع)"
-      }
+      },
+      "dailyLimitPrefix": "الحد اليومي:",
+      "testInboxButton": "جرّب الرقم",
+      "testInboxHint": "يفتح واتساب عندك على محادثة مع هذا الرقم — ابعث رسالة وتأكد أنها وصلت للبرنامج",
+      "testInboxMessage": "اختبار وصول الرسائل"
     },
     "templates": {
       "title": "القوالب",
