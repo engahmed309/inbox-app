@@ -972,7 +972,8 @@
         "not_in": "none of",
         "between": "between",
         "gte": "on or after",
-        "lte": "on or before"
+        "lte": "on or before",
+        "not_eq": "is not"
       },
       "values": {
         "open": "Open",

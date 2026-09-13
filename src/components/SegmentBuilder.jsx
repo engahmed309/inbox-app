@@ -13,6 +13,15 @@ const DATE_OPS = ['between', 'gte', 'lte']
 // لو عدد الخيارات أكتر من كده بنضيف مربع بحث فوق قايمة الاختيار (الدول مثلاً ممكن توصل لمية دولة)
 const SEARCH_THRESHOLD = 8
 
+// "أي من" و"ولا واحد منهم" بيوصفوا اختيار متعدد، لكن لما تكون القيمة واحدة بس هما حرفيًا "يساوي"
+// و"لا يساوي" — ونفس الاستعلام في قاعدة البيانات. فبنسمّيهم بالاسم اللي يناسب الحالة بدل ما نضيف
+// خيارين تانيين بيعملوا نفس الشغل بالظبط ويلخبطوا اللي بيستخدم الشاشة
+function opLabel(t, op, valueCount) {
+  if (op === 'in') return t(valueCount > 1 ? 'conversations.segments.ops.in' : 'conversations.segments.ops.eq')
+  if (op === 'not_in') return t(valueCount > 1 ? 'conversations.segments.ops.not_in' : 'conversations.segments.ops.not_eq')
+  return t(`conversations.segments.ops.${op}`)
+}
+
 function emptyCondition(connector) {
   return { field: 'lifecycle_stage_id', op: 'in', value: [], connector }
 }
@@ -238,7 +247,9 @@ export default function SegmentBuilder({ segment, lifecycles, tagsList, allChann
                     </select>
                     <select value={cond.op} onChange={e => updateCondition(idx, { op: e.target.value })}
                       className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg w-32 flex-shrink-0">
-                      {(DATE_FIELDS.has(cond.field) ? DATE_OPS : MULTI_OPS).map(op => <option key={op} value={op}>{t(`conversations.segments.ops.${op}`)}</option>)}
+                      {(DATE_FIELDS.has(cond.field) ? DATE_OPS : MULTI_OPS).map(op => (
+                        <option key={op} value={op}>{opLabel(t, op, Array.isArray(cond.value) ? cond.value.length : 0)}</option>
+                      ))}
                     </select>
                   </div>
                   {renderValueInput(cond, idx)}
