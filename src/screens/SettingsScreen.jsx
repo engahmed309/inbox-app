@@ -1224,7 +1224,9 @@ function CreateTemplateModal({ channel, existing, onClose, onCreated }) {
       const url = isEdit
         ? `${API_URL}/channels/${channel.id}/templates/${existing.id}`
         : `${API_URL}/channels/${channel.id}/templates`
-      const res = await fetch(url, {
+      // لازم apiFetch مش fetch — السيرفر بيطلب توكن الدخول على المسار ده (requireAuth)، والـ fetch
+      // العادي بيبعت من غير هيدر Authorization فبيرجع "تسجيل الدخول مطلوب" مهما كان المستخدم داخل
+      const res = await apiFetch(url, {
         method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
