@@ -1594,9 +1594,9 @@ function ConnectNewChannel() {
           toast.error(t('settings.channels.linkCancelledOrError'))
           setConnecting(null)
         }
-        // rerequest: من غيرها فيسبوك بيشوف إن المستخدم وافق على التطبيق قبل كده فبيرجّع نفس
-        // الصلاحيات القديمة من غير ما يعرض الحوار أصلاً — فأي صلاحية بتتضاف للإعداد بعد أول ربط
-        // مابتوصلش للتوكن مهما أعدت الربط
+        // rerequest: من غيرها فيسبوك بيشوف إن المستخدم وافق قبل كده فبيرجّع نفس الصلاحيات
+        // القديمة من غير ما يعرض الحوار — فأي صلاحية بتتضاف للإعداد بعد أول ربط مابتوصلش للتوكن.
+        // الحوار أحيانًا بيطلع صفحة بيضا من أول مرة؛ إعادة المحاولة بتعدّي عادي
       }, { config_id: FACEBOOK_LOGIN_CONFIG_ID, auth_type: 'rerequest' })
     } catch (err) {
       toast.error(err.message)
