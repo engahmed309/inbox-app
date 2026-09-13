@@ -1436,13 +1436,14 @@
     "privateReply": "Private reply",
     "markHandled": "Mark handled",
     "ignore": "Ignore",
-    "openPost": "Post",
     "privateReplySent": "Private reply sent",
     "privateReplyTitle": "Private reply to {{name}}",
     "privateReplyPlaceholder": "Write your private message…",
     "privateReplyHint": "Sent as a private message. Meta allows one private reply per comment, within 7 days of it.",
     "sendPrivateReply": "Send private reply",
     "sending": "Sending…",
-    "privateReplyDone": "Private reply sent"
+    "privateReplyDone": "Private reply sent",
+    "onPost": "On post:",
+    "untitledPost": "Post with no caption"
   }
 }

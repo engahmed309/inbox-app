@@ -1436,13 +1436,14 @@
     "privateReply": "رد خاص",
     "markHandled": "تمت المعالجة",
     "ignore": "تجاهل",
-    "openPost": "المنشور",
     "privateReplySent": "تم إرسال رد خاص",
     "privateReplyTitle": "رد خاص على {{name}}",
     "privateReplyPlaceholder": "اكتب رسالتك الخاصة…",
     "privateReplyHint": "يُرسل كرسالة خاصة. ميتا تسمح برد خاص واحد فقط لكل تعليق، وخلال ٧ أيام منه.",
     "sendPrivateReply": "إرسال الرد الخاص",
     "sending": "جارٍ الإرسال…",
-    "privateReplyDone": "تم إرسال الرد الخاص"
+    "privateReplyDone": "تم إرسال الرد الخاص",
+    "onPost": "تعليق على:",
+    "untitledPost": "منشور بدون نص"
   }
 }

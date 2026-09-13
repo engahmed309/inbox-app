@@ -107,6 +107,23 @@ export default function CommentsScreen() {
 
             <LinkifiedText text={c.content} className="block text-sm text-fg whitespace-pre-wrap break-words" />
 
+            {/* التعليق لوحده مالوش معنى — الموظف لازم يعرف جاي على أنهي منشور قبل ما يرد */}
+            {(c.post_caption || c.post_thumbnail_url || c.post_permalink) && (
+              <a href={c.post_permalink || undefined} target="_blank" rel="noopener noreferrer"
+                className={`flex items-center gap-2 mt-2 bg-surface-2 rounded-lg p-1.5 border border-surface-3 ${c.post_permalink ? 'hover:border-brand/50' : 'pointer-events-none'}`}>
+                {c.post_thumbnail_url && (
+                  <img src={c.post_thumbnail_url} alt="" loading="lazy"
+                    className="w-9 h-9 rounded object-cover flex-shrink-0 bg-surface-3"
+                    onError={e => { e.target.style.display = 'none' }} />
+                )}
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[10px] text-fg-subtle">{t('comments.onPost')}</span>
+                  <span className="block text-[11px] text-fg-muted truncate">{c.post_caption || t('comments.untitledPost')}</span>
+                </span>
+                {c.post_permalink && <ExternalLink size={12} className="text-fg-subtle flex-shrink-0" />}
+              </a>
+            )}
+
             {c.private_replied_at && (
               <p className="text-[11px] text-success mt-1.5">✓ {t('comments.privateReplySent')}</p>
             )}
@@ -129,12 +146,6 @@ export default function CommentsScreen() {
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg">
                   <EyeOff size={11} /> {t('comments.ignore')}
                 </button>
-              )}
-              {c.post_permalink && (
-                <a href={c.post_permalink} target="_blank" rel="noopener noreferrer"
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg ms-auto">
-                  <ExternalLink size={11} /> {t('comments.openPost')}
-                </a>
               )}
             </div>
           </div>
