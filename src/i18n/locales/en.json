@@ -86,7 +86,10 @@
       "headerMediaHint": "This template has media at the top, and WhatsApp requires the file with every message. The same file goes to every customer.",
       "headerMediaRequired": "Upload the template file before sending",
       "headerMediaMixedFormats": "The numbers picked templates with different media types — the same file will be used for all, make sure it fits.",
-      "headerUploadFailed": "Could not upload the file"
+      "headerUploadFailed": "Could not upload the file",
+      "recipientTagLabel": "Tag for people who receive it (optional)",
+      "recipientTagPlaceholder": "e.g. National Day 95 offer",
+      "recipientTagHint": "Added to every customer the message actually reaches, so you can filter them later or leave them out of a future campaign. Leave empty to skip."
     }
   },
   "login": {

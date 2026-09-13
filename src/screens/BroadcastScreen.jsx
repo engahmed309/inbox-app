@@ -264,6 +264,11 @@ function BroadcastWizard({ onDone }) {
   const [headerMediaUrl, setHeaderMediaUrl] = useState(null)
   const [headerMediaName, setHeaderMediaName] = useState(null)
 
+  // تاج بيتحط على كل عميل الرسالة توصله فعلاً — سجل دائم لـ"مين استلم الحملة دي" تقدر تفلتر
+  // بيه في الشرائح بعدين. فاضي = مفيش تاج
+  const [recipientTag, setRecipientTag] = useState('')
+  const [tagTouched, setTagTouched] = useState(false)
+
   const [openMessage, setOpenMessage] = useState('')
   const [preview, setPreview] = useState(null)
   const [previewing, setPreviewing] = useState(false)
@@ -358,6 +363,12 @@ function BroadcastWizard({ onDone }) {
   const headerMediaFormat = mediaHeaderFormats[0] || null
   const headerMediaMissing = !!headerMediaFormat && !headerMediaUrl
 
+  // اسم القالب كاقتراح مبدئي للتاج — بنبطّل نغيّره أول ما الأدمن يكتب حاجة بنفسه
+  const firstTemplateName = selectedTemplates[0]?.name || ''
+  useEffect(() => {
+    if (!tagTouched && firstTemplateName) setRecipientTag(firstTemplateName)
+  }, [firstTemplateName, tagTouched])
+
   const send = async () => {
     if (channelMode === 'fixed') {
       if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
@@ -377,7 +388,10 @@ function BroadcastWizard({ onDone }) {
     if (headerMediaMissing) { toast.error(t('broadcast.wizard.headerMediaRequired')); return }
     setSending(true)
     try {
-      const body = { segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim() }
+      const body = {
+        segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim(),
+        recipient_tag_name: recipientTag.trim() || null
+      }
       if (channelMode === 'fixed') {
         body.channel_id = channelId
         body.template_name = selectedTemplate.name
@@ -530,6 +544,14 @@ function BroadcastWizard({ onDone }) {
             <textarea value={openMessage} onChange={e => setOpenMessage(e.target.value)} rows={3}
               className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
             <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.openMessageHint')}</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.recipientTagLabel')}</label>
+            <input value={recipientTag} onChange={e => { setTagTouched(true); setRecipientTag(e.target.value) }}
+              placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
+              className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+            <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.recipientTagHint')}</p>
           </div>
 
           <div className="flex gap-2">
