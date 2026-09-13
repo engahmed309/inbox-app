@@ -1629,7 +1629,9 @@ function ConnectNewChannel() {
     // لازم يطابق حرفيًا اللي مسجل في "Redirect URL" عند ميتا — وميتا بتحط "/" في الآخر أوتوماتيك
     // مهما كتبت، فبنضيفها إحنا كمان هنا عشان تفضل مطابقة لنفس القيمة اللي السيرفر هيبعتها
     const redirectUri = window.location.origin + '/'
-    const scope = 'instagram_business_basic,instagram_business_manage_messages'
+    // manage_comments لازم تتطلب هنا صراحةً — إضافتها في لوحة ميتا بتخليها متاحة بس، والتوكن
+    // بياخد اللي اتطلب في رابط الربط ده وبس. من غيرها الربط هينجح والتعليقات تفضل مرفوضة
+    const scope = 'instagram_business_basic,instagram_business_manage_messages,instagram_business_manage_comments'
     window.location.href = `https://www.instagram.com/oauth/authorize?client_id=${INSTAGRAM_APP_ID}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code&scope=${scope}`
   }
 
