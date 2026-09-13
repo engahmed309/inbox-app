@@ -9,8 +9,18 @@ import BackArrow from '../components/BackArrow'
 import TemplatePreview from '../components/TemplatePreview'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
-const BROADCAST_STATUS_KEYS = { draft: 'draft', previewed: 'previewed', sending: 'sending', completed: 'completed' }
-const RECIPIENT_STATUS_KEYS = ['pending', 'sent', 'delivered', 'read', 'failed', 'skipped_blocked', 'skipped_no_template']
+const BROADCAST_STATUS_KEYS = {
+  draft: 'draft', previewed: 'previewed', scheduled: 'scheduled', sending: 'sending',
+  paused: 'paused', completed: 'completed', cancelled: 'cancelled'
+}
+const STATUS_PILL = {
+  completed: 'bg-brand/15 text-brand',
+  sending: 'bg-warning/15 text-warning',
+  scheduled: 'bg-brand/10 text-brand',
+  paused: 'bg-danger/15 text-danger',
+  cancelled: 'bg-surface-3 text-fg-subtle'
+}
+const RECIPIENT_STATUS_KEYS = ['pending', 'sent', 'delivered', 'read', 'failed', 'skipped_blocked', 'skipped_no_template', 'cancelled']
 
 // في وضع "آخر رقم كلّم بيه العميل" ممكن يبقى فيه أكتر من قالب مختلف (واحد لكل رقم) — لو كده مفيش
 // اسم واحد نعرضه في القايمة
@@ -41,6 +51,7 @@ const MEDIA_HEADER_FORMATS = ['IMAGE', 'VIDEO', 'DOCUMENT']
 const headerFormatOf = (tpl) => tpl?.components?.find(c => c.type === 'HEADER')?.format || null
 const needsHeaderMedia = (tpl) => MEDIA_HEADER_FORMATS.includes(headerFormatOf(tpl))
 const ACCEPT_BY_FORMAT = { IMAGE: 'image/*', VIDEO: 'video/*', DOCUMENT: '.pdf,.doc,.docx' }
+const HOURS = Array.from({ length: 24 }, (_, i) => i)
 
 export default function BroadcastScreen() {
   const { t } = useTranslation()
@@ -100,8 +111,7 @@ function BroadcastListView({ broadcasts, onSelect }) {
           className="w-full text-start bg-surface-2 rounded-xl p-4 border border-surface-3 hover:border-brand/50 transition-colors">
           <div className="flex items-center justify-between gap-2">
             <p className="font-semibold text-fg text-sm truncate">{b.segment_name_snapshot}</p>
-            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${
-              b.status === 'completed' ? 'bg-brand/15 text-brand' : b.status === 'sending' ? 'bg-warning/15 text-warning' : 'bg-surface-3 text-fg-muted'}`}>
+            <span className={`text-[10px] font-bold px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_PILL[b.status] || 'bg-surface-3 text-fg-muted'}`}>
               {t(`broadcast.status.${BROADCAST_STATUS_KEYS[b.status] || b.status}`)}
             </span>
           </div>
@@ -115,11 +125,29 @@ function BroadcastListView({ broadcasts, onSelect }) {
 
 function BroadcastDetailView({ broadcastId }) {
   const { t } = useTranslation()
+  const toast = useToast()
   const [data, setData] = useState(null)
+  const [acting, setActing] = useState(false)
 
   const load = useCallback(() => {
     apiFetch(`${API_URL}/broadcasts/${broadcastId}`).then(r => r.json()).then(d => { if (!d.error) setData(d) }).catch(() => {})
   }, [broadcastId])
+
+  const act = async (action) => {
+    if (action === 'cancel' && !confirm(t('broadcast.detail.cancelConfirm'))) return
+    setActing(true)
+    try {
+      const res = await apiFetch(`${API_URL}/broadcasts/${broadcastId}/${action}`, { method: 'POST' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      toast.success(t(`broadcast.detail.${action}Done`))
+      load()
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setActing(false)
+    }
+  }
 
   useEffect(() => {
     load()
@@ -137,10 +165,47 @@ function BroadcastDetailView({ broadcastId }) {
       <div className="bg-surface-2 rounded-xl p-4 border border-surface-3">
         <p className="font-semibold text-fg">{broadcast.segment_name_snapshot}</p>
         <p className="text-xs text-fg-muted mt-1">{t('broadcast.list.templateAndCount', { template: templateDisplayName(broadcast, t), count: broadcast.total_recipients })}</p>
-        <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
-          broadcast.status === 'completed' ? 'bg-brand/15 text-brand' : broadcast.status === 'sending' ? 'bg-warning/15 text-warning' : 'bg-surface-3 text-fg-muted'}`}>
+        <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${STATUS_PILL[broadcast.status] || 'bg-surface-3 text-fg-muted'}`}>
           {t(`broadcast.status.${BROADCAST_STATUS_KEYS[broadcast.status] || broadcast.status}`)}
         </span>
+
+        {/* الحملة اتوقفت لوحدها عشان تقييم الرقم نزل — الأدمن يقدر يكمّل، بس لازم يعرف السبب الأول */}
+        {broadcast.status === 'paused' && broadcast.pause_reason === 'quality' && (
+          <div className="flex items-start gap-1.5 bg-danger/10 text-danger rounded-lg p-2 mt-2 text-xs">
+            <AlertTriangle size={13} className="flex-shrink-0 mt-0.5" />
+            <span>{t('broadcast.detail.qualityPausedWarning')}</span>
+          </div>
+        )}
+
+        {(broadcast.daily_limit || broadcast.send_window_start != null || broadcast.scheduled_start_at) && (
+          <p className="text-[11px] text-fg-subtle mt-2">
+            {[
+              broadcast.scheduled_start_at && t('broadcast.detail.scheduledFor', { when: localeFormatDateTime(broadcast.scheduled_start_at) }),
+              broadcast.daily_limit && t('broadcast.detail.dailyLimitInfo', { count: broadcast.daily_limit }),
+              broadcast.send_window_start != null && t('broadcast.detail.windowInfo', { from: broadcast.send_window_start, to: broadcast.send_window_end })
+            ].filter(Boolean).join(' · ')}
+          </p>
+        )}
+
+        {['sending', 'scheduled', 'paused'].includes(broadcast.status) && (
+          <div className="flex gap-2 mt-3">
+            {broadcast.status === 'paused' ? (
+              <button onClick={() => act('resume')} disabled={acting}
+                className="flex-1 py-2 rounded-lg bg-brand text-white text-xs font-semibold disabled:opacity-50">
+                {t('broadcast.detail.resumeButton')}
+              </button>
+            ) : (
+              <button onClick={() => act('pause')} disabled={acting}
+                className="flex-1 py-2 rounded-lg bg-surface-3 text-fg text-xs font-semibold disabled:opacity-50">
+                {t('broadcast.detail.pauseButton')}
+              </button>
+            )}
+            <button onClick={() => act('cancel')} disabled={acting}
+              className="flex-1 py-2 rounded-lg bg-danger/10 text-danger text-xs font-semibold disabled:opacity-50">
+              {t('broadcast.detail.cancelButton')}
+            </button>
+          </div>
+        )}
       </div>
 
       <div className="grid grid-cols-3 gap-2">
@@ -269,6 +334,14 @@ function BroadcastWizard({ onDone }) {
   const [recipientTag, setRecipientTag] = useState('')
   const [tagTouched, setTagTouched] = useState(false)
 
+  // إرسال على مهل: حد أقصى يومي + ساعات مسموح فيها + معاد بدء. القيم دي هي اللي بتحمي تقييم
+  // الرقم من ميتا — دفعة ضخمة مرة واحدة، أو رسايل تسويقية بالليل، أسرع طريق لتنزيل الجودة
+  const [pacing, setPacing] = useState('now') // 'now' | 'paced'
+  const [dailyLimit, setDailyLimit] = useState('1000')
+  const [windowStart, setWindowStart] = useState('10')
+  const [windowEnd, setWindowEnd] = useState('21')
+  const [startAt, setStartAt] = useState('')
+
   const [openMessage, setOpenMessage] = useState('')
   const [preview, setPreview] = useState(null)
   const [previewing, setPreviewing] = useState(false)
@@ -391,6 +464,15 @@ function BroadcastWizard({ onDone }) {
       const body = {
         segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim(),
         recipient_tag_name: recipientTag.trim() || null
+      }
+      if (pacing === 'paced') {
+        body.daily_limit = Number(dailyLimit) || null
+        body.send_window_start = Number(windowStart)
+        body.send_window_end = Number(windowEnd)
+        body.send_window_tz = 'Asia/Riyadh'
+        // حقل datetime-local بيدي وقت محلي من غير منطقة زمنية — new Date بتفسّره بتوقيت
+        // الجهاز، وده الصح هنا لأن الأدمن بيكتب الميعاد بساعته هو
+        if (startAt) body.scheduled_start_at = new Date(startAt).toISOString()
       }
       if (channelMode === 'fixed') {
         body.channel_id = channelId
@@ -552,6 +634,59 @@ function BroadcastWizard({ onDone }) {
               placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
               className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
             <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.recipientTagHint')}</p>
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.pacingLabel')}</label>
+            <div className="flex gap-2">
+              <button onClick={() => setPacing('now')}
+                className={`flex-1 py-2 rounded-xl text-xs font-medium ${pacing === 'now' ? 'bg-brand text-white' : 'bg-surface-2 border border-surface-3 text-fg-muted'}`}>
+                {t('broadcast.wizard.pacingNow')}
+              </button>
+              <button onClick={() => setPacing('paced')}
+                className={`flex-1 py-2 rounded-xl text-xs font-medium ${pacing === 'paced' ? 'bg-brand text-white' : 'bg-surface-2 border border-surface-3 text-fg-muted'}`}>
+                {t('broadcast.wizard.pacingPaced')}
+              </button>
+            </div>
+            <p className="text-[11px] text-fg-subtle mt-1">
+              {pacing === 'now' ? t('broadcast.wizard.pacingNowHint') : t('broadcast.wizard.pacingPacedHint')}
+            </p>
+
+            {pacing === 'paced' && (
+              <div className="bg-surface-2 border border-surface-3 rounded-xl p-3 mt-2 space-y-3">
+                <div>
+                  <label className="block text-[11px] font-semibold text-fg mb-1">{t('broadcast.wizard.dailyLimitLabel')}</label>
+                  <input type="number" min="1" value={dailyLimit} onChange={e => setDailyLimit(e.target.value)}
+                    className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg" />
+                  {preview?.willSend > 0 && Number(dailyLimit) > 0 && (
+                    <p className="text-[11px] text-fg-subtle mt-1">
+                      {t('broadcast.wizard.estimatedDaysHint', { days: Math.ceil(preview.willSend / Number(dailyLimit)) })}
+                    </p>
+                  )}
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-fg mb-1">{t('broadcast.wizard.sendWindowLabel')}</label>
+                  <div className="flex items-center gap-2">
+                    <select value={windowStart} onChange={e => setWindowStart(e.target.value)}
+                      className="flex-1 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg">
+                      {HOURS.map(h => <option key={h} value={h}>{h}:00</option>)}
+                    </select>
+                    <span className="text-xs text-fg-subtle">←</span>
+                    <select value={windowEnd} onChange={e => setWindowEnd(e.target.value)}
+                      className="flex-1 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg">
+                      {HOURS.map(h => <option key={h} value={h}>{h}:00</option>)}
+                    </select>
+                  </div>
+                  <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.sendWindowHint')}</p>
+                </div>
+                <div>
+                  <label className="block text-[11px] font-semibold text-fg mb-1">{t('broadcast.wizard.startAtLabel')}</label>
+                  <input type="datetime-local" value={startAt} onChange={e => setStartAt(e.target.value)}
+                    className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg" />
+                  <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.startAtHint')}</p>
+                </div>
+              </div>
+            )}
           </div>
 
           <div className="flex gap-2">

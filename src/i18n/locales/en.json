@@ -11,7 +11,10 @@
       "draft": "Draft",
       "previewed": "Previewed",
       "sending": "Sending",
-      "completed": "Completed"
+      "completed": "Completed",
+      "scheduled": "Scheduled",
+      "paused": "Paused",
+      "cancelled": "Cancelled"
     },
     "recipientStatus": {
       "pending": "Pending",
@@ -20,12 +23,24 @@
       "read": "Read",
       "failed": "Failed",
       "skipped_blocked": "Skipped (blocked)",
-      "skipped_no_template": "Skipped (no template)"
+      "skipped_no_template": "Skipped (no template)",
+      "cancelled": "Cancelled"
     },
     "detail": {
       "loading": "Loading...",
       "recipientsHeading": "Customers",
-      "replied": "Replied"
+      "replied": "Replied",
+      "pauseButton": "Pause",
+      "resumeButton": "Resume",
+      "cancelButton": "Cancel campaign",
+      "cancelConfirm": "Cancel this campaign for good? Messages already sent cannot be undone, and the rest will not go out.",
+      "pauseDone": "Campaign paused",
+      "resumeDone": "Campaign resumed",
+      "cancelDone": "Campaign cancelled",
+      "qualityPausedWarning": "We paused this automatically because the number quality rating dropped at Meta. Resuming now may get the number restricted.",
+      "scheduledFor": "Starts {{when}}",
+      "dailyLimitInfo": "{{count}} per day",
+      "windowInfo": "{{from}}:00 to {{to}}:00"
     },
     "wizard": {
       "selectPlaceholder": "Select...",
@@ -89,7 +104,18 @@
       "headerUploadFailed": "Could not upload the file",
       "recipientTagLabel": "Tag for people who receive it (optional)",
       "recipientTagPlaceholder": "e.g. National Day 95 offer",
-      "recipientTagHint": "Added to every customer the message actually reaches, so you can filter them later or leave them out of a future campaign. Leave empty to skip."
+      "recipientTagHint": "Added to every customer the message actually reaches, so you can filter them later or leave them out of a future campaign. Leave empty to skip.",
+      "pacingLabel": "Sending speed",
+      "pacingNow": "Send to everyone now",
+      "pacingPaced": "Spread it out",
+      "pacingNowHint": "Sends as fast as WhatsApp allows. Fine for small audiences only.",
+      "pacingPacedHint": "Sends a capped number each day, within hours you choose — safer for your number quality rating.",
+      "dailyLimitLabel": "Daily maximum",
+      "estimatedDaysHint": "At this rate the campaign takes about {{days}} days.",
+      "sendWindowLabel": "Sending hours (Saudi time)",
+      "sendWindowHint": "Sending stops outside these hours and resumes automatically. Avoid marketing at night.",
+      "startAtLabel": "Start at (optional)",
+      "startAtHint": "Leave empty to start now. Uses your device time."
     }
   },
   "login": {
