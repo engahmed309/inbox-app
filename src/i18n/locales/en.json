@@ -102,9 +102,9 @@
       "headerMediaRequired": "Upload the template file before sending",
       "headerMediaMixedFormats": "The numbers picked templates with different media types — the same file will be used for all, make sure it fits.",
       "headerUploadFailed": "Could not upload the file",
-      "recipientTagLabel": "Tag for people who receive it (optional)",
-      "recipientTagPlaceholder": "e.g. National Day 95 offer",
-      "recipientTagHint": "Added to every customer the message actually reaches, so you can filter them later or leave them out of a future campaign. Leave empty to skip.",
+      "recipientTagLabel": "Tags for people who receive it (optional)",
+      "recipientTagPlaceholder": "Type a new tag name…",
+      "recipientTagHint": "All of these are added to everyone the message actually reaches, so you can filter on them later or leave those people out of a future campaign.",
       "pacingLabel": "Sending speed",
       "pacingNow": "Send to everyone now",
       "pacingPaced": "Spread it out",
@@ -122,9 +122,9 @@
       "limitRecipientsOffHint": "Everyone in the segment will get the message.",
       "willSendConfirmCapped": "{{count}} of the {{total}} people in this segment will be contacted, about {{templateCount}} of them billed as paid templates.",
       "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) — your chosen count is picked at random from it.",
-      "existingTags": "Or pick an existing tag:",
-      "recipientTagExisting": "✓ Existing tag — recipients join the people already in it, so one exclusion rule still covers them all.",
-      "recipientTagNew": "A new tag called \"{{name}}\" will be created."
+      "existingTags": "Existing tags — tap to add:",
+      "addTagButton": "Add",
+      "tagIsNew": "new"
     }
   },
   "login": {

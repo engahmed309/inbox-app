@@ -331,11 +331,21 @@ function BroadcastWizard({ onDone }) {
 
   // تاج بيتحط على كل عميل الرسالة توصله فعلاً — سجل دائم لـ"مين استلم الحملة دي" تقدر تفلتر
   // بيه في الشرائح بعدين. فاضي = مفيش تاج
-  const [recipientTag, setRecipientTag] = useState('')
+  // تاجات مختارة (أسماء) + خانة كتابة لتاج جديد. اللي اتختار بيبقى شريحة ثابتة مش نص قابل
+  // للتعديل — تعديل اسم تاج موجود هنا كان هيعمل تاج جديد بالغلط ويفرّق الناس على تاجين
+  const [recipientTags, setRecipientTags] = useState([])
+  const [tagDraft, setTagDraft] = useState('')
   const [tagTouched, setTagTouched] = useState(false)
-  // التاجات الموجودة بتتعرض تحت الخانة عشان الأدمن يختار واحد موجود بضغطة بدل ما يكتبه بإيده
-  // ويغلط في حرف فيتعمل تاج تاني بنفس المعنى ويفضل الاتنين ناقصين
   const [allTags, setAllTags] = useState([])
+
+  const addTag = (name) => {
+    const clean = String(name || '').trim()
+    if (!clean) return
+    setTagTouched(true)
+    setRecipientTags(prev => prev.some(x => x.toLowerCase() === clean.toLowerCase()) ? prev : [...prev, clean])
+    setTagDraft('')
+  }
+  const removeTag = (name) => { setTagTouched(true); setRecipientTags(prev => prev.filter(x => x !== name)) }
 
   // إرسال على مهل: حد أقصى يومي + ساعات مسموح فيها + معاد بدء. القيم دي هي اللي بتحمي تقييم
   // الرقم من ميتا — دفعة ضخمة مرة واحدة، أو رسايل تسويقية بالليل، أسرع طريق لتنزيل الجودة
@@ -457,7 +467,7 @@ function BroadcastWizard({ onDone }) {
   // اسم القالب كاقتراح مبدئي للتاج — بنبطّل نغيّره أول ما الأدمن يكتب حاجة بنفسه
   const firstTemplateName = selectedTemplates[0]?.name || ''
   useEffect(() => {
-    if (!tagTouched && firstTemplateName) setRecipientTag(firstTemplateName)
+    if (!tagTouched && firstTemplateName) setRecipientTags([firstTemplateName])
   }, [firstTemplateName, tagTouched])
 
   const send = async () => {
@@ -481,7 +491,8 @@ function BroadcastWizard({ onDone }) {
     try {
       const body = {
         segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim(),
-        recipient_tag_name: recipientTag.trim() || null
+        // بنضيف اللي مكتوب في الخانة ومتضغطش عليه "إضافة" — عشان محدش يكتب تاج ويفتكره اتحفظ
+        recipient_tag_names: [...recipientTags, tagDraft.trim()].filter(Boolean)
       }
       if (limitRecipients && Number(recipientLimit) > 0) body.recipient_limit = Number(recipientLimit)
       if (pacing === 'paced') {
@@ -649,39 +660,54 @@ function BroadcastWizard({ onDone }) {
 
           <div>
             <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.recipientTagLabel')}</label>
-            <input value={recipientTag} onChange={e => { setTagTouched(true); setRecipientTag(e.target.value) }}
-              placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
-              className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
-            {/* لو الاسم المكتوب مطابق لتاج موجود، بنقول كده صراحةً — الناس هيتجمعوا في نفس التاج
-                بدل ما يتعمل تاج جديد، وده اللي بيخلي شرط الاستبعاد يفضل شرط واحد */}
-            {allTags.length > 0 && (
+            {/* المختار بيبقى شرايح ثابتة — اللي جاي من النظام مايتعدلش اسمه، بيتشال ويترجع بس */}
+            {recipientTags.length > 0 && (
+              <div className="flex flex-wrap gap-1.5 mb-2">
+                {recipientTags.map(name => {
+                  const known = allTags.find(tg => tg.name.toLowerCase() === name.toLowerCase())
+                  return (
+                    <span key={name} className="flex items-center gap-1.5 px-2 py-1 rounded-full text-[11px] bg-brand/15 text-brand border border-brand/40">
+                      <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: known?.color || '#6366F1' }} />
+                      {name}
+                      {!known && <span className="opacity-60">({t('broadcast.wizard.tagIsNew')})</span>}
+                      <button onClick={() => removeTag(name)} className="hover:opacity-70"><X size={11} /></button>
+                    </span>
+                  )
+                })}
+              </div>
+            )}
+
+            <div className="flex gap-1.5">
+              <input value={tagDraft} onChange={e => setTagDraft(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTag(tagDraft) } }}
+                placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
+                className="flex-1 min-w-0 bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+              <button onClick={() => addTag(tagDraft)} disabled={!tagDraft.trim()}
+                className="px-3 rounded-xl bg-surface-3 text-fg text-sm font-medium disabled:opacity-40 flex-shrink-0">
+                {t('broadcast.wizard.addTagButton')}
+              </button>
+            </div>
+
+            {/* التاجات الموجودة — ضغطة بتضيفها، عشان محدش يكتب اسم موجود بحرف مختلف ويعمل تاج تاني */}
+            {allTags.filter(tg => !recipientTags.some(n => n.toLowerCase() === tg.name.toLowerCase())).length > 0 && (
               <div className="mt-2">
                 <p className="text-[11px] text-fg-subtle mb-1">{t('broadcast.wizard.existingTags')}</p>
                 <div className="flex flex-wrap gap-1.5">
                   {allTags
-                    .filter(tg => !recipientTag.trim() || tg.name.toLowerCase().includes(recipientTag.trim().toLowerCase()))
+                    .filter(tg => !recipientTags.some(n => n.toLowerCase() === tg.name.toLowerCase()))
+                    .filter(tg => !tagDraft.trim() || tg.name.toLowerCase().includes(tagDraft.trim().toLowerCase()))
                     .slice(0, 12)
-                    .map(tg => {
-                      const picked = tg.name.toLowerCase() === recipientTag.trim().toLowerCase()
-                      return (
-                        <button key={tg.id} onClick={() => { setTagTouched(true); setRecipientTag(tg.name) }}
-                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border transition-colors ${
-                            picked ? 'border-brand bg-brand/15 text-brand' : 'border-surface-3 bg-surface-2 text-fg-muted hover:border-brand/50'}`}>
-                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tg.color || '#94A3B8' }} />
-                          {tg.name}
-                        </button>
-                      )
-                    })}
+                    .map(tg => (
+                      <button key={tg.id} onClick={() => addTag(tg.name)}
+                        className="flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border border-surface-3 bg-surface-2 text-fg-muted hover:border-brand/50 transition-colors">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tg.color || '#94A3B8' }} />
+                        {tg.name}
+                      </button>
+                    ))}
                 </div>
               </div>
             )}
-            <p className="text-[11px] text-fg-subtle mt-1.5">
-              {recipientTag.trim() && allTags.some(tg => tg.name.toLowerCase() === recipientTag.trim().toLowerCase())
-                ? t('broadcast.wizard.recipientTagExisting')
-                : recipientTag.trim()
-                  ? t('broadcast.wizard.recipientTagNew', { name: recipientTag.trim() })
-                  : t('broadcast.wizard.recipientTagHint')}
-            </p>
+            <p className="text-[11px] text-fg-subtle mt-1.5">{t('broadcast.wizard.recipientTagHint')}</p>
           </div>
 
           <div>
