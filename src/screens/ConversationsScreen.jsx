@@ -517,16 +517,17 @@ export default function ConversationsScreen() {
       return
     }
 
-    // فلتر المرحلة بيتطبّق بـ join على contacts (مش بجلب كل معرّفات العملاء وبعتها في .in())، عشان
-    // مراحل زي "تم ارسال الباقات" فيها أكتر من ١١ ألف عميل — .in() بقايمة بالحجم ده كان بيعدّي حد
-    // طول الرابط المسموح به ويرجّع 400 من غير أي سبب واضح في الواجهة. فلتر التاج لسه بنفس الطريقة
-    // القديمة (idSets) لحد ما يظهر نفس المشكلة، أعداده أصغر بكتير حاليًا
-    const idSets = []
-    if (selectedTagIds.length > 0) {
-      const { data: tagRows } = await supabase.from('contact_tags').select('contact_id').in('tag_id', selectedTagIds)
-      idSets.push(new Set((tagRows || []).map(r => r.contact_id)))
+    // فلتر المرحلة وفلتر التاج الاتنين بيتطبّقوا بـ join على contacts (مش بجلب كل معرّفات العملاء
+    // وبعتها في .in()). التاج كان لسه بالطريقة القديمة لأن أعداده كانت صغيرة — لحد ما تاج حملة
+    // وصل لأكتر من ١٥٠٠ عميل، وساعتها بقى فيه عطلين مع بعض: الرابط بيعدّي الحد المسموح فالطلب
+    // بيفشل، وجلب المعرّفات نفسه بيتقص عند ١٠٠٠ صف فالنتيجة كانت هتبقى ناقصة من غير ما حد يلاحظ
+    const filterByTags = selectedTagIds.length > 0
+    const joinContacts = Boolean(selectedLifecycle) || filterByTags
+    const applyContactFilters = (q) => {
+      if (selectedLifecycle) q = q.eq('contacts.lifecycle_stage_id', selectedLifecycle)
+      if (filterByTags) q = q.in('contacts.contact_tags.tag_id', selectedTagIds)
+      return q
     }
-    const scopeContactIds = idSets.length ? idSets.reduce((a, b) => new Set([...a].filter(x => b.has(x)))) : null
 
     // فلاتر القناة/الموظف بس (من غير تاج/lifecycle) — مستخدمة في عدادات الـ lifecycle نفسها
     const applyBaseScope = (q) => {
@@ -554,11 +555,7 @@ export default function ConversationsScreen() {
 
     // فلاتر مشتركة (القناة/الموظف/التاج/الحملة/التاريخ) — فلتر المرحلة بيتطبّق لوحده بـ join في
     // كل مكان محتاجه (شوف تعليق فوق)، مش هنا
-    const applyScope = (q) => {
-      q = applyBaseScope(q)
-      if (scopeContactIds) q = q.in('contact_id', scopeContactIds.size ? [...scopeContactIds] : ['00000000-0000-0000-0000-000000000000'])
-      return q
-    }
+    const applyScope = (q) => applyContactFilters(applyBaseScope(q))
 
     // بيجيب كل صفوف كويري معينة بصفحات من ١٠٠٠ (سوبابيز بيوقف عند الحد ده افتراضيًا). القاعدة بقى
     // فيها أكتر من ٦٣ ألف محادثة، يعني ده ممكن يبقى ٦٣+ صفحة — لو كلهم اتبعتوا مرة واحدة بالتوازي
@@ -601,12 +598,10 @@ export default function ConversationsScreen() {
       // بس المحادثات المفتوحة (بنفس نطاق الفلترة الحالي) — لازمة لعدّاد "مفتوحة" غير المقروءة
       // ولتحديد أي محادثة في القائمة نفسها غير مقروءة ليّا (isUnreadForMe تحت)
       fetchAllPaged(() => {
-        let q = supabase.from('conversations')
-          .select(selectedLifecycle ? 'id, status, unread_count, last_inbound_at, contacts!inner(id)' : 'id, status, unread_count, last_inbound_at', { count: 'exact' })
-          .eq('status', 'open')
-        q = applyScope(q)
-        if (selectedLifecycle) q = q.eq('contacts.lifecycle_stage_id', selectedLifecycle)
-        return q
+        const embed = joinContacts ? `, contacts!inner(id${filterByTags ? ', contact_tags!inner(tag_id)' : ''})` : ''
+        return applyScope(supabase.from('conversations')
+          .select(`id, status, unread_count, last_inbound_at${embed}`, { count: 'exact' })
+          .eq('status', 'open'))
       })
     ])
 
@@ -658,15 +653,13 @@ export default function ConversationsScreen() {
     setStatusCounts(counts); screenCache.statusCounts = counts
 
     // Conversations query — بنجيب أول visibleLimit بس مش كل المحادثات دفعة واحدة (يزيد بـ"تحميل المزيد")
-    const contactsEmbed = selectedLifecycle
-      ? 'contacts!inner(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
-      : 'contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))'
+    const contactsEmbed = `contacts${joinContacts ? '!inner' : ''}(id, name, profile_pic, platform_id, country, lifecycle_stage_id`
+      + `${filterByTags ? ', contact_tags!inner(tag_id)' : ''}, lifecycle_stages(id, name, color, icon))`
     let query = applyScope(supabase
       .from('conversations')
       .select(`*, ${contactsEmbed}`)
       .order('last_message_at', { ascending: false })
       .range(0, visibleLimit - 1))
-    if (selectedLifecycle) query = query.eq('contacts.lifecycle_stage_id', selectedLifecycle)
     if (status !== 'all') query = query.eq('status', status)
     if (unrepliedOnly) query = query.gt('unread_count', 0)
 
