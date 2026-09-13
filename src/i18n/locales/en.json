@@ -115,7 +115,11 @@
       "sendWindowLabel": "Sending hours (Saudi time)",
       "sendWindowHint": "Sending stops outside these hours and resumes automatically. Avoid marketing at night.",
       "startAtLabel": "Start at (optional)",
-      "startAtHint": "Leave empty to start now. Uses your device time."
+      "startAtHint": "Leave empty to start now. Uses your device time.",
+      "limitRecipientsLabel": "Send to part of the segment only",
+      "limitRecipientsHint": "This many people will be picked at random from the segment.",
+      "limitRecipientsOf": "{{count}} of {{total}}, picked at random — send the rest later by excluding the tag.",
+      "limitRecipientsOffHint": "Everyone in the segment will get the message."
     }
   },
   "login": {

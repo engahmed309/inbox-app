@@ -336,6 +336,10 @@ function BroadcastWizard({ onDone }) {
 
   // إرسال على مهل: حد أقصى يومي + ساعات مسموح فيها + معاد بدء. القيم دي هي اللي بتحمي تقييم
   // الرقم من ميتا — دفعة ضخمة مرة واحدة، أو رسايل تسويقية بالليل، أسرع طريق لتنزيل الجودة
+  // إرسال لجزء من الشريحة بدل كلها — العدد بيتاخد عشوائي من السيرفر عشان العيّنة تبقى ممثلة
+  const [limitRecipients, setLimitRecipients] = useState(false)
+  const [recipientLimit, setRecipientLimit] = useState('500')
+
   const [pacing, setPacing] = useState('now') // 'now' | 'paced'
   const [dailyLimit, setDailyLimit] = useState('1000')
   const [windowStart, setWindowStart] = useState('10')
@@ -465,6 +469,7 @@ function BroadcastWizard({ onDone }) {
         segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim(),
         recipient_tag_name: recipientTag.trim() || null
       }
+      if (limitRecipients && Number(recipientLimit) > 0) body.recipient_limit = Number(recipientLimit)
       if (pacing === 'paced') {
         body.daily_limit = Number(dailyLimit) || null
         body.send_window_start = Number(windowStart)
@@ -634,6 +639,27 @@ function BroadcastWizard({ onDone }) {
               placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
               className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
             <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.recipientTagHint')}</p>
+          </div>
+
+          <div>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" checked={limitRecipients} onChange={e => setLimitRecipients(e.target.checked)}
+                className="accent-brand w-3.5 h-3.5" />
+              <span className="text-xs font-semibold text-fg">{t('broadcast.wizard.limitRecipientsLabel')}</span>
+            </label>
+            {limitRecipients ? (
+              <div className="mt-2">
+                <input type="number" min="1" value={recipientLimit} onChange={e => setRecipientLimit(e.target.value)}
+                  className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+                <p className="text-[11px] text-fg-subtle mt-1">
+                  {preview?.willSend > 0
+                    ? t('broadcast.wizard.limitRecipientsOf', { count: Number(recipientLimit) || 0, total: preview.willSend })
+                    : t('broadcast.wizard.limitRecipientsHint')}
+                </p>
+              </div>
+            ) : (
+              <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.limitRecipientsOffHint')}</p>
+            )}
           </div>
 
           <div>
