@@ -333,6 +333,9 @@ function BroadcastWizard({ onDone }) {
   // بيه في الشرائح بعدين. فاضي = مفيش تاج
   const [recipientTag, setRecipientTag] = useState('')
   const [tagTouched, setTagTouched] = useState(false)
+  // التاجات الموجودة بتتعرض تحت الخانة عشان الأدمن يختار واحد موجود بضغطة بدل ما يكتبه بإيده
+  // ويغلط في حرف فيتعمل تاج تاني بنفس المعنى ويفضل الاتنين ناقصين
+  const [allTags, setAllTags] = useState([])
 
   // إرسال على مهل: حد أقصى يومي + ساعات مسموح فيها + معاد بدء. القيم دي هي اللي بتحمي تقييم
   // الرقم من ميتا — دفعة ضخمة مرة واحدة، أو رسايل تسويقية بالليل، أسرع طريق لتنزيل الجودة
@@ -357,6 +360,7 @@ function BroadcastWizard({ onDone }) {
     apiFetch(`${API_URL}/channels`).then(r => r.json()).then(d => {
       setChannels((d.channels || []).filter(c => (c.platform === 'whatsapp' || c.platform === 'whatsapp_qr') && c.status === 'active'))
     }).catch(() => {})
+    supabase.from('tags').select('id, name, color').order('name').then(({ data }) => setAllTags(data || []))
   }, [])
 
   useEffect(() => {
@@ -648,7 +652,36 @@ function BroadcastWizard({ onDone }) {
             <input value={recipientTag} onChange={e => { setTagTouched(true); setRecipientTag(e.target.value) }}
               placeholder={t('broadcast.wizard.recipientTagPlaceholder')}
               className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
-            <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.recipientTagHint')}</p>
+            {/* لو الاسم المكتوب مطابق لتاج موجود، بنقول كده صراحةً — الناس هيتجمعوا في نفس التاج
+                بدل ما يتعمل تاج جديد، وده اللي بيخلي شرط الاستبعاد يفضل شرط واحد */}
+            {allTags.length > 0 && (
+              <div className="mt-2">
+                <p className="text-[11px] text-fg-subtle mb-1">{t('broadcast.wizard.existingTags')}</p>
+                <div className="flex flex-wrap gap-1.5">
+                  {allTags
+                    .filter(tg => !recipientTag.trim() || tg.name.toLowerCase().includes(recipientTag.trim().toLowerCase()))
+                    .slice(0, 12)
+                    .map(tg => {
+                      const picked = tg.name.toLowerCase() === recipientTag.trim().toLowerCase()
+                      return (
+                        <button key={tg.id} onClick={() => { setTagTouched(true); setRecipientTag(tg.name) }}
+                          className={`flex items-center gap-1 px-2 py-1 rounded-full text-[11px] border transition-colors ${
+                            picked ? 'border-brand bg-brand/15 text-brand' : 'border-surface-3 bg-surface-2 text-fg-muted hover:border-brand/50'}`}>
+                          <span className="w-2 h-2 rounded-full flex-shrink-0" style={{ background: tg.color || '#94A3B8' }} />
+                          {tg.name}
+                        </button>
+                      )
+                    })}
+                </div>
+              </div>
+            )}
+            <p className="text-[11px] text-fg-subtle mt-1.5">
+              {recipientTag.trim() && allTags.some(tg => tg.name.toLowerCase() === recipientTag.trim().toLowerCase())
+                ? t('broadcast.wizard.recipientTagExisting')
+                : recipientTag.trim()
+                  ? t('broadcast.wizard.recipientTagNew', { name: recipientTag.trim() })
+                  : t('broadcast.wizard.recipientTagHint')}
+            </p>
           </div>
 
           <div>

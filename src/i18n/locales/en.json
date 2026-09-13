@@ -121,7 +121,10 @@
       "limitRecipientsOf": "{{count}} of {{total}}, picked at random — send the rest later by excluding the tag.",
       "limitRecipientsOffHint": "Everyone in the segment will get the message.",
       "willSendConfirmCapped": "{{count}} of the {{total}} people in this segment will be contacted, about {{templateCount}} of them billed as paid templates.",
-      "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) — your chosen count is picked at random from it."
+      "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) — your chosen count is picked at random from it.",
+      "existingTags": "Or pick an existing tag:",
+      "recipientTagExisting": "✓ Existing tag — recipients join the people already in it, so one exclusion rule still covers them all.",
+      "recipientTagNew": "A new tag called \"{{name}}\" will be created."
     }
   },
   "login": {
