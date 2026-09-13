@@ -986,7 +986,8 @@
     "list": {
       "empty": "No conversations",
       "loadMore": "Load more",
-      "loadError": "Failed to load conversations, please try again"
+      "loadError": "Failed to load conversations, please try again",
+      "updating": "Updating…"
     },
     "selection": {
       "enable": "Select",

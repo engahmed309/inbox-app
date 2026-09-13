@@ -350,6 +350,10 @@ export default function ConversationsScreen() {
   const [search, setSearch] = useState(screenCache.search)
   const [searchType, setSearchType] = useState(screenCache.searchType || 'contact') // 'contact' | 'message' | 'comment'
   const [loading, setLoading] = useState(screenCache.conversations === null)
+  // loading بيتفعّل أول فتح بس (عشان منمسحش القائمة مع كل تحديث خلفي). لكن لما الموظف يغيّر فلتر
+  // القائمة اللي قدامه بتبقى بيانات غلط لحد ما الرد يوصل، ومكانش فيه أي إشارة إن فيه حاجة بتحصل —
+  // فالتأخير كان بيتقري كـ"مفيش رد" مش "بيحمّل". fetching بيغطي أي جلب شغال مهما كان سببه
+  const [fetching, setFetching] = useState(false)
   const [showAgentStatus, setShowAgentStatus] = useState(false)
   const [viewMode, setViewMode] = useState(screenCache.viewMode) // 'all' | 'mine'
   const [agentsList, setAgentsList] = useState(screenCache.agentsList)
@@ -871,7 +875,13 @@ export default function ConversationsScreen() {
     // لو عندنا كاش من قبل (يعني ده مش أول فتح للشاشة)، منعملش سبينر ولا نمسح القائمة —
     // بنوريها زي ما هي فوراً وبنعمل تحديث هادئ في الخلفية بس
     if (screenCache.conversations === null) setLoading(true)
-    if (!searchActiveRef.current) fetchConversations()
+    // بنوري المؤشر للجلب اللي المستخدم طلبه بنفسه (غيّر فلتر/تاب) بس — التحديثات الخلفية
+    // (realtime، رجوع للتاب، الـ polling) بتفضل صامتة زي ما هي، عشان مايبقاش فيه شريط بيلعب
+    // على الشاشة طول اليوم من غير سبب واضح
+    if (!searchActiveRef.current) {
+      setFetching(true)
+      fetchConversations().finally(() => setFetching(false))
+    }
 
     // كل تغيير في conversations (حتى تحديث last_message_at من رسالة واحدة) كان بيعمل fetchConversations()
     // فوري — وده بيعيد حساب عدادات التابات/الـ lifecycle من الصفر (fetchAllPaged بتجيب آلاف
@@ -1342,8 +1352,16 @@ export default function ConversationsScreen() {
         )}
         </div>
 
+        {/* شريط رفيع بيتحرك طول ما فيه جلب شغال — القائمة اللي تحته لسه بيانات الفلتر القديم،
+            فبنخفّت وضوحها كمان عشان يبان إنها مش النتيجة النهائية */}
+        {fetching && !loading && (
+          <div className="h-0.5 bg-surface-3 overflow-hidden flex-shrink-0" role="status" aria-label={t('conversations.list.updating')}>
+            <div className="h-full w-1/3 bg-brand loading-bar" />
+          </div>
+        )}
+
         {/* List */}
-        <div className="flex-1 overflow-y-auto">
+        <div className={`flex-1 overflow-y-auto transition-opacity ${fetching && !loading ? 'opacity-50' : ''}`}>
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
