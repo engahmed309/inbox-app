@@ -11,6 +11,7 @@ import { logActivity } from '../lib/activityLog'
 import { formatTime as localeFormatTime, formatDate as localeFormatDate, formatDateTime as localeFormatDateTime } from '../lib/locale'
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
+import LinkifiedText from '../components/LinkifiedText'
 import {
   Send, Paperclip, ChevronDown, Search, X,
   User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode
@@ -1640,7 +1641,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             <StickyNote size={11} /> {authorName} · {t('chat.note.badge')}
             <span className="text-fg-subtle font-normal ms-auto">{formatTime(msg.created_at)}</span>
           </div>
-          <p className="text-sm text-fg whitespace-pre-wrap break-words">{msg.content}</p>
+          <LinkifiedText text={msg.content} className="block text-sm text-fg whitespace-pre-wrap break-words" />
         </div>
       </div>
     )
@@ -1704,7 +1705,7 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
               📎 {msg.content}
             </a>
           ) : (
-            <span className="whitespace-pre-wrap break-words">{msg.content}</span>
+            <LinkifiedText text={msg.content} className="whitespace-pre-wrap break-words" />
           )}
           {/* القالب بيتخزن كنص عادي، فمن غير العلامة دي مافيش أي فرق ظاهر بينه وبين رسالة مكتوبة */}
           {msg.template_name && (
