@@ -119,7 +119,9 @@
       "limitRecipientsLabel": "Send to part of the segment only",
       "limitRecipientsHint": "This many people will be picked at random from the segment.",
       "limitRecipientsOf": "{{count}} of {{total}}, picked at random — send the rest later by excluding the tag.",
-      "limitRecipientsOffHint": "Everyone in the segment will get the message."
+      "limitRecipientsOffHint": "Everyone in the segment will get the message.",
+      "willSendConfirmCapped": "{{count}} of the {{total}} people in this segment will be contacted, about {{templateCount}} of them billed as paid templates.",
+      "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) — your chosen count is picked at random from it."
     }
   },
   "login": {

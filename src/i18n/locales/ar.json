@@ -119,7 +119,9 @@
       "limitRecipientsLabel": "أرسل لجزء من الشريحة فقط",
       "limitRecipientsHint": "سيُختار هذا العدد عشوائيًا من الشريحة.",
       "limitRecipientsOf": "{{count}} من {{total}}، يُختارون عشوائيًا — والباقي يمكنك إرساله لاحقًا باستبعاد التاج.",
-      "limitRecipientsOffHint": "ستصل الرسالة لكل من في الشريحة."
+      "limitRecipientsOffHint": "ستصل الرسالة لكل من في الشريحة.",
+      "willSendConfirmCapped": "سيتم التواصل مع {{count}} عميل من أصل {{total}} في الشريحة، ومنهم {{templateCount}} تقريبًا سيُحتسبون كقالب مدفوع.",
+      "segmentNumbersNote": "الأرقام التالية تخص الشريحة كاملة ({{total}}) — وسيُختار منها العدد الذي حددته عشوائيًا."
     }
   },
   "login": {

@@ -440,6 +440,16 @@ function BroadcastWizard({ onDone }) {
   const headerMediaFormat = mediaHeaderFormats[0] || null
   const headerMediaMissing = !!headerMediaFormat && !headerMediaUrl
 
+  // المعاينة بتيجي من السيرفر للشريحة كاملة، لكن لو الأدمن حدّد عدد أقل فاللي هيتبعت فعلاً هو
+  // العدد ده. من غير الحساب ده شاشة التأكيد كانت بتقول رقم الشريحة الكامل — يعني آخر رقم بيتقري
+  // قبل صرف فلوس على قوالب مدفوعة يبقى غلط
+  const cap = limitRecipients && Number(recipientLimit) > 0 ? Number(recipientLimit) : null
+  const cappedTotal = preview?.willSend != null ? (cap ? Math.min(cap, preview.willSend) : preview.willSend) : 0
+  const isCapped = !!cap && preview?.willSend > cap
+  // توزيع المفتوح/المقفول جوه عيّنة عشوائية بيبقى بنفس نسبة الشريحة تقريبًا، مش رقم مضبوط
+  const scale = (n) => (!preview?.willSend ? 0 : Math.round(n * cappedTotal / preview.willSend))
+  const cappedTemplates = preview ? scale(preview.closed) : 0
+
   // اسم القالب كاقتراح مبدئي للتاج — بنبطّل نغيّره أول ما الأدمن يكتب حاجة بنفسه
   const firstTemplateName = selectedTemplates[0]?.name || ''
   useEffect(() => {
@@ -686,7 +696,7 @@ function BroadcastWizard({ onDone }) {
                     className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg" />
                   {preview?.willSend > 0 && Number(dailyLimit) > 0 && (
                     <p className="text-[11px] text-fg-subtle mt-1">
-                      {t('broadcast.wizard.estimatedDaysHint', { days: Math.ceil(preview.willSend / Number(dailyLimit)) })}
+                      {t('broadcast.wizard.estimatedDaysHint', { days: Math.ceil(cappedTotal / Number(dailyLimit)) })}
                     </p>
                   )}
                 </div>
@@ -730,6 +740,11 @@ function BroadcastWizard({ onDone }) {
 
           {channelMode === 'fixed' && preview && (
             <div className="bg-surface-2 rounded-xl p-4 border border-surface-3 space-y-3">
+              {/* لما يكون فيه عدد محدد، الأرقام دي بتوصف الشريحة كلها مش اللي هيتبعت — بنقول كده
+                  صراحةً بدل ما الأدمن يفتكر إنها الحملة نفسها */}
+              {isCapped && (
+                <p className="text-[11px] text-fg-subtle -mb-1">{t('broadcast.wizard.segmentNumbersNote', { total: preview.willSend })}</p>
+              )}
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <p className="text-fg-muted">{t('broadcast.wizard.previewOpen')}: <span className="text-fg font-semibold">{preview.open}</span></p>
                 <p className="text-fg-muted">{t('broadcast.wizard.previewClosed')}: <span className="text-fg font-semibold">{preview.closed}</span></p>
@@ -742,7 +757,7 @@ function BroadcastWizard({ onDone }) {
                   <div key={row.channel_id} className="bg-surface-3 rounded-lg p-2.5 text-xs space-y-1">
                     <div className="flex items-center justify-between">
                       <span className="font-semibold text-fg">{channelLabel(channels, row.channel_id)}</span>
-                      <span className="text-fg-muted">{t('broadcast.wizard.byChannelTotal', { count: row.total })}</span>
+                      <span className="text-fg-muted">{t('broadcast.wizard.byChannelTotal', { count: isCapped ? scale(row.total) : row.total })}</span>
                     </div>
                     {row.exceedsDailyLimit && (
                       <div className="flex items-start gap-1.5 bg-warning/10 text-warning rounded-lg p-1.5">
@@ -753,13 +768,15 @@ function BroadcastWizard({ onDone }) {
                   </div>
                 ))}
               </div>
-              <p className="text-sm font-semibold text-fg pt-1">{t('broadcast.wizard.willSendConfirm', { count: preview.willSend, templateCount: preview.closed })}</p>
+              <p className="text-sm font-semibold text-fg pt-1">{t(isCapped ? 'broadcast.wizard.willSendConfirmCapped' : 'broadcast.wizard.willSendConfirm',
+                { count: cappedTotal, templateCount: cappedTemplates, total: preview.willSend })}</p>
             </div>
           )}
 
           {channelMode === 'last_contacted' && preview && (
             <p className="text-sm font-semibold text-fg">
-              {t('broadcast.wizard.willSendConfirm', { count: preview.willSend, templateCount: preview.closed })}
+              {t(isCapped ? 'broadcast.wizard.willSendConfirmCapped' : 'broadcast.wizard.willSendConfirm',
+                { count: cappedTotal, templateCount: cappedTemplates, total: preview.willSend })}
             </p>
           )}
 
