@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, ExternalLink, X } from 'lucide-react'
+import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, ExternalLink, X, MessageCircle, Trash2 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -24,7 +24,8 @@ export default function CommentsScreen() {
   const [comments, setComments] = useState([])
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
-  const [replyTo, setReplyTo] = useState(null)
+  const [replyTo, setReplyTo] = useState(null)   // { comment, mode: 'private' | 'public' }
+  const [deleting, setDeleting] = useState(null)
 
   const canSee = agent?.role === 'admin' || ['comments', 'both'].includes(agent?.access_scope)
 
@@ -60,6 +61,20 @@ export default function CommentsScreen() {
       if (!res.ok) throw new Error((await res.json()).error)
       load()
     } catch (err) { toast.error(err.message); load() }
+  }
+
+  // الحذف نهائي عند ميتا، فبنسأل مرة قبله. الصف عندنا بيفضل معلّم "اتمسح" مش بيختفي
+  const deleteComment = async (c) => {
+    const platform = t(c.platform === 'facebook' ? 'comments.platformFacebook' : 'comments.platformInstagram')
+    if (!window.confirm(t('comments.deleteConfirm', { name: c.author_name || t('comments.unknownAuthor'), platform }))) return
+    setDeleting(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('comments.deleteFailed'))
+      toast.success(t('comments.deleted'))
+      load()
+    } catch (err) { toast.error(err.message) } finally { setDeleting(null) }
   }
 
   if (!canSee) return (
@@ -102,6 +117,9 @@ export default function CommentsScreen() {
               {c.parent_comment_id && (
                 <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">{t('comments.isReply')}</span>
               )}
+              {c.deleted_at && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger/15 text-danger flex-shrink-0">{t('comments.deletedBadge')}</span>
+              )}
               <span className="text-[11px] text-fg-subtle ms-auto flex-shrink-0">{localeFormatDateTime(c.posted_at || c.created_at)}</span>
             </div>
 
@@ -124,15 +142,38 @@ export default function CommentsScreen() {
               </a>
             )}
 
+            {/* الرد العام بيتعرض بنصه — سواء اتكتب من هنا أو من الفيسبوك نفسه — عشان الموظف
+                يشوف إن حد سبقه ويشوف قال إيه، مايرجعش يرد تاني بحاجة مختلفة */}
+            {c.public_reply_at && (
+              <div className="mt-2 ps-2.5 border-s-2 border-success/40">
+                <p className="text-[11px] text-success">✓ {t('comments.publicReplySent')}</p>
+                {c.public_reply_text && (
+                  <LinkifiedText text={c.public_reply_text} className="block text-xs text-fg-muted whitespace-pre-wrap break-words" />
+                )}
+              </div>
+            )}
+
             {c.private_replied_at && (
               <p className="text-[11px] text-success mt-1.5">✓ {t('comments.privateReplySent')}</p>
             )}
 
-            <div className="flex items-center gap-2 mt-2">
-              {!c.private_replied_at && (
-                <button onClick={() => setReplyTo(c)}
+            <div className="flex flex-wrap items-center gap-2 mt-2">
+              {!c.deleted_at && (
+                <button onClick={() => setReplyTo({ comment: c, mode: 'public' })}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20">
+                  <MessageCircle size={11} /> {c.public_reply_at ? t('comments.publicReplyAgain') : t('comments.publicReply')}
+                </button>
+              )}
+              {!c.private_replied_at && (
+                <button onClick={() => setReplyTo({ comment: c, mode: 'private' })}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-surface-3 text-fg-muted hover:text-fg">
                   <Send size={11} /> {t('comments.privateReply')}
+                </button>
+              )}
+              {!c.deleted_at && (
+                <button onClick={() => deleteComment(c)} disabled={deleting === c.id}
+                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-danger disabled:opacity-40">
+                  <Trash2 size={11} /> {t('comments.delete')}
                 </button>
               )}
               {status !== 'handled' && (
@@ -152,30 +193,35 @@ export default function CommentsScreen() {
         ))}
       </div>
 
-      {replyTo && <PrivateReplyModal comment={replyTo} onClose={() => setReplyTo(null)} onSent={() => { setReplyTo(null); load() }} />}
+      {replyTo && (
+        <ReplyModal comment={replyTo.comment} mode={replyTo.mode}
+          onClose={() => setReplyTo(null)} onSent={() => { setReplyTo(null); load() }} />
+      )}
     </div>
   )
 }
 
-// الرد الخاص بيتبعت مرة واحدة بس لكل تعليق وخلال ٧ أيام منه (قاعدة ميتا) — بنقولها للموظف قبل
-// ما يكتب، مش بعد ما الرسالة تفشل
-function PrivateReplyModal({ comment, onClose, onSent }) {
+// نفس المودال للردين — الفرق الوحيد المسار والنصوص. الفرق اللي يهم الموظف إن العام بيشوفه
+// كل الناس والخاص لأ، وإن الخاص مرة واحدة وخلال ٧ أيام (قاعدة ميتا) — بنقولهاله قبل ما يكتب
+// مش بعد ما الرسالة تفشل
+function ReplyModal({ comment, mode, onClose, onSent }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const isPublic = mode === 'public'
 
   const send = async () => {
     if (!text.trim()) return
     setSending(true)
     try {
-      const res = await apiFetch(`${API_URL}/comments/${comment.id}/private-reply`, {
+      const res = await apiFetch(`${API_URL}/comments/${comment.id}/${isPublic ? 'reply' : 'private-reply'}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ message: text.trim() })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
-      toast.success(t('comments.privateReplyDone'))
+      toast.success(t(isPublic ? 'comments.publicReplyDone' : 'comments.privateReplyDone'))
       onSent()
     } catch (err) { toast.error(err.message) } finally { setSending(false) }
   }
@@ -184,7 +230,9 @@ function PrivateReplyModal({ comment, onClose, onSent }) {
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !sending && onClose()}>
       <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3">
-          <span className="font-semibold text-fg text-sm">{t('comments.privateReplyTitle', { name: comment.author_name || '' })}</span>
+          <span className="font-semibold text-fg text-sm">
+            {t(isPublic ? 'comments.publicReplyTitle' : 'comments.privateReplyTitle', { name: comment.author_name || '' })}
+          </span>
           <button onClick={onClose} className="text-fg-subtle hover:text-fg"><X size={18} /></button>
         </div>
         <div className="p-4 space-y-3">
@@ -192,12 +240,13 @@ function PrivateReplyModal({ comment, onClose, onSent }) {
             <LinkifiedText text={comment.content} className="block text-xs text-fg-muted whitespace-pre-wrap break-words" />
           </div>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
-            placeholder={t('comments.privateReplyPlaceholder')}
+            placeholder={t(isPublic ? 'comments.publicReplyPlaceholder' : 'comments.privateReplyPlaceholder')}
             className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
-          <p className="text-[11px] text-fg-subtle">{t('comments.privateReplyHint')}</p>
+          <p className="text-[11px] text-fg-subtle">{t(isPublic ? 'comments.publicReplyHint' : 'comments.privateReplyHint')}</p>
           <button onClick={send} disabled={sending || !text.trim()}
             className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
-            <Send size={15} /> {sending ? t('comments.sending') : t('comments.sendPrivateReply')}
+            {isPublic ? <MessageCircle size={15} /> : <Send size={15} />}
+            {sending ? t('comments.sending') : t(isPublic ? 'comments.sendPublicReply' : 'comments.sendPrivateReply')}
           </button>
         </div>
       </div>

@@ -1444,6 +1444,21 @@
     "sending": "جارٍ الإرسال…",
     "privateReplyDone": "تم إرسال الرد الخاص",
     "onPost": "تعليق على:",
-    "untitledPost": "منشور بدون نص"
+    "untitledPost": "منشور بدون نص",
+    "publicReply": "رد عام",
+    "publicReplyTitle": "رد عام على {{name}}",
+    "publicReplyPlaceholder": "اكتب ردك…",
+    "publicReplyHint": "يظهر كرد علني تحت التعليق يراه الجميع، باسم الصفحة.",
+    "sendPublicReply": "نشر الرد",
+    "publicReplyDone": "تم نشر الرد",
+    "publicReplySent": "تم الرد علنًا",
+    "publicReplyAgain": "رد مرة أخرى",
+    "delete": "حذف",
+    "deleteConfirm": "حذف تعليق {{name}} من {{platform}} نهائيًا؟ الحذف عند ميتا لا يمكن التراجع عنه.",
+    "deleted": "تم حذف التعليق",
+    "deletedBadge": "تم حذف التعليق",
+    "deleteFailed": "تعذّر حذف التعليق",
+    "platformFacebook": "فيسبوك",
+    "platformInstagram": "انستجرام"
   }
 }

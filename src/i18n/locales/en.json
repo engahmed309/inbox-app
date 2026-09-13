@@ -1444,6 +1444,21 @@
     "sending": "Sending…",
     "privateReplyDone": "Private reply sent",
     "onPost": "On post:",
-    "untitledPost": "Post with no caption"
+    "untitledPost": "Post with no caption",
+    "publicReply": "Public reply",
+    "publicReplyTitle": "Public reply to {{name}}",
+    "publicReplyPlaceholder": "Write your reply…",
+    "publicReplyHint": "Posted publicly under the comment as the page, visible to everyone.",
+    "sendPublicReply": "Post reply",
+    "publicReplyDone": "Reply posted",
+    "publicReplySent": "Replied publicly",
+    "publicReplyAgain": "Reply again",
+    "delete": "Delete",
+    "deleteConfirm": "Permanently delete {{name}}'s comment on {{platform}}? Deletion on Meta cannot be undone.",
+    "deleted": "Comment deleted",
+    "deletedBadge": "Comment deleted",
+    "deleteFailed": "Could not delete the comment",
+    "platformFacebook": "Facebook",
+    "platformInstagram": "Instagram"
   }
 }
