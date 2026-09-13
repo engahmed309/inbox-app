@@ -24,6 +24,12 @@ registerSW({
     document.addEventListener('visibilitychange', () => {
       if (document.visibilityState === 'visible') registration.update().catch(() => {})
     })
+    // visibilitychange لوحدها مش كفاية: موظف سايب التطبيق مفتوح قدامه ساعات من غير ما يخرج منه
+    // مابيحصلش عنده أي فحص خالص، فبيفضل شغال على نسخة قديمة وهو مش واخد باله — وده بيخلي
+    // "الميزة مش شغالة" مختلطة بـ"الميزة مش عندك أصلاً". نفحص كل ربع ساعة كمان طول ما التاب ظاهر
+    setInterval(() => {
+      if (document.visibilityState === 'visible') registration.update().catch(() => {})
+    }, 15 * 60 * 1000)
   }
 })
 
