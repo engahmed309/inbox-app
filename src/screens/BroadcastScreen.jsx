@@ -10,7 +10,14 @@ import TemplatePreview from '../components/TemplatePreview'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const BROADCAST_STATUS_KEYS = { draft: 'draft', previewed: 'previewed', sending: 'sending', completed: 'completed' }
-const RECIPIENT_STATUS_KEYS = ['pending', 'sent', 'delivered', 'read', 'failed', 'skipped_blocked']
+const RECIPIENT_STATUS_KEYS = ['pending', 'sent', 'delivered', 'read', 'failed', 'skipped_blocked', 'skipped_no_template']
+
+// في وضع "آخر رقم كلّم بيه العميل" ممكن يبقى فيه أكتر من قالب مختلف (واحد لكل رقم) — لو كده مفيش
+// اسم واحد نعرضه في القايمة
+function templateDisplayName(b, t) {
+  if (b.multi_template && !b.template_name) return t('broadcast.list.multipleTemplates')
+  return b.template_name
+}
 
 // شكل ميتا الخام للقالب (components: [{type, format, text, buttons}]) مش نفس شكل TemplatePreview
 // ({header, body, footer, buttons}) — مابر بسيط لتحويل واحد للتاني، مع تمرير النص بعد استبدال
@@ -91,7 +98,7 @@ function BroadcastListView({ broadcasts, onSelect }) {
               {t(`broadcast.status.${BROADCAST_STATUS_KEYS[b.status] || b.status}`)}
             </span>
           </div>
-          <p className="text-xs text-fg-muted mt-1">{t('broadcast.list.templateAndCount', { template: b.template_name, count: b.total_recipients })}</p>
+          <p className="text-xs text-fg-muted mt-1">{t('broadcast.list.templateAndCount', { template: templateDisplayName(b, t), count: b.total_recipients })}</p>
           <p className="text-[11px] text-fg-subtle mt-1">{localeFormatDateTime(b.created_at)}</p>
         </button>
       ))}
@@ -122,7 +129,7 @@ function BroadcastDetailView({ broadcastId }) {
     <div className="p-4 max-w-2xl mx-auto space-y-4">
       <div className="bg-surface-2 rounded-xl p-4 border border-surface-3">
         <p className="font-semibold text-fg">{broadcast.segment_name_snapshot}</p>
-        <p className="text-xs text-fg-muted mt-1">{t('broadcast.list.templateAndCount', { template: broadcast.template_name, count: broadcast.total_recipients })}</p>
+        <p className="text-xs text-fg-muted mt-1">{t('broadcast.list.templateAndCount', { template: templateDisplayName(broadcast, t), count: broadcast.total_recipients })}</p>
         <span className={`inline-block mt-2 text-[10px] font-bold px-2 py-0.5 rounded-full ${
           broadcast.status === 'completed' ? 'bg-brand/15 text-brand' : broadcast.status === 'sending' ? 'bg-warning/15 text-warning' : 'bg-surface-3 text-fg-muted'}`}>
           {t(`broadcast.status.${BROADCAST_STATUS_KEYS[broadcast.status] || broadcast.status}`)}
@@ -173,19 +180,31 @@ function channelLabel(channels, id) {
   return c ? (c.custom_name || c.display_name || c.external_id) : id
 }
 
+const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
+const varCountOf = (tpl) => (bodyOf(tpl).match(/\{\{\d+\}\}/g) || []).length
+const resolvedBodyOf = (tpl, prms) => bodyOf(tpl).replace(/\{\{(\d+)\}\}/g, (_, n) => prms?.[Number(n) - 1] || `{{${n}}}`)
+
 function BroadcastWizard({ onDone }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [segments, setSegments] = useState([])
   const [segmentId, setSegmentId] = useState('')
   const [channels, setChannels] = useState([])
-  const [channelId, setChannelId] = useState('')
-  // fixed: رقم واحد ثابت لكل العملاء. last_contacted: كل عميل من آخر رقم كلّمه بيه فعلاً —
-  // بيزود عدد اللي شاتهم لسه مفتوح لأن نافذة الـ٢٤ ساعة مربوطة بالرقم نفسه عند ميتا
+  // fixed: رقم واحد ثابت لكل العملاء (قالب واحد). last_contacted: كل عميل من آخر رقم كلّمه بيه
+  // فعلاً — بيزود عدد اللي شاتهم لسه مفتوح لأن نافذة الـ٢٤ ساعة مربوطة بالرقم نفسه عند ميتا، لكن
+  // معناه كمان إن كل رقم ممكن يكون له قالب مختلف (القوالب معتمدة لكل رقم/WABA على حدة، مش مشتركة)
   const [channelMode, setChannelMode] = useState('fixed')
+
+  // وضع "رقم محدد": قالب واحد بس
+  const [channelId, setChannelId] = useState('')
   const [templates, setTemplates] = useState(null)
   const [selectedTemplate, setSelectedTemplate] = useState(null)
   const [params, setParams] = useState([])
+
+  // وضع "آخر رقم كلّم بيه العميل": قالب مستقل لكل رقم ظهر في تكسير الشريحة
+  const [channelTemplates, setChannelTemplates] = useState({}) // { [channel_id]: templates[] | 'loading' }
+  const [channelSelections, setChannelSelections] = useState({}) // { [channel_id]: { template, params } }
+
   const [openMessage, setOpenMessage] = useState('')
   const [preview, setPreview] = useState(null)
   const [previewing, setPreviewing] = useState(false)
@@ -200,16 +219,16 @@ function BroadcastWizard({ onDone }) {
   }, [])
 
   useEffect(() => {
+    if (channelMode !== 'fixed') return
     setTemplates(null); setSelectedTemplate(null); setParams([]); setPreview(null)
     if (!channelId) return
     apiFetch(`${API_URL}/channels/${channelId}/templates`).then(r => r.json())
       .then(d => setTemplates((d.templates || []).filter(t => t.status === 'APPROVED')))
       .catch(() => setTemplates([]))
-  }, [channelId])
+  }, [channelId, channelMode])
 
-  const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
-  const varCount = selectedTemplate ? (bodyOf(selectedTemplate).match(/\{\{\d+\}\}/g) || []).length : 0
-  const resolvedPreview = selectedTemplate ? bodyOf(selectedTemplate).replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] || `{{${n}}}`) : ''
+  const varCount = selectedTemplate ? varCountOf(selectedTemplate) : 0
+  const resolvedPreview = selectedTemplate ? resolvedBodyOf(selectedTemplate, params) : ''
 
   const selectTemplate = (tpl) => {
     setSelectedTemplate(tpl)
@@ -220,20 +239,40 @@ function BroadcastWizard({ onDone }) {
   }
 
   useEffect(() => {
-    if (selectedTemplate) setOpenMessage(resolvedPreview)
+    if (channelMode === 'fixed' && selectedTemplate) setOpenMessage(resolvedPreview)
   }, [params]) // eslint-disable-line react-hooks/exhaustive-deps
 
+  const switchMode = (mode) => {
+    setChannelMode(mode)
+    setPreview(null)
+    setSelectedTemplate(null); setTemplates(null); setChannelId('')
+    setChannelTemplates({}); setChannelSelections({})
+  }
+
+  const loadChannelTemplates = (chId) => {
+    apiFetch(`${API_URL}/channels/${chId}/templates`).then(r => r.json())
+      .then(d => setChannelTemplates(prev => ({ ...prev, [chId]: (d.templates || []).filter(t => t.status === 'APPROVED') })))
+      .catch(() => setChannelTemplates(prev => ({ ...prev, [chId]: [] })))
+  }
+
   const runPreview = async () => {
-    if (!segmentId || !channelId) return
+    if (!segmentId) return
+    if (channelMode === 'fixed' && !channelId) return
     setPreviewing(true)
     try {
       const res = await apiFetch(`${API_URL}/broadcasts/preview`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ segment_id: segmentId, mode: channelMode, channel_id: channelId })
+        body: JSON.stringify({ segment_id: segmentId, mode: channelMode, channel_id: channelMode === 'fixed' ? channelId : undefined })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setPreview(data)
+      if (channelMode === 'last_contacted') {
+        const nextTemplates = {}
+        ;(data.byChannel || []).forEach(row => { nextTemplates[row.channel_id] = 'loading' })
+        setChannelTemplates(nextTemplates)
+        ;(data.byChannel || []).forEach(row => loadChannelTemplates(row.channel_id))
+      }
     } catch (err) {
       toast.error(err.message)
     } finally {
@@ -241,21 +280,53 @@ function BroadcastWizard({ onDone }) {
     }
   }
 
+  const selectChannelTemplate = (chId, tpl) => setChannelSelections(prev => ({ ...prev, [chId]: { template: tpl, params: [] } }))
+  const updateChannelParam = (chId, i, value) => setChannelSelections(prev => {
+    const cur = prev[chId] || { template: null, params: [] }
+    const nextParams = [...cur.params]; nextParams[i] = value
+    return { ...prev, [chId]: { ...cur, params: nextParams } }
+  })
+
+  const readyToSend = channelMode === 'fixed' ? !!selectedTemplate : !!preview?.byChannel?.length
+  const allChannelsHaveTemplate = channelMode !== 'last_contacted' || (preview?.byChannel || []).every(row => channelSelections[row.channel_id]?.template)
+
   const send = async () => {
-    if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
-      toast.error(t('broadcast.wizard.fillVariablesFirst'))
-      return
+    if (channelMode === 'fixed') {
+      if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
+        toast.error(t('broadcast.wizard.fillVariablesFirst')); return
+      }
+    } else {
+      const missingValue = (preview?.byChannel || []).some(row => {
+        const sel = channelSelections[row.channel_id]
+        if (!sel?.template) return false // مسموح تسيبه من غير قالب — هيتستبعد من الإرسال بس مش بيوقف الباقي
+        const vc = varCountOf(sel.template)
+        return vc > 0 && (sel.params || []).filter(p => p?.trim()).length < vc
+      })
+      if (missingValue) { toast.error(t('broadcast.wizard.fillVariablesFirst')); return }
+      if (!allChannelsHaveTemplate && !confirm(t('broadcast.wizard.someChannelsSkippedConfirm'))) return
     }
     if (!openMessage.trim()) { toast.error(t('broadcast.wizard.openMessageRequired')); return }
     setSending(true)
     try {
-      const res = await apiFetch(`${API_URL}/broadcasts`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          segment_id: segmentId, mode: channelMode, channel_id: channelId,
-          template_name: selectedTemplate.name, template_language: selectedTemplate.language,
-          template_params: params.slice(0, varCount), open_window_message: openMessage.trim()
+      const body = { segment_id: segmentId, mode: channelMode, open_window_message: openMessage.trim() }
+      if (channelMode === 'fixed') {
+        body.channel_id = channelId
+        body.template_name = selectedTemplate.name
+        body.template_language = selectedTemplate.language
+        body.template_params = params.slice(0, varCount)
+      } else {
+        const templatesByChannel = {}
+        Object.entries(channelSelections).forEach(([chId, sel]) => {
+          if (!sel.template) return
+          templatesByChannel[chId] = {
+            template_name: sel.template.name, template_language: sel.template.language,
+            template_params: (sel.params || []).slice(0, varCountOf(sel.template))
+          }
         })
+        body.templates_by_channel = templatesByChannel
+      }
+      const res = await apiFetch(`${API_URL}/broadcasts`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
@@ -281,27 +352,13 @@ function BroadcastWizard({ onDone }) {
 
       {segmentId && (
         <div>
-          <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.channelLabel')}</label>
-          <select value={channelId} onChange={e => { setChannelId(e.target.value); setPreview(null) }}
-            className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg">
-            <option value="">{t('broadcast.wizard.selectPlaceholder')}</option>
-            {channels.map(c => <option key={c.id} value={c.id}>{c.custom_name || c.display_name || c.external_id}</option>)}
-          </select>
-          {channelMode === 'last_contacted' && (
-            <p className="text-[11px] text-fg-subtle mt-1">{t('broadcast.wizard.channelUsedForTemplatesOnly')}</p>
-          )}
-        </div>
-      )}
-
-      {channelId && (
-        <div>
           <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.channelModeLabel')}</label>
           <div className="flex gap-2">
-            <button onClick={() => { setChannelMode('fixed'); setPreview(null) }}
+            <button onClick={() => switchMode('fixed')}
               className={`flex-1 py-2 rounded-xl text-xs font-medium ${channelMode === 'fixed' ? 'bg-brand text-white' : 'bg-surface-2 border border-surface-3 text-fg-muted'}`}>
               {t('broadcast.wizard.channelModeFixed')}
             </button>
-            <button onClick={() => { setChannelMode('last_contacted'); setPreview(null) }}
+            <button onClick={() => switchMode('last_contacted')}
               className={`flex-1 py-2 rounded-xl text-xs font-medium ${channelMode === 'last_contacted' ? 'bg-brand text-white' : 'bg-surface-2 border border-surface-3 text-fg-muted'}`}>
               {t('broadcast.wizard.channelModeLastContacted')}
             </button>
@@ -312,7 +369,18 @@ function BroadcastWizard({ onDone }) {
         </div>
       )}
 
-      {channelId && templates && !selectedTemplate && (
+      {segmentId && channelMode === 'fixed' && (
+        <div>
+          <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.channelLabel')}</label>
+          <select value={channelId} onChange={e => setChannelId(e.target.value)}
+            className="w-full bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg">
+            <option value="">{t('broadcast.wizard.selectPlaceholder')}</option>
+            {channels.map(c => <option key={c.id} value={c.id}>{c.custom_name || c.display_name || c.external_id}</option>)}
+          </select>
+        </div>
+      )}
+
+      {segmentId && channelMode === 'fixed' && channelId && templates && !selectedTemplate && (
         <div>
           <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.templateLabel')}</label>
           {templates.length === 0 ? (
@@ -331,23 +399,45 @@ function BroadcastWizard({ onDone }) {
         </div>
       )}
 
-      {selectedTemplate && (
-        <>
-          <div className="bg-surface-2 rounded-xl p-3 border border-surface-3">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-semibold text-fg">{selectedTemplate.name}</p>
-              <button onClick={() => setSelectedTemplate(null)} className="text-xs text-brand">{t('broadcast.wizard.changeTemplate')}</button>
-            </div>
-            {Array.from({ length: varCount }).map((_, i) => (
-              <input key={i} value={params[i] || ''} onChange={e => setParams(p => { const n = [...p]; n[i] = e.target.value; return n })}
-                placeholder={t('broadcast.wizard.variablePlaceholder', { n: i + 1 })}
-                className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg mt-2" />
-            ))}
-            <div className="mt-3">
-              <TemplatePreview {...templateToPreviewProps(selectedTemplate, resolvedPreview)} />
-            </div>
+      {channelMode === 'fixed' && selectedTemplate && (
+        <div className="bg-surface-2 rounded-xl p-3 border border-surface-3">
+          <div className="flex items-center justify-between">
+            <p className="text-sm font-semibold text-fg">{selectedTemplate.name}</p>
+            <button onClick={() => setSelectedTemplate(null)} className="text-xs text-brand">{t('broadcast.wizard.changeTemplate')}</button>
           </div>
+          {Array.from({ length: varCount }).map((_, i) => (
+            <input key={i} value={params[i] || ''} onChange={e => setParams(p => { const n = [...p]; n[i] = e.target.value; return n })}
+              placeholder={t('broadcast.wizard.variablePlaceholder', { n: i + 1 })}
+              className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg mt-2" />
+          ))}
+          <div className="mt-3">
+            <TemplatePreview {...templateToPreviewProps(selectedTemplate, resolvedPreview)} />
+          </div>
+        </div>
+      )}
 
+      {segmentId && channelMode === 'last_contacted' && !preview && (
+        <button onClick={runPreview} disabled={previewing}
+          className="w-full py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium disabled:opacity-50">
+          {previewing ? t('broadcast.wizard.previewing') : t('broadcast.wizard.calculateBreakdownButton')}
+        </button>
+      )}
+
+      {channelMode === 'last_contacted' && preview?.byChannel?.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs font-semibold text-fg-subtle">{t('broadcast.wizard.pickTemplatePerChannel')}</p>
+          {preview.byChannel.map(row => (
+            <ChannelTemplateBlock key={row.channel_id} row={row} channels={channels}
+              templates={channelTemplates[row.channel_id]}
+              selection={channelSelections[row.channel_id]}
+              onSelectTemplate={tpl => selectChannelTemplate(row.channel_id, tpl)}
+              onParamChange={(i, v) => updateChannelParam(row.channel_id, i, v)} />
+          ))}
+        </div>
+      )}
+
+      {readyToSend && (
+        <>
           <div>
             <label className="block text-xs font-semibold text-fg mb-1.5">{t('broadcast.wizard.openMessageLabel')}</label>
             <textarea value={openMessage} onChange={e => setOpenMessage(e.target.value)} rows={3}
@@ -356,17 +446,19 @@ function BroadcastWizard({ onDone }) {
           </div>
 
           <div className="flex gap-2">
-            <button onClick={runPreview} disabled={previewing}
-              className="flex-1 py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium disabled:opacity-50">
-              {previewing ? t('broadcast.wizard.previewing') : t('broadcast.wizard.previewButton')}
-            </button>
+            {channelMode === 'fixed' && (
+              <button onClick={runPreview} disabled={previewing}
+                className="flex-1 py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-medium disabled:opacity-50">
+                {previewing ? t('broadcast.wizard.previewing') : t('broadcast.wizard.previewButton')}
+              </button>
+            )}
             <button onClick={() => setShowTestModal(true)}
               className="px-4 py-2.5 rounded-xl bg-surface-2 border border-surface-3 text-fg text-sm font-medium">
               {t('broadcast.wizard.testBroadcastButton')}
             </button>
           </div>
 
-          {preview && (
+          {channelMode === 'fixed' && preview && (
             <div className="bg-surface-2 rounded-xl p-4 border border-surface-3 space-y-3">
               <div className="grid grid-cols-2 gap-2 text-sm">
                 <p className="text-fg-muted">{t('broadcast.wizard.previewOpen')}: <span className="text-fg font-semibold">{preview.open}</span></p>
@@ -374,44 +466,50 @@ function BroadcastWizard({ onDone }) {
                 <p className="text-fg-muted">{t('broadcast.wizard.previewBlocked')}: <span className="text-fg font-semibold">{preview.blocked}</span></p>
                 <p className="text-fg-muted">{t('broadcast.wizard.previewNoWhatsapp')}: <span className="text-fg font-semibold">{preview.noWhatsapp}</span></p>
               </div>
-
               <div>
                 <p className="text-[11px] font-semibold text-fg-subtle mb-1.5">{t('broadcast.wizard.byChannelBreakdown')}</p>
-                <div className="space-y-1.5">
-                  {(preview.byChannel || []).map(row => (
-                    <div key={row.channel_id} className="bg-surface-3 rounded-lg p-2.5 text-xs space-y-1">
-                      <div className="flex items-center justify-between">
-                        <span className="font-semibold text-fg">{channelLabel(channels, row.channel_id)}</span>
-                        <span className="text-fg-muted">{t('broadcast.wizard.byChannelTotal', { count: row.total })}</span>
-                      </div>
-                      <div className="flex items-center gap-3 text-fg-muted">
-                        <span>{t('broadcast.wizard.previewOpen')}: <span className="text-fg font-medium">{row.open}</span></span>
-                        <span>{t('broadcast.wizard.previewClosed')}: <span className="text-fg font-medium">{row.closed}</span></span>
-                      </div>
-                      {row.exceedsDailyLimit && (
-                        <div className="flex items-start gap-1.5 bg-warning/10 text-warning rounded-lg p-1.5">
-                          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
-                          <span>{t('broadcast.wizard.exceedsDailyLimit', { days: row.estimatedDays, limit: row.dailyLimit })}</span>
-                        </div>
-                      )}
+                {(preview.byChannel || []).map(row => (
+                  <div key={row.channel_id} className="bg-surface-3 rounded-lg p-2.5 text-xs space-y-1">
+                    <div className="flex items-center justify-between">
+                      <span className="font-semibold text-fg">{channelLabel(channels, row.channel_id)}</span>
+                      <span className="text-fg-muted">{t('broadcast.wizard.byChannelTotal', { count: row.total })}</span>
                     </div>
-                  ))}
-                </div>
+                    {row.exceedsDailyLimit && (
+                      <div className="flex items-start gap-1.5 bg-warning/10 text-warning rounded-lg p-1.5">
+                        <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+                        <span>{t('broadcast.wizard.exceedsDailyLimit', { days: row.estimatedDays, limit: row.dailyLimit })}</span>
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
-
               <p className="text-sm font-semibold text-fg pt-1">{t('broadcast.wizard.willSendConfirm', { count: preview.willSend, templateCount: preview.closed })}</p>
-              <button onClick={send} disabled={sending || preview.willSend === 0}
-                className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
-                <Send size={15} /> {sending ? t('broadcast.wizard.sending') : t('broadcast.wizard.confirmSend')}
-              </button>
             </div>
           )}
 
+          {channelMode === 'last_contacted' && preview && (
+            <p className="text-sm font-semibold text-fg">
+              {t('broadcast.wizard.willSendConfirm', { count: preview.willSend, templateCount: preview.closed })}
+            </p>
+          )}
+
+          <button onClick={send} disabled={sending || (channelMode === 'fixed' ? !preview || preview.willSend === 0 : !preview?.byChannel?.some(r => channelSelections[r.channel_id]?.template))}
+            className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+            <Send size={15} /> {sending ? t('broadcast.wizard.sending') : t('broadcast.wizard.confirmSend')}
+          </button>
+
           {showTestModal && (
             <TestBroadcastModal
-              channels={channels} defaultChannelId={channelId} mode={channelMode}
-              templateName={selectedTemplate.name} templateLanguage={selectedTemplate.language}
+              channels={channels} mode={channelMode}
+              defaultChannelId={channelMode === 'fixed' ? channelId : preview?.byChannel?.[0]?.channel_id}
+              templateName={selectedTemplate?.name} templateLanguage={selectedTemplate?.language}
               templateParams={params.slice(0, varCount)}
+              templatesByChannel={channelMode === 'last_contacted' ? Object.fromEntries(
+                Object.entries(channelSelections).filter(([, sel]) => sel.template).map(([chId, sel]) => [chId, {
+                  template_name: sel.template.name, template_language: sel.template.language,
+                  template_params: (sel.params || []).slice(0, varCountOf(sel.template))
+                }])
+              ) : null}
               onClose={() => setShowTestModal(false)}
             />
           )}
@@ -421,9 +519,62 @@ function BroadcastWizard({ onDone }) {
   )
 }
 
+// كارت رقم واحد في تكسير وضع "آخر رقم كلّم بيه العميل" — كل رقم له قوالبه المعتمدة الخاصة بيه
+// (القوالب متسجلة لكل رقم/WABA على حدة عند ميتا، مش مشتركة بين كل الأرقام)، فلازم يتختار قالب
+// مستقل لكل واحد منهم بدل ما نفرض نفس القالب على الكل ويفشل على الأرقام اللي مالهاش نفس القالب
+function ChannelTemplateBlock({ row, channels, templates, selection, onSelectTemplate, onParamChange }) {
+  const { t } = useTranslation()
+  const varCount = selection?.template ? varCountOf(selection.template) : 0
+  const resolvedPreview = selection?.template ? resolvedBodyOf(selection.template, selection.params) : ''
+
+  return (
+    <div className="bg-surface-2 border border-surface-3 rounded-xl p-3 space-y-2">
+      <div className="flex items-center justify-between text-sm">
+        <span className="font-semibold text-fg">{channelLabel(channels, row.channel_id)}</span>
+        <span className="text-fg-muted text-xs">{t('broadcast.wizard.byChannelTotal', { count: row.total })}</span>
+      </div>
+      <div className="flex items-center gap-3 text-fg-muted text-xs">
+        <span>{t('broadcast.wizard.previewOpen')}: <span className="text-fg font-medium">{row.open}</span></span>
+        <span>{t('broadcast.wizard.previewClosed')}: <span className="text-fg font-medium">{row.closed}</span></span>
+      </div>
+      {row.exceedsDailyLimit && (
+        <div className="flex items-start gap-1.5 bg-warning/10 text-warning rounded-lg p-1.5 text-xs">
+          <AlertTriangle size={12} className="flex-shrink-0 mt-0.5" />
+          <span>{t('broadcast.wizard.exceedsDailyLimit', { days: row.estimatedDays, limit: row.dailyLimit })}</span>
+        </div>
+      )}
+
+      {templates === 'loading' || templates === undefined ? (
+        <p className="text-xs text-fg-subtle">{t('broadcast.wizard.loadingTemplates')}</p>
+      ) : templates.length === 0 ? (
+        <p className="text-xs text-danger">{t('broadcast.wizard.noTemplatesForChannel')}</p>
+      ) : !selection?.template ? (
+        <select value="" onChange={e => onSelectTemplate(templates.find(tp => tp.name === e.target.value))}
+          className="w-full bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg">
+          <option value="">{t('broadcast.wizard.templateLabel')}</option>
+          {templates.map(tpl => <option key={tpl.name} value={tpl.name}>{tpl.name}</option>)}
+        </select>
+      ) : (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="text-sm text-fg font-medium">{selection.template.name}</span>
+            <button onClick={() => onSelectTemplate(null)} className="text-xs text-brand">{t('broadcast.wizard.changeTemplate')}</button>
+          </div>
+          {Array.from({ length: varCount }).map((_, i) => (
+            <input key={i} value={selection.params?.[i] || ''} onChange={e => onParamChange(i, e.target.value)}
+              placeholder={t('broadcast.wizard.variablePlaceholder', { n: i + 1 })}
+              className="w-full bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg" />
+          ))}
+          <TemplatePreview {...templateToPreviewProps(selection.template, resolvedPreview)} />
+        </div>
+      )}
+    </div>
+  )
+}
+
 // إرسال تجربة فورية لعدد من الأرقام (موجودين كعملاء أو لأ) قبل بدء التنفيذ الفعلي على الشريحة —
 // نفس شكل حقول بدء محادثة جديدة (اسم + رقم) بالظبط، بس بيسمح بأكتر من صف
-function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, templateLanguage, templateParams, onClose }) {
+function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, templateLanguage, templateParams, templatesByChannel, onClose }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [channelId, setChannelId] = useState(defaultChannelId)
@@ -441,12 +592,12 @@ function TestBroadcastModal({ channels, defaultChannelId, mode, templateName, te
     setSending(true)
     setResults(null)
     try {
+      const body = mode === 'last_contacted'
+        ? { mode, channel_id: channelId, templates_by_channel: templatesByChannel, targets: validTargets }
+        : { mode, channel_id: channelId, template_name: templateName, template_language: templateLanguage, template_params: templateParams, targets: validTargets }
       const res = await apiFetch(`${API_URL}/broadcasts/test`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          template_name: templateName, template_language: templateLanguage, template_params: templateParams,
-          mode, channel_id: channelId, targets: validTargets
-        })
+        body: JSON.stringify(body)
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)

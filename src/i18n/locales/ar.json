@@ -4,7 +4,8 @@
     "newButton": "جديد",
     "list": {
       "empty": "مفيش إرسال جماعي لسه — دوس \"جديد\" عشان تبدأ",
-      "templateAndCount": "قالب: {{template}} — {{count}} عميل"
+      "templateAndCount": "قالب: {{template}} — {{count}} عميل",
+      "multipleTemplates": "قوالب متعددة"
     },
     "status": {
       "draft": "مسودة",
@@ -18,7 +19,8 @@
       "delivered": "وصلت",
       "read": "اتقرت",
       "failed": "فشلت",
-      "skipped_blocked": "متجاهلة (محظور)"
+      "skipped_blocked": "متجاهلة (محظور)",
+      "skipped_no_template": "متجاهلة (مفيش قالب)"
     },
     "detail": {
       "loading": "جاري التحميل...",
@@ -29,12 +31,16 @@
       "selectPlaceholder": "اختر...",
       "segmentLabel": "الشريحة",
       "channelLabel": "الرقم",
-      "channelUsedForTemplatesOnly": "الرقم ده هيُستخدم بس لعرض قوالبه — الإرسال الفعلي هيبقى من آخر رقم كل عميل كلّم بيه",
       "channelModeLabel": "وضع الإرسال",
       "channelModeFixed": "رقم محدد",
       "channelModeLastContacted": "آخر رقم كلّم بيه العميل",
-      "channelModeFixedHint": "كل العملاء هيتبعتلهم من نفس الرقم المختار",
-      "channelModeLastContactedHint": "كل عميل هيتبعتله من آخر رقم واتساب كلّمنا بيه هو بالذات — بيزود عدد اللي شاتهم لسه مفتوح",
+      "channelModeFixedHint": "كل العملاء هيتبعتلهم من نفس الرقم المختار، بقالب واحد",
+      "channelModeLastContactedHint": "كل عميل هيتبعتله من آخر رقم واتساب كلّمنا بيه هو بالذات — بيزود عدد اللي شاتهم لسه مفتوح. لازم تختار قالب مستقل لكل رقم لأن القوالب معتمدة لكل رقم على حدة عند ميتا",
+      "calculateBreakdownButton": "احسب التكسير بالرقم",
+      "pickTemplatePerChannel": "اختار قالب لكل رقم",
+      "loadingTemplates": "جاري تحميل القوالب...",
+      "noTemplatesForChannel": "الرقم ده مالوش قوالب معتمدة — العملاء اللي هيتبعتلهم من هنا هيتستبعدوا",
+      "someChannelsSkippedConfirm": "فيه أرقام في التكسير من غير قالب مختار — العملاء بتوعها مش هيتبعتلهم. تكمل؟",
       "templateLabel": "القالب المعتمد",
       "noTemplates": "الرقم ده مالوش قوالب معتمدة لسه",
       "changeTemplate": "غيّر القالب",

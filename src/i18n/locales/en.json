@@ -4,7 +4,8 @@
     "newButton": "New",
     "list": {
       "empty": "No broadcasts yet — tap \"New\" to start",
-      "templateAndCount": "Template: {{template}} — {{count}} customers"
+      "templateAndCount": "Template: {{template}} — {{count}} customers",
+      "multipleTemplates": "Multiple templates"
     },
     "status": {
       "draft": "Draft",
@@ -18,7 +19,8 @@
       "delivered": "Delivered",
       "read": "Read",
       "failed": "Failed",
-      "skipped_blocked": "Skipped (blocked)"
+      "skipped_blocked": "Skipped (blocked)",
+      "skipped_no_template": "Skipped (no template)"
     },
     "detail": {
       "loading": "Loading...",
@@ -29,12 +31,16 @@
       "selectPlaceholder": "Select...",
       "segmentLabel": "Segment",
       "channelLabel": "Number",
-      "channelUsedForTemplatesOnly": "This number is only used to browse its templates — actual sending will use each customer's own last-contacted number",
       "channelModeLabel": "Send mode",
       "channelModeFixed": "Specific number",
       "channelModeLastContacted": "Customer's last-contacted number",
-      "channelModeFixedHint": "Every customer will be messaged from the same selected number",
-      "channelModeLastContactedHint": "Each customer will be messaged from the actual WhatsApp number they last talked to us on — this increases how many still have an open chat window",
+      "channelModeFixedHint": "Every customer will be messaged from the same selected number, with one template",
+      "channelModeLastContactedHint": "Each customer will be messaged from the actual WhatsApp number they last talked to us on — this increases how many still have an open chat window. You'll need to pick a separate template per number, since templates are approved per number with Meta",
+      "calculateBreakdownButton": "Calculate breakdown by number",
+      "pickTemplatePerChannel": "Pick a template for each number",
+      "loadingTemplates": "Loading templates...",
+      "noTemplatesForChannel": "This number has no approved templates — its customers will be excluded",
+      "someChannelsSkippedConfirm": "Some numbers in the breakdown have no template selected — their customers won't be messaged. Continue?",
       "templateLabel": "Approved template",
       "noTemplates": "This number has no approved templates yet",
       "changeTemplate": "Change template",
