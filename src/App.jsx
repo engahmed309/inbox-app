@@ -14,6 +14,7 @@ import SetPasswordScreen from './screens/SetPasswordScreen'
 const SettingsScreen = lazy(() => import('./screens/SettingsScreen'))
 const ReportsScreen = lazy(() => import('./screens/ReportsScreen'))
 const BroadcastScreen = lazy(() => import('./screens/BroadcastScreen'))
+const CommentsScreen = lazy(() => import('./screens/CommentsScreen'))
 
 function ScreenLoader() {
   return (
@@ -70,6 +71,14 @@ function InstagramOAuthHandler() {
   return null
 }
 
+function HomeForAgent() {
+  const { agent } = useAuth()
+  if (agent && agent.role !== 'admin' && agent.access_scope === 'comments') {
+    return <Navigate to="/comments" replace />
+  }
+  return <ConversationsScreen />
+}
+
 export default function App() {
   return (
     <>
@@ -77,11 +86,14 @@ export default function App() {
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/set-password" element={<SetPasswordScreen />} />
-        <Route path="/" element={<PrivateRoute><ConversationsScreen /></PrivateRoute>} />
+        {/* موظف التعليقات بس مالوش شغل في شاشة المحادثات — بيدخل على شاشته مباشرة بدل ما يشوف
+            شاشة فاضية أو بيانات مش من حقه */}
+        <Route path="/" element={<PrivateRoute><HomeForAgent /></PrivateRoute>} />
         <Route path="/chat/:id" element={<PrivateRoute><ChatScreen /></PrivateRoute>} />
         <Route path="/settings/*" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><SettingsScreen /></Suspense></PrivateRoute>} />
         <Route path="/reports" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><ReportsScreen /></Suspense></PrivateRoute>} />
         <Route path="/broadcast" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><BroadcastScreen /></Suspense></PrivateRoute>} />
+        <Route path="/comments" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><CommentsScreen /></Suspense></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

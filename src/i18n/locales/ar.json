@@ -227,7 +227,13 @@
       "passwordChanged": "تم تغيير كلمة المرور بنجاح",
       "neverLoggedIn": "لم يسجّل الدخول بعد",
       "limitPrefix": "الحد:",
-      "resetPasswordTitle": "تعيين كلمة مرور للدخول المؤقت"
+      "resetPasswordTitle": "تعيين كلمة مرور للدخول المؤقت",
+      "accessScope": {
+        "label": "نطاق الوصول",
+        "messages": "المحادثات فقط",
+        "comments": "التعليقات فقط",
+        "both": "المحادثات والتعليقات"
+      }
     },
     "channels": {
       "connectedTab": "القنوات المرتبطة",
@@ -526,6 +532,13 @@
       "typeToEnableSuffix": "لتفعيل الزر",
       "wipedButton": "✓ تم مسح البيانات",
       "wipeButton": "امسح جميع بيانات المحادثات والعملاء نهائيًا"
+    },
+    "comments": {
+      "toggleLabel": "استقبال التعليقات",
+      "onHint": "تعليقات فيسبوك وانستجرام تصل للبرنامج وتُحفظ.",
+      "offHint": "التعليقات لا تُحفظ حاليًا. ما يصل أثناء الإيقاف لن يظهر لاحقًا.",
+      "paused": "تم إيقاف استقبال التعليقات",
+      "resumed": "تم استئناف استقبال التعليقات"
     }
   },
   "reports": {
@@ -902,13 +915,13 @@
     },
     "search": {
       "placeholderContact": "البحث بالاسم أو رقم الهاتف...",
-      "placeholderComment": "البحث في التعليقات...",
+      "placeholderComment": "البحث في الملاحظات الداخلية...",
       "placeholderMessage": "البحث في الرسائل...",
       "error": "فشل البحث، حاول مرة أخرى",
       "types": {
         "contact": "عميل",
         "message": "رسالة",
-        "comment": "تعليق"
+        "comment": "ملاحظة داخلية"
       }
     },
     "filters": {
@@ -1408,5 +1421,28 @@
     "ZM": "زامبيا",
     "ZW": "زيمبابوي",
     "PS": "فلسطين"
+  },
+  "comments": {
+    "title": "التعليقات",
+    "noAccess": "حسابك ليس لديه صلاحية على التعليقات",
+    "empty": "لا توجد تعليقات هنا",
+    "unknownAuthor": "غير معروف",
+    "isReply": "رد",
+    "status": {
+      "new": "جديدة",
+      "handled": "تمت المعالجة",
+      "ignored": "متجاهلة"
+    },
+    "privateReply": "رد خاص",
+    "markHandled": "تمت المعالجة",
+    "ignore": "تجاهل",
+    "openPost": "المنشور",
+    "privateReplySent": "تم إرسال رد خاص",
+    "privateReplyTitle": "رد خاص على {{name}}",
+    "privateReplyPlaceholder": "اكتب رسالتك الخاصة…",
+    "privateReplyHint": "يُرسل كرسالة خاصة. ميتا تسمح برد خاص واحد فقط لكل تعليق، وخلال ٧ أيام منه.",
+    "sendPrivateReply": "إرسال الرد الخاص",
+    "sending": "جارٍ الإرسال…",
+    "privateReplyDone": "تم إرسال الرد الخاص"
   }
 }

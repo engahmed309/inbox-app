@@ -227,7 +227,13 @@
       "passwordChanged": "Password changed successfully",
       "neverLoggedIn": "Hasn't logged in yet",
       "limitPrefix": "Limit:",
-      "resetPasswordTitle": "Set a password for temporary sign-in"
+      "resetPasswordTitle": "Set a password for temporary sign-in",
+      "accessScope": {
+        "label": "Access",
+        "messages": "Conversations only",
+        "comments": "Comments only",
+        "both": "Conversations and comments"
+      }
     },
     "channels": {
       "connectedTab": "Connected Channels",
@@ -526,6 +532,13 @@
       "typeToEnableSuffix": "to enable the button",
       "wipedButton": "✓ Data wiped",
       "wipeButton": "Permanently wipe all conversation and customer data"
+    },
+    "comments": {
+      "toggleLabel": "Receive comments",
+      "onHint": "Facebook and Instagram comments reach the app and are saved.",
+      "offHint": "Comments are not being saved. Anything arriving while this is off will not appear later.",
+      "paused": "Comment intake paused",
+      "resumed": "Comment intake resumed"
     }
   },
   "reports": {
@@ -902,13 +915,13 @@
     },
     "search": {
       "placeholderContact": "Search by name or phone number...",
-      "placeholderComment": "Search in comments...",
+      "placeholderComment": "Search internal notes...",
       "placeholderMessage": "Search in messages...",
       "error": "Search failed, please try again",
       "types": {
         "contact": "Contact",
         "message": "Message",
-        "comment": "Comment"
+        "comment": "Internal note"
       }
     },
     "filters": {
@@ -1408,5 +1421,28 @@
     "ZM": "Zambia",
     "ZW": "Zimbabwe",
     "PS": "Palestine"
+  },
+  "comments": {
+    "title": "Comments",
+    "noAccess": "Your account does not have access to comments",
+    "empty": "No comments here",
+    "unknownAuthor": "Unknown",
+    "isReply": "reply",
+    "status": {
+      "new": "New",
+      "handled": "Handled",
+      "ignored": "Ignored"
+    },
+    "privateReply": "Private reply",
+    "markHandled": "Mark handled",
+    "ignore": "Ignore",
+    "openPost": "Post",
+    "privateReplySent": "Private reply sent",
+    "privateReplyTitle": "Private reply to {{name}}",
+    "privateReplyPlaceholder": "Write your private message…",
+    "privateReplyHint": "Sent as a private message. Meta allows one private reply per comment, within 7 days of it.",
+    "sendPrivateReply": "Send private reply",
+    "sending": "Sending…",
+    "privateReplyDone": "Private reply sent"
   }
 }

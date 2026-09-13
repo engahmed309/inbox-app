@@ -470,6 +470,52 @@ function TotalStat({ label, value, color }) {
   )
 }
 
+// مفتاح استقبال تعليقات فيسبوك وانستجرام. ميتا بتفضل تبعت والسيرفر بيفضل يرد عليها (لازم، وإلا
+// بتوقف الويب هوك)، بس مافيش حاجة بتتخزن — فالإيقاف فوري ومن غير أي أثر جانبي
+function CommentsIngestionToggle() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [enabled, setEnabled] = useState(null)
+
+  useEffect(() => {
+    supabase.from('app_settings').select('comments_enabled').eq('id', true).maybeSingle()
+      .then(({ data }) => setEnabled(data?.comments_enabled ?? true))
+  }, [])
+
+  const toggle = async (v) => {
+    setEnabled(v)
+    const { error } = await supabase.from('app_settings').update({ comments_enabled: v }).eq('id', true)
+    if (error) { setEnabled(!v); toast.error(error.message); return }
+    toast.success(v ? t('settings.comments.resumed') : t('settings.comments.paused'))
+  }
+
+  if (enabled === null) return null
+  return (
+    <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+      <Toggle label={t('settings.comments.toggleLabel')} value={enabled} onChange={toggle} />
+      <p className="text-[11px] text-fg-subtle mt-1.5">
+        {enabled ? t('settings.comments.onHint') : t('settings.comments.offHint')}
+      </p>
+    </div>
+  )
+}
+
+// نطاق وصول الموظف — الأدمن بيشوف كل حاجة بغض النظر عن ده
+function AccessScopeField({ value, onChange }) {
+  const { t } = useTranslation()
+  return (
+    <div>
+      <label className="block text-xs text-fg-muted mb-1">{t('settings.agents.accessScope.label')}</label>
+      <select value={value} onChange={e => onChange(e.target.value)}
+        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+        <option value="messages">{t('settings.agents.accessScope.messages')}</option>
+        <option value="comments">{t('settings.agents.accessScope.comments')}</option>
+        <option value="both">{t('settings.agents.accessScope.both')}</option>
+      </select>
+    </div>
+  )
+}
+
 function MaxConversationsField({ value, onChange }) {
   const { t } = useTranslation()
   const unlimited = value == null
@@ -492,7 +538,7 @@ function MaxConversationsField({ value, onChange }) {
 
 function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   const { t } = useTranslation()
-  const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations })
+  const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations, access_scope: agent.access_scope || 'messages' })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
   const toast = useToast()
 
@@ -527,6 +573,7 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
               <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
+          <AccessScopeField value={form.access_scope} onChange={v => setForm({ ...form, access_scope: v })} />
           <Toggle label={t('settings.agents.seeAllConversations')} value={form.can_see_all_conversations} onChange={v => setForm({ ...form, can_see_all_conversations: v })} />
           <div className="flex gap-2">
             <button onClick={() => onUpdate(form)} className="flex-1 py-2 bg-brand rounded-xl text-sm text-white">{t('settings.common.save')}</button>
@@ -708,6 +755,7 @@ function ConnectedChannelsList() {
 
   return (
     <div className="space-y-3 pt-1">
+      <CommentsIngestionToggle />
       {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
         const meta = PLATFORM_META[platform]
         const metaLabel = t(meta.labelKey)

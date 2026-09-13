@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode, MessageSquareText } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 import i18n from '../i18n'
@@ -1152,6 +1152,12 @@ export default function ConversationsScreen() {
               {language === 'ar' ? 'EN' : 'ع'}
             </button>
             <PushNotificationToggle />
+            {(agent?.role === 'admin' || ['comments', 'both'].includes(agent?.access_scope)) && (
+              <button onClick={() => navigate('/comments')} title={t('comments.title')}
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+                <MessageSquareText size={15} />
+              </button>
+            )}
             {agent?.role === 'admin' && (
               <button onClick={() => navigate('/broadcast')} title={t('conversations.sidebar.broadcastTitle')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
