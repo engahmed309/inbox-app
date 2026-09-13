@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { API_URL, apiFetch } from '../lib/supabase'
@@ -10,6 +10,7 @@ import LinkifiedText from '../components/LinkifiedText'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const STATUS_TABS = ['new', 'handled', 'ignored']
+const PAGE_SIZE = 30
 const PLATFORM_ICONS = {
   facebook: <Facebook size={13} className="text-blue-400" />,
   instagram: <Instagram size={13} className="text-pink-400" />,
@@ -24,32 +25,93 @@ export default function CommentsScreen() {
   const [comments, setComments] = useState([])
   const [counts, setCounts] = useState({})
   const [loading, setLoading] = useState(true)
-  const [replyTo, setReplyTo] = useState(null)   // { comment, mode: 'private' | 'public' }
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [hasMore, setHasMore] = useState(false)
+  const [seenCount, setSeenCount] = useState(null)  // عدّاد التبويب وقت آخر تحميل للقائمة
+  const [replyTo, setReplyTo] = useState(null)      // { comment, mode: 'private' | 'public' }
   const [deleting, setDeleting] = useState(null)
+  const sentinelRef = useRef(null)
 
   const canSee = agent?.role === 'admin' || ['comments', 'both'].includes(agent?.access_scope)
 
+  const fetchCounts = useCallback(async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/comments/counts`)
+      const data = await res.json()
+      if (res.ok) { setCounts(data.counts || {}); return data.counts || {} }
+    } catch { /* بنسيب العدادات القديمة معروضة */ }
+    return null
+  }, [])
+
+  // بيرجّع القائمة لأول صفحة. بنستدعيها عند فتح التبويب وبعد أي إجراء — مش كل ٣٠ ثانية،
+  // عشان القائمة ماتتحركش تحت إيد الموظف وهو بيقرا
   const load = useCallback(async () => {
     try {
-      const [listRes, countRes] = await Promise.all([
-        apiFetch(`${API_URL}/comments?status=${status}&limit=100`),
-        apiFetch(`${API_URL}/comments/counts`)
+      const [listRes, fresh] = await Promise.all([
+        apiFetch(`${API_URL}/comments?status=${status}&limit=${PAGE_SIZE}`),
+        fetchCounts()
       ])
       const listData = await listRes.json()
-      if (listRes.ok) setComments(listData.comments || [])
-      const countData = await countRes.json()
-      if (countRes.ok) setCounts(countData.counts || {})
+      if (listRes.ok) {
+        setComments(listData.comments || [])
+        setHasMore(!!listData.hasMore)
+      }
+      if (fresh) setSeenCount(fresh[status] ?? 0)
     } catch { /* هنسيب اللي معروض زي ما هو */ } finally { setLoading(false) }
-  }, [status])
+  }, [status, fetchCounts])
+
+  const loadMore = useCallback(async () => {
+    if (loadingMore || !hasMore) return
+    setLoadingMore(true)
+    try {
+      const res = await apiFetch(`${API_URL}/comments?status=${status}&limit=${PAGE_SIZE}&offset=${comments.length}`)
+      const data = await res.json()
+      if (res.ok) {
+        // بنستبعد المكرر: لو تعليق جديد وصل بين الصفحتين، الإزاحة بتتحرك وممكن صف يتكرر
+        setComments(prev => {
+          const seen = new Set(prev.map(c => c.id))
+          return [...prev, ...(data.comments || []).filter(c => !seen.has(c.id))]
+        })
+        setHasMore(!!data.hasMore)
+      }
+    } catch { /* بنسيب اللي اتحمّل */ } finally { setLoadingMore(false) }
+  }, [status, comments.length, hasMore, loadingMore])
 
   useEffect(() => {
     if (!canSee) return
     setLoading(true)
+    setComments([])
     load()
-    // التعليقات عددها قليل، فسؤال كل نص دقيقة أبسط وأخف من اشتراك لحظي
-    const id = setInterval(load, 30000)
-    return () => clearInterval(id)
   }, [load, canSee])
+
+  // التحديث الدوري بيجيب العدادات بس (استعلام عدّ في الداتابيز، مش صفوف) — ولو ظهر جديد
+  // بنعرض زرار للموظف يحدّث لما يحب، بدل ما نقفز بالقائمة وهو نازل فيها
+  useEffect(() => {
+    if (!canSee) return
+    const id = setInterval(fetchCounts, 30000)
+    return () => clearInterval(id)
+  }, [fetchCounts, canSee])
+
+  // التحميل التدريجي بيتشغّل لما آخر الصفحة يبان — من غير زرار الموظف يدوّر عليه
+  useEffect(() => {
+    const el = sentinelRef.current
+    if (!el || !hasMore) return
+    const io = new IntersectionObserver(e => { if (e[0].isIntersecting) loadMore() }, { rootMargin: '200px' })
+    io.observe(el)
+    return () => io.disconnect()
+  }, [hasMore, loadMore])
+
+  const pendingChanges = seenCount !== null && counts[status] !== undefined && counts[status] !== seenCount
+
+  // بعد أي إجراء بنعدّل الصف مكانه ونحدّث العدادات بس — مابنعيدش تحميل القائمة، عشان الموظف
+  // اللي نازل في تعليق رقم ٢٠٠ مايترميش لأول القائمة كل مرة يعالج واحد
+  const patchRow = (id, patch, dropIf) => setComments(prev =>
+    prev.flatMap(c => {
+      if (c.id !== id) return [c]
+      const next = { ...c, ...patch }
+      return dropIf?.(next) ? [] : [next]
+    })
+  )
 
   const setCommentStatus = async (c, next) => {
     setComments(prev => prev.filter(x => x.id !== c.id))
@@ -59,7 +121,7 @@ export default function CommentsScreen() {
         body: JSON.stringify({ status: next })
       })
       if (!res.ok) throw new Error((await res.json()).error)
-      load()
+      fetchCounts()
     } catch (err) { toast.error(err.message); load() }
   }
 
@@ -73,7 +135,9 @@ export default function CommentsScreen() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('comments.deleteFailed'))
       toast.success(t('comments.deleted'))
-      load()
+      // الحذف بيحوّل الحالة لـ"تمت المعالجة" على السيرفر، فبيخرج من تبويبي "جديدة" و"متجاهلة"
+      patchRow(c.id, { deleted_at: new Date().toISOString(), status: 'handled' }, () => status !== 'handled')
+      fetchCounts()
     } catch (err) { toast.error(err.message) } finally { setDeleting(null) }
   }
 
@@ -98,6 +162,13 @@ export default function CommentsScreen() {
           </button>
         ))}
       </div>
+
+      {pendingChanges && !loading && (
+        <button onClick={() => { setLoading(true); load() }}
+          className="mx-4 mt-2 py-1.5 rounded-full bg-brand/15 text-brand text-[11px] font-medium">
+          {t('comments.refreshAvailable')}
+        </button>
+      )}
 
       <div className="flex-1 overflow-y-auto">
         {loading ? (
@@ -191,11 +262,23 @@ export default function CommentsScreen() {
             </div>
           </div>
         ))}
+
+        {/* آخر الصفحة: أول ما يبان بنجيب الدفعة اللي بعده */}
+        {hasMore && (
+          <div ref={sentinelRef} className="flex items-center justify-center py-4">
+            <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          </div>
+        )}
       </div>
 
       {replyTo && (
         <ReplyModal comment={replyTo.comment} mode={replyTo.mode}
-          onClose={() => setReplyTo(null)} onSent={() => { setReplyTo(null); load() }} />
+          onClose={() => setReplyTo(null)}
+          onSent={patch => {
+            patchRow(replyTo.comment.id, { ...patch, status: 'handled' }, () => status !== 'handled')
+            setReplyTo(null)
+            fetchCounts()
+          }} />
       )}
     </div>
   )
@@ -222,7 +305,10 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success(t(isPublic ? 'comments.publicReplyDone' : 'comments.privateReplyDone'))
-      onSent()
+      const now = new Date().toISOString()
+      onSent(isPublic
+        ? { public_reply_at: now, public_reply_text: text.trim() }
+        : { private_replied_at: now })
     } catch (err) { toast.error(err.message) } finally { setSending(false) }
   }
 

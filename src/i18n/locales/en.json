@@ -1459,6 +1459,7 @@
     "deletedBadge": "Comment deleted",
     "deleteFailed": "Could not delete the comment",
     "platformFacebook": "Facebook",
-    "platformInstagram": "Instagram"
+    "platformInstagram": "Instagram",
+    "refreshAvailable": "New updates — tap to load"
   }
 }

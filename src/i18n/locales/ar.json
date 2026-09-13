@@ -1459,6 +1459,7 @@
     "deletedBadge": "تم حذف التعليق",
     "deleteFailed": "تعذّر حذف التعليق",
     "platformFacebook": "فيسبوك",
-    "platformInstagram": "انستجرام"
+    "platformInstagram": "انستجرام",
+    "refreshAvailable": "فيه تحديث — اضغط للتحميل"
   }
 }
