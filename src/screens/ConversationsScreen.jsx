@@ -31,6 +31,7 @@ const CHANNELS = [
   { key: 'whatsapp', labelKey: 'settings.channels.platforms.whatsapp', icon: <Phone size={12} className="text-green-400" /> },
   { key: 'tiktok', labelKey: 'settings.channels.platforms.tiktok', icon: <Music2 size={12} className="text-fg" /> },
   { key: 'whatsapp_qr', labelKey: 'settings.channels.platforms.whatsapp_qr', icon: <QrCode size={12} className="text-emerald-400" /> },
+  { key: 'telegram', labelKey: 'settings.channels.platforms.telegram', icon: <Send size={12} className="text-sky-400" /> },
 ]
 
 const PLATFORM_ICONS = {
@@ -39,6 +40,7 @@ const PLATFORM_ICONS = {
   whatsapp: <Phone size={12} className="text-green-400" />,
   tiktok: <Music2 size={12} className="text-fg" />,
   whatsapp_qr: <QrCode size={12} className="text-emerald-400" />,
+  telegram: <Send size={12} className="text-sky-400" />,
 }
 
 // لو فيه أكتر من قناة لنفس المنصة (أرقام واتساب متعددة، أو أكتر من صفحة فيسبوك...) مفتاح الفلتر

@@ -298,7 +298,18 @@
         "instagram": "إنستغرام",
         "whatsapp": "واتساب",
         "tiktok": "تيك توك",
-        "whatsapp_qr": "واتساب (ربط سريع)"
+        "whatsapp_qr": "واتساب (ربط سريع)",
+        "telegram": "تليجرام"
+      },
+      "telegram": {
+        "title": "ربط بوت تليجرام",
+        "step1": "افتح @BotFather على تليجرام واكتب /newbot (أو /mybots لبوت موجود).",
+        "step2": "انسخ توكن البوت — شكله 123456789:AA...",
+        "step3": "الزقه هنا واضغط ربط.",
+        "singleWebhookWarning": "⚠️ تليجرام يسمح بوجهة واحدة فقط لكل بوت. ربط البوت هنا يفصله فورًا عن أي نظام آخر مربوط عليه (مثل respond.io) ولا يمكن تشغيل الاثنين معًا.",
+        "connectButton": "ربط البوت",
+        "connecting": "جارٍ الربط…",
+        "connected": "تم ربط {{name}} بنجاح"
       },
       "dailyLimitPrefix": "الحد اليومي:",
       "testInboxButton": "جرّب الرقم",
@@ -1001,7 +1012,8 @@
         "whatsapp_qr": "واتساب (ربط سريع)",
         "facebook": "فيسبوك",
         "instagram": "إنستجرام",
-        "tiktok": "تيك توك"
+        "tiktok": "تيك توك",
+        "telegram": "تليجرام"
       }
     },
     "list": {

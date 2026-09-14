@@ -32,7 +32,8 @@ const MESSAGES_PAGE_SIZE = 50 // بنجيب آخر ٥٠ رسالة بس، وال
 const MESSAGE_WINDOW_HOURS = 24
 // whatsapp_qr مالوش قيد نافذة الـ٢٤ ساعة أصلاً — ده بالظبط سبب وجود القناة دي — فـ Infinity
 // بتخلّي شرط isWindowExpired تحت دايمًا false ليها من غير أي شرط إضافي في أي مكان تاني
-const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity }
+// تليجرام كمان مفيهوش نافذة خالص — البوت يقدر يبعت لأي حد بدأ معاه محادثة، في أي وقت
+const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity, telegram: Infinity }
 // كل قيمة هنا مفتاح ترجمة (مش نص جاهز) — بيتحل بـ t() وقت الاستخدام جوه الكومبوننت
 const WINDOW_EXPIRED_KEYS = {
   tiktok: 'chat.windowExpired.tiktok',
@@ -945,7 +946,7 @@ export default function ChatScreen() {
   const isWindowExpired = conv?.last_inbound_at
     ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > (PLATFORM_WINDOW_HOURS[conv.platform] || MESSAGE_WINDOW_HOURS)
     : conv?.platform === 'whatsapp' // لسه ما كلمناش خالص على واتساب الرسمي — لازم قالب معتمد لأول رسالة
-  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : Facebook
+  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : conv?.platform === 'telegram' ? Send : Facebook
   // تيك توك بيقبل نص وصور بس في الـ Business Messaging API — لا فيديو ولا صوت ولا ملفات،
   // فبنخفي أزرار الحاجات دي بدل ما الموظف يبعتها ويكتشف إنها فشلت (أو الأسوأ: توصل كنص فيه اسم الملف)
   const isTiktok = conv?.platform === 'tiktok'

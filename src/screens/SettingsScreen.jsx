@@ -646,6 +646,7 @@ const PLATFORM_META = {
   whatsapp: { labelKey: 'settings.channels.platforms.whatsapp', icon: Phone, color: 'text-green-400' },
   tiktok: { labelKey: 'settings.channels.platforms.tiktok', icon: Music2, color: 'text-fg' },
   whatsapp_qr: { labelKey: 'settings.channels.platforms.whatsapp_qr', icon: QrCode, color: 'text-emerald-400' },
+  telegram: { labelKey: 'settings.channels.platforms.telegram', icon: Send, color: 'text-sky-400' },
 }
 
 function ChannelsTab() {
@@ -756,7 +757,7 @@ function ConnectedChannelsList() {
   return (
     <div className="space-y-3 pt-1">
       <CommentsIngestionToggle />
-      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram'].map(platform => {
         const meta = PLATFORM_META[platform]
         const metaLabel = t(meta.labelKey)
         const Icon = meta.icon
@@ -1534,6 +1535,7 @@ function ConnectNewChannel() {
   const { agent } = useAuth()
   const [connecting, setConnecting] = useState(null)
   const [qrModal, setQrModal] = useState(null) // { channelId, qr, status }
+  const [telegramModal, setTelegramModal] = useState(false)
 
   const connectWhatsApp = async () => {
     if (!WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID) {
@@ -1720,26 +1722,21 @@ function ConnectNewChannel() {
     <>
     <div className="space-y-3 pt-1">
       <p className="text-xs text-fg-subtle -mt-1">{t('settings.channels.connectDesc')}</p>
-      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
-        const isReady = platform === 'whatsapp' || platform === 'instagram' || platform === 'facebook' || platform === 'tiktok' || platform === 'whatsapp_qr'
         const isConnecting = connecting === platform
-        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok, whatsapp_qr: connectWhatsappQr }
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok, whatsapp_qr: connectWhatsappQr, telegram: () => setTelegramModal(true) }
         return (
           <button key={platform}
-            disabled={!isReady || isConnecting}
-            onClick={isReady ? handlers[platform] : undefined}
-            className={`w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 transition-colors ${!isReady ? 'opacity-60 cursor-not-allowed' : 'hover:bg-surface-3'}`}>
+            disabled={isConnecting}
+            onClick={handlers[platform]}
+            className="w-full flex items-center gap-3 bg-surface-2 rounded-2xl p-4 border border-surface-3 transition-colors hover:bg-surface-3">
             <div className="w-10 h-10 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
               <Icon size={16} className={meta.color} />
             </div>
             <span className="flex-1 text-start text-sm text-fg font-medium">{t('settings.channels.connectButton', { platform: t(meta.labelKey) })}</span>
-            {isReady ? (
-              isConnecting && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />
-            ) : (
-              <span className="text-[11px] text-fg-subtle flex-shrink-0">{t('settings.common.comingSoon')}</span>
-            )}
+            {isConnecting && <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" />}
           </button>
         )
       })}
@@ -1774,7 +1771,69 @@ function ConnectNewChannel() {
         </div>
       </div>
     )}
+
+    {telegramModal && <TelegramConnectModal onClose={() => setTelegramModal(false)} />}
     </>
+  )
+}
+
+// تليجرام مفيهوش OAuth — بتاخد توكن البوت من BotFather وتلزقه هنا وخلاص. التحذير الأحمر مش
+// شكلي: البوت ليه ويب هوك واحد بس، فالربط هنا بيقطعه فعليًا عن أي نظام تاني كان مربوط عليه
+function TelegramConnectModal({ onClose }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [token, setToken] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const connect = async () => {
+    if (!token.trim()) return
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/channels/telegram/connect`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ bot_token: token.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('settings.channels.telegram.connected', { name: data.channel?.display_name || '' }))
+      onClose()
+    } catch (err) { toast.error(err.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !saving && onClose()}>
+      <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[460px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3">
+          <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+            <Send size={15} className="text-sky-400" />
+          </div>
+          <p className="flex-1 text-sm font-semibold text-fg">{t('settings.channels.telegram.title')}</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <ol className="text-xs text-fg-muted space-y-1.5 list-decimal list-inside">
+            <li>{t('settings.channels.telegram.step1')}</li>
+            <li>{t('settings.channels.telegram.step2')}</li>
+            <li>{t('settings.channels.telegram.step3')}</li>
+          </ol>
+
+          <div className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+            <p className="text-[11px] text-danger leading-relaxed">{t('settings.channels.telegram.singleWebhookWarning')}</p>
+          </div>
+
+          <input value={token} onChange={e => setToken(e.target.value)} autoFocus dir="ltr"
+            placeholder="123456789:AA..." spellCheck={false} autoComplete="off"
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
+
+          <button onClick={connect} disabled={saving || !token.trim()}
+            className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+            <Send size={15} /> {saving ? t('settings.channels.telegram.connecting') : t('settings.channels.telegram.connectButton')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

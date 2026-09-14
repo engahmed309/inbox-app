@@ -298,7 +298,18 @@
         "instagram": "Instagram",
         "whatsapp": "WhatsApp",
         "tiktok": "TikTok",
-        "whatsapp_qr": "WhatsApp (Quick Pairing)"
+        "whatsapp_qr": "WhatsApp (Quick Pairing)",
+        "telegram": "Telegram"
+      },
+      "telegram": {
+        "title": "Connect a Telegram bot",
+        "step1": "Open @BotFather on Telegram and send /newbot (or /mybots for an existing one).",
+        "step2": "Copy the bot token — it looks like 123456789:AA...",
+        "step3": "Paste it here and press connect.",
+        "singleWebhookWarning": "⚠️ Telegram allows only one destination per bot. Connecting it here immediately disconnects it from any other system it is wired to (such as respond.io) — the two cannot run at once.",
+        "connectButton": "Connect bot",
+        "connecting": "Connecting…",
+        "connected": "{{name}} connected"
       },
       "dailyLimitPrefix": "Daily limit:",
       "testInboxButton": "Test inbox",
@@ -1001,7 +1012,8 @@
         "whatsapp_qr": "WhatsApp (quick link)",
         "facebook": "Facebook",
         "instagram": "Instagram",
-        "tiktok": "TikTok"
+        "tiktok": "TikTok",
+        "telegram": "Telegram"
       }
     },
     "list": {
