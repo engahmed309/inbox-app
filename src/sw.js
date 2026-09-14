@@ -46,7 +46,12 @@ self.addEventListener('push', (event) => {
         badge: '/icons/icon-192.png',
         silent: !!payload.silent,
         tag: payload.tag || undefined,
-        data: { url: payload.url || '/' }
+        // مكالمة بترن مش إشعار عادي: لازم تفضل على الشاشة لحد ما حد يدوس، وتهتز.
+        // الإشعار اللي بيختفي لوحده بعد ثانيتين معناه مكالمة ضايعة
+        requireInteraction: !!payload.requireInteraction,
+        renotify: !!payload.tag && !!payload.requireInteraction,
+        vibrate: payload.vibrate || undefined,
+        data: { url: payload.data?.url || payload.url || '/' }
       })
     })()
   )

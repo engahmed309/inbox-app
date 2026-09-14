@@ -42,36 +42,65 @@ export default function CallCenter() {
   const streamRef = useRef(null)
   const audioRef = useRef(null)
   const ringRef = useRef(null)
+  const audioCtxRef = useRef(null)
+  const activeRef = useRef(null)
+  const tokenRef = useRef(null)
 
   const canTakeCalls = agent && ['messages', 'both'].includes(agent.access_scope || 'both')
 
-  // نغمة الرنين بتتولد في المتصفح — مفيش ملف صوت نحمّله، وبتشتغل على الموبايل والديسكتوب
-  const startRinging = useCallback(() => {
-    try {
-      const ctx = new (window.AudioContext || window.webkitAudioContext)()
-      const gain = ctx.createGain()
-      gain.gain.value = 0.0001
-      gain.connect(ctx.destination)
-      const beep = () => {
-        const osc = ctx.createOscillator()
-        osc.frequency.value = 480
-        osc.connect(gain)
-        osc.start()
-        gain.gain.exponentialRampToValueAtTime(0.15, ctx.currentTime + 0.05)
-        gain.gain.exponentialRampToValueAtTime(0.0001, ctx.currentTime + 0.9)
-        osc.stop(ctx.currentTime + 1)
-      }
-      beep()
-      const id = setInterval(beep, 2500)
-      ringRef.current = { ctx, id }
-    } catch { /* المتصفح رافض الصوت قبل أي تفاعل — الواجهة المرئية كفاية */ }
+  // المتصفحات بتبدأ الصوت "معلّق" لحد ما المستخدم يلمس الصفحة — وده كان بيخلي نغمة الرنين
+  // ماتطلعش أصلاً، خصوصًا على الموبايل. فبنجهّز السياق الصوتي من أول لمسة للتطبيق ونسيبه
+  // مفتوح، عشان أول مكالمة تيجي يبقى جاهز يرن فورًا
+  const ensureAudio = useCallback(() => {
+    if (!audioCtxRef.current) {
+      const Ctx = window.AudioContext || window.webkitAudioContext
+      if (!Ctx) return null
+      audioCtxRef.current = new Ctx()
+    }
+    if (audioCtxRef.current.state === 'suspended') audioCtxRef.current.resume().catch(() => {})
+    return audioCtxRef.current
   }, [])
+
+  useEffect(() => {
+    const unlock = () => ensureAudio()
+    for (const e of ['pointerdown', 'keydown', 'touchstart']) document.addEventListener(e, unlock, { passive: true })
+    return () => { for (const e of ['pointerdown', 'keydown', 'touchstart']) document.removeEventListener(e, unlock) }
+  }, [ensureAudio])
+
+  // رنة تليفون حقيقية: نغمتين متداخلتين (زي نغمة الشبكة) بدل بيب واحد، عشان تبان إنها مكالمة
+  const startRinging = useCallback(() => {
+    const ctx = ensureAudio()
+    if (!ctx) return
+    const ring = () => {
+      try {
+        const gain = ctx.createGain()
+        gain.gain.value = 0.0001
+        gain.connect(ctx.destination)
+        for (const freq of [440, 480]) {
+          const osc = ctx.createOscillator()
+          osc.type = 'sine'
+          osc.frequency.value = freq
+          osc.connect(gain)
+          osc.start()
+          osc.stop(ctx.currentTime + 1.2)
+        }
+        const t = ctx.currentTime
+        gain.gain.exponentialRampToValueAtTime(0.35, t + 0.05)
+        gain.gain.setValueAtTime(0.35, t + 0.9)
+        gain.gain.exponentialRampToValueAtTime(0.0001, t + 1.2)
+      } catch { /* السياق اتقفل */ }
+      // اهتزاز كمان على الموبايل — بيوصل حتى لو الجهاز صامت
+      try { navigator.vibrate?.([400, 200, 400]) } catch { /* مش مدعوم */ }
+    }
+    ring()
+    ringRef.current = { id: setInterval(ring, 3000) }
+  }, [ensureAudio])
 
   const stopRinging = useCallback(() => {
     if (!ringRef.current) return
     clearInterval(ringRef.current.id)
-    ringRef.current.ctx.close().catch(() => {})
     ringRef.current = null
+    try { navigator.vibrate?.(0) } catch { /* مش مدعوم */ }
   }, [])
 
   const teardown = useCallback(() => {
@@ -114,6 +143,30 @@ export default function CallCenter() {
     const id = setInterval(() => setSeconds(s => s + 1), 1000)
     return () => clearInterval(id)
   }, [active])
+
+  // بنمسك التوكن مقدمًا عشان لحظة الإغلاق مافيهاش وقت لأي await
+  useEffect(() => {
+    activeRef.current = active
+    if (active) supabase.auth.getSession().then(({ data }) => { tokenRef.current = data?.session?.access_token || null })
+  }, [active])
+
+  // لما الموظف يقفل التطبيق وهو في مكالمة، الصوت بيموت عنده فورًا لكن المريض بيفضل سامع خط
+  // مفتوح لحد ما ميتا تستسلم لوحدها. لازم نقول لميتا إن المكالمة خلصت.
+  //
+  // كل حاجة هنا لازم تكون متزامنة: المتصفح مش مستني أي await وهو بيقفل الصفحة. وkeepalive
+  // هو اللي بيخلي الطلب يكمّل بعد ما الصفحة تموت — fetch عادي بيتلغي معاها
+  useEffect(() => {
+    const endOnLeave = () => {
+      const id = activeRef.current?.call_id
+      if (!id) return
+      fetch(`${API_URL}/calls/${id}/hangup`, {
+        method: 'POST', keepalive: true,
+        headers: tokenRef.current ? { Authorization: `Bearer ${tokenRef.current}` } : {}
+      }).catch(() => {})
+    }
+    window.addEventListener('pagehide', endOnLeave)
+    return () => window.removeEventListener('pagehide', endOnLeave)
+  }, [])
 
   // ─── الرد ─────────────────────────────────────────────────
   const answer = async () => {
