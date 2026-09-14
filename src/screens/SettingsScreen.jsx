@@ -14,7 +14,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube
+  QrCode, Filter, Send, Youtube, Activity
 } from 'lucide-react'
 
 const TABS = [
@@ -27,6 +27,7 @@ const TABS = [
   { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
   { key: 'segments', labelKey: 'settings.tabs.segments', icon: Filter },
+  { key: 'health', labelKey: 'settings.tabs.health', icon: Activity },
   { key: 'danger', labelKey: 'settings.tabs.danger', icon: AlertTriangle },
 ]
 
@@ -77,6 +78,7 @@ export default function SettingsScreen() {
         {tab === 'roundrobin' && <RoundRobinTab />}
         {tab === 'ai' && <AiAgentTab />}
         {tab === 'segments' && <SegmentsTab />}
+        {tab === 'health' && <SystemHealthTab />}
         {tab === 'danger' && <DangerZoneTab />}
       </div>
     </div>
@@ -1842,6 +1844,122 @@ function YoutubeConnectModal({ onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// شاشة صحة النظام: الإجابة على "إيه اللي شغال دلوقتي؟" في بصة واحدة. الإنذارات فوق لأنها
+// اللي محتاجة تصرّف، والجدول تحتها للاطمئنان
+function SystemHealthTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [data, setData] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [settings, setSettings] = useState(null)
+  const [savingReply, setSavingReply] = useState(false)
+
+  const load = useCallback(async () => {
+    try {
+      const [h, s] = await Promise.all([
+        apiFetch(`${API_URL}/system/health`).then(r => r.json()),
+        supabase.from('app_settings').select('missed_call_reply_enabled, missed_call_message').eq('id', true).maybeSingle()
+      ])
+      if (h.error) throw new Error(h.error)
+      setData(h)
+      if (s.data) setSettings(s.data)
+    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
+
+  const saveMissedCall = async (patch) => {
+    setSavingReply(true)
+    try {
+      const { error } = await supabase.from('app_settings').update(patch).eq('id', true)
+      if (error) throw error
+      setSettings(s => ({ ...s, ...patch }))
+      toast.success(t('settings.health.saved'))
+    } catch (err) { toast.error(err.message) } finally { setSavingReply(false) }
+  }
+
+  const ago = (iso) => {
+    if (!iso) return t('settings.health.never')
+    const mins = Math.floor((Date.now() - new Date(iso).getTime()) / 60000)
+    if (mins < 60) return t('settings.health.minsAgo', { count: mins })
+    const hrs = Math.floor(mins / 60)
+    if (hrs < 48) return t('settings.health.hoursAgo', { count: hrs })
+    return t('settings.health.daysAgo', { count: Math.floor(hrs / 24) })
+  }
+  // ساكتة من أكتر من ٦ ساعات = تستاهل نظرة، مش بالضرورة عطل
+  const stale = (iso) => iso && (Date.now() - new Date(iso).getTime()) > 6 * 3600 * 1000
+
+  if (loading) return <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+
+  return (
+    <div className="space-y-3 pt-1">
+      <div className="flex items-center justify-between">
+        <p className="text-xs text-fg-subtle">{t('settings.health.desc')}</p>
+        <button onClick={() => { setLoading(true); load() }}
+          className="flex items-center gap-1 px-2 py-1 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg">
+          <RefreshCw size={11} /> {t('settings.health.refresh')}
+        </button>
+      </div>
+
+      {data?.alerts?.length > 0 ? (
+        <div className="space-y-2">
+          {data.alerts.map(a => (
+            <div key={a.id} className="bg-danger/10 border border-danger/30 rounded-xl p-3">
+              <p className="text-xs font-semibold text-danger">{t(`settings.health.reasons.${a.reason}`, a.reason)}</p>
+              {a.detail && <p className="text-[11px] text-fg-muted mt-0.5">{a.detail}</p>}
+              <p className="text-[10px] text-fg-subtle mt-1">{ago(a.opened_at)}</p>
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div className="bg-success/10 border border-success/25 rounded-xl p-3">
+          <p className="text-xs text-success font-medium">{t('settings.health.allGood')}</p>
+        </div>
+      )}
+
+      <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3">
+        {(data?.channels || []).map(ch => (
+          <div key={ch.id} className="flex items-center gap-2 p-3">
+            <span className={`w-2 h-2 rounded-full flex-shrink-0 ${ch.status === 'active' ? 'bg-success' : 'bg-danger'}`} />
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-fg truncate">{ch.custom_name || ch.display_name || ch.platform}</p>
+              <p className="text-[10px] text-fg-subtle">{ch.platform}</p>
+            </div>
+            <div className="text-end flex-shrink-0">
+              <p className={`text-[11px] ${stale(ch.last_inbound_at) ? 'text-warning' : 'text-fg-muted'}`}>
+                {t('settings.health.lastInbound')}: {ago(ch.last_inbound_at)}
+              </p>
+            </div>
+          </div>
+        ))}
+      </div>
+
+      <div className="bg-surface-2 rounded-2xl border border-surface-3 p-3 space-y-1">
+        <p className="text-[11px] text-fg-muted">{t('settings.health.lastComment')}: {ago(data?.last_comment_at)}</p>
+        <p className="text-[11px] text-fg-muted">{t('settings.health.lastCall')}: {ago(data?.last_call_at)}</p>
+      </div>
+
+      {settings && (
+        <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-2.5">
+          <p className="text-sm font-semibold text-fg">{t('settings.health.missedCallTitle')}</p>
+          <p className="text-[11px] text-fg-subtle">{t('settings.health.missedCallHint')}</p>
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-xs text-fg">{t('settings.health.missedCallEnable')}</span>
+            <input type="checkbox" checked={!!settings.missed_call_reply_enabled} disabled={savingReply}
+              onChange={e => saveMissedCall({ missed_call_reply_enabled: e.target.checked })}
+              className="accent-brand w-4 h-4" />
+          </label>
+          {settings.missed_call_reply_enabled && (
+            <textarea rows={2} defaultValue={settings.missed_call_message || ''} disabled={savingReply}
+              onBlur={e => { if (e.target.value !== settings.missed_call_message) saveMissedCall({ missed_call_message: e.target.value }) }}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg" />
+          )}
+        </div>
+      )}
     </div>
   )
 }

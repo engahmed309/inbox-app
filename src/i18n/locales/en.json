@@ -155,7 +155,29 @@
       "roundRobin": "Distribution",
       "ai": "AI Agent",
       "segments": "Segments",
+      "health": "System health",
       "danger": "Danger Zone"
+    },
+    "health": {
+      "desc": "Where every channel stands right now, and what needs attention.",
+      "refresh": "Refresh",
+      "allGood": "✅ All channels are working normally",
+      "lastInbound": "Last inbound",
+      "lastComment": "Last comment received",
+      "lastCall": "Last call",
+      "never": "Never",
+      "minsAgo": "{{count}} min ago",
+      "hoursAgo": "{{count}}h ago",
+      "daysAgo": "{{count}}d ago",
+      "saved": "Saved",
+      "reasons": {
+        "no_inbound": "Stopped receiving messages",
+        "disconnected": "Channel disconnected",
+        "token_invalid": "Token is no longer valid"
+      },
+      "missedCallTitle": "Missed call reply",
+      "missedCallHint": "When a patient calls and nobody answers, this message goes out automatically, turning a lost call into a conversation. It will not send if they have not messaged within 24 hours (Meta's rule).",
+      "missedCallEnable": "Send automatically"
     },
     "common": {
       "cancel": "Cancel",
