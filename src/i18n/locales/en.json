@@ -1445,6 +1445,19 @@
     "ZW": "Zimbabwe",
     "PS": "Palestine"
   },
+  "calls": {
+    "incoming": "Incoming call",
+    "connecting": "Connecting…",
+    "inCall": "In call",
+    "answer": "Answer",
+    "decline": "Decline",
+    "hangup": "End",
+    "mute": "Mute",
+    "unmute": "Unmute",
+    "openChat": "Chat",
+    "answerFailed": "Could not answer the call",
+    "mediaFailed": "Audio dropped"
+  },
   "comments": {
     "title": "Comments",
     "noAccess": "Your account does not have access to comments",

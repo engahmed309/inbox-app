@@ -8,6 +8,7 @@ import LoginScreen from './screens/LoginScreen'
 import ConversationsScreen from './screens/ConversationsScreen'
 import ChatScreen from './screens/ChatScreen'
 import SetPasswordScreen from './screens/SetPasswordScreen'
+import CallCenter from './components/CallCenter'
 
 // الشاشتين دول (ومعاهم مكتبة الشارتات الخاصة بالتقارير) مش محتاجهم غير الأدمن، فبنأجّل تحميلهم
 // عشان الموظفين العاديين ميحملوش الحجم ده كله كل مرة يفتحوا التطبيق
@@ -83,6 +84,8 @@ export default function App() {
   return (
     <>
       <InstagramOAuthHandler />
+      {/* المكالمة بترن عند الموظف مهما كانت الشاشة المفتوحة، فالمكوّن ده فوق الراوتر مش جواه */}
+      <CallCenter />
       <Routes>
         <Route path="/login" element={<LoginScreen />} />
         <Route path="/set-password" element={<SetPasswordScreen />} />
