@@ -123,6 +123,12 @@ export default function CallsScreen() {
                   {dur && <span className="ms-1.5"><Clock size={9} className="inline align-[-1px]" /> {dur}</span>}
                   {c.channels && <span className="ms-1.5">· {c.channels.custom_name || c.channels.display_name}</span>}
                 </p>
+                {/* "فاتت" لوحدها مش كفاية — مين كان فاتح البرنامج وقتها وسابها ترن؟ */}
+                {missed && c.notified_agents?.length > 0 && (
+                  <p className="text-[10px] text-warning truncate mt-0.5">
+                    {t('callsLog.shownTo', { names: c.notified_agents.join('، ') })}
+                  </p>
+                )}
               </div>
 
               <div className="flex items-center gap-2 flex-shrink-0">

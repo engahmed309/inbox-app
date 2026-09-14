@@ -156,7 +156,8 @@
       "ai": "AI Agent",
       "segments": "Segments",
       "health": "System health",
-      "danger": "Danger Zone"
+      "danger": "Danger Zone",
+      "ratings": "Ratings"
     },
     "health": {
       "desc": "Where every channel stands right now, and what needs attention.",
@@ -595,6 +596,22 @@
       "offHint": "Comments are not being saved. Anything arriving while this is off will not appear later.",
       "paused": "Comment intake paused",
       "resumed": "Comment intake resumed"
+    },
+    "ratings": {
+      "desc": "Customer ratings of the service. Lowest-rated agents first.",
+      "enable": "Ask for a rating after a call and after closing a conversation",
+      "hint": "Sent automatically on every platform. The customer replies with a number from 0 to 5, and anything under 3 raises an alert to admins.",
+      "saved": "Saved",
+      "count": "{{count}} ratings",
+      "lowCount": "{{count}} low",
+      "recent": "Recent ratings",
+      "showingLow": "Low only",
+      "showingAll": "All",
+      "empty": "No ratings yet",
+      "trigger": {
+        "call": "after a call",
+        "conversation_closed": "after a conversation closed"
+      }
     }
   },
   "reports": {
@@ -1485,12 +1502,17 @@
     "empty": "No calls yet",
     "openChat": "Open chat",
     "answeredBy": "Answered by {{name}}",
-    "tabs": { "all": "All", "answered": "Answered", "missed": "Missed" },
+    "tabs": {
+      "all": "All",
+      "answered": "Answered",
+      "missed": "Missed"
+    },
     "status": {
       "missed": "Nobody answered",
       "rejected": "Declined",
       "failed": "Connection failed"
-    }
+    },
+    "shownTo": "Shown to {{names}} - nobody answered"
   },
   "calls": {
     "incoming": "Incoming call",
@@ -1563,4 +1585,3 @@
     "refreshAvailable": "New updates â€” tap to load"
   }
 }
-

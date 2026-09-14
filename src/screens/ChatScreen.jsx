@@ -639,7 +639,11 @@ export default function ChatScreen() {
     const newLabel = t(STATUS_OPTS.find(o => o.key === s)?.labelKey || s)
     if (oldLabel !== newLabel) logActivity(id, agent?.id, t('chat.activity.statusChanged', { from: oldLabel, to: newLabel }))
     // قفل المحادثة بيفضي مساحة عند الموظف، جرب توزّع أي محادثة مستنية
-    if (s === 'closed') apiFetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+    if (s === 'closed') {
+      apiFetch(`${API_URL}/rebalance`, { method: 'POST' }).catch(() => {})
+      // وبنسأل العميل يقيّم الخدمة. السيرفر بيتجاهلها لو فيه طلب تقييم مستني رد بالفعل
+      apiFetch(`${API_URL}/conversations/${id}/request-rating`, { method: 'POST' }).catch(() => {})
+    }
   }
 
   // بيحسب افتراضي معقول (بعد ساعة من دلوقتي) عشان يبقى فيه قيمة جاهزة في المودال بدل مربع فاضي

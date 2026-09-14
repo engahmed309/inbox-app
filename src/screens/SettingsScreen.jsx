@@ -6,6 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
+import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 import { formatNumber } from '../lib/locale'
 import SegmentBuilder from '../components/SegmentBuilder'
 import TemplatePreview from '../components/TemplatePreview'
@@ -14,7 +15,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity
+  QrCode, Filter, Send, Youtube, Activity, Star
 } from 'lucide-react'
 
 const TABS = [
@@ -27,6 +28,7 @@ const TABS = [
   { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
   { key: 'segments', labelKey: 'settings.tabs.segments', icon: Filter },
+  { key: 'ratings', labelKey: 'settings.tabs.ratings', icon: Star },
   { key: 'health', labelKey: 'settings.tabs.health', icon: Activity },
   { key: 'danger', labelKey: 'settings.tabs.danger', icon: AlertTriangle },
 ]
@@ -78,6 +80,7 @@ export default function SettingsScreen() {
         {tab === 'roundrobin' && <RoundRobinTab />}
         {tab === 'ai' && <AiAgentTab />}
         {tab === 'segments' && <SegmentsTab />}
+        {tab === 'ratings' && <RatingsTab />}
         {tab === 'health' && <SystemHealthTab />}
         {tab === 'danger' && <DangerZoneTab />}
       </div>
@@ -1843,6 +1846,117 @@ function YoutubeConnectModal({ onClose }) {
             <Youtube size={15} /> {saving ? t('settings.channels.youtube.connecting') : t('settings.channels.youtube.connectButton')}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+// تقييمات العملاء. الموظفين مرتبين بالأقل تقييمًا الأول — الشاشة دي غرضها تلاقي المشكلة،
+// مش تعرض لوحة شرف
+function RatingsTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [summary, setSummary] = useState(null)
+  const [lowScore, setLowScore] = useState(3)
+  const [list, setList] = useState([])
+  const [onlyLow, setOnlyLow] = useState(true)
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const [s, l, st] = await Promise.all([
+        apiFetch(`${API_URL}/ratings/summary`).then(r => r.json()),
+        apiFetch(`${API_URL}/ratings?limit=40${onlyLow ? '&max_score=2' : ''}`).then(r => r.json()),
+        supabase.from('app_settings').select('rating_enabled, rating_message').eq('id', true).maybeSingle()
+      ])
+      if (s.error) throw new Error(s.error)
+      setSummary(s.agents || []); setLowScore(s.lowScore ?? 3)
+      setList(l.ratings || [])
+      if (st.data) setSettings(st.data)
+    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+  }, [onlyLow, toast])
+
+  useEffect(() => { load() }, [load])
+
+  const saveSetting = async (patch) => {
+    try {
+      const { error } = await supabase.from('app_settings').update(patch).eq('id', true)
+      if (error) throw error
+      setSettings(s => ({ ...s, ...patch }))
+      toast.success(t('settings.ratings.saved'))
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const stars = (n) => '★'.repeat(n) + '☆'.repeat(5 - n)
+
+  if (loading) return <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+
+  return (
+    <div className="space-y-3 pt-1">
+      <p className="text-xs text-fg-subtle">{t('settings.ratings.desc')}</p>
+
+      {settings && (
+        <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-2.5">
+          <label className="flex items-center justify-between gap-2">
+            <span className="text-xs text-fg">{t('settings.ratings.enable')}</span>
+            <input type="checkbox" checked={!!settings.rating_enabled}
+              onChange={e => saveSetting({ rating_enabled: e.target.checked })}
+              className="accent-brand w-4 h-4" />
+          </label>
+          {settings.rating_enabled && (
+            <textarea rows={3} defaultValue={settings.rating_message || ''}
+              onBlur={e => { if (e.target.value !== settings.rating_message) saveSetting({ rating_message: e.target.value }) }}
+              className="w-full bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg" />
+          )}
+          <p className="text-[10px] text-fg-subtle">{t('settings.ratings.hint')}</p>
+        </div>
+      )}
+
+      {summary?.length > 0 && (
+        <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3">
+          {summary.map(a => (
+            <div key={a.agent_id} className="flex items-center gap-3 p-3">
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-fg truncate">{a.name}</p>
+                <p className="text-[10px] text-fg-subtle">{t('settings.ratings.count', { count: a.count })}</p>
+              </div>
+              {a.low > 0 && (
+                <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger/15 text-danger flex-shrink-0">
+                  {t('settings.ratings.lowCount', { count: a.low })}
+                </span>
+              )}
+              <span className={`text-sm font-bold flex-shrink-0 ${a.average < lowScore ? 'text-danger' : 'text-success'}`}>
+                {a.average}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
+
+      <div className="flex items-center justify-between">
+        <p className="text-xs font-semibold text-fg">{t('settings.ratings.recent')}</p>
+        <button onClick={() => setOnlyLow(v => !v)}
+          className={`px-2.5 py-1 rounded-full text-[11px] font-medium ${onlyLow ? 'bg-danger/15 text-danger' : 'bg-surface-3 text-fg-muted'}`}>
+          {onlyLow ? t('settings.ratings.showingLow') : t('settings.ratings.showingAll')}
+        </button>
+      </div>
+
+      <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3">
+        {list.length === 0 ? (
+          <p className="p-4 text-xs text-fg-subtle text-center">{t('settings.ratings.empty')}</p>
+        ) : list.map(r => (
+          <div key={r.id} className="flex items-center gap-3 p-3">
+            <span className={`text-sm flex-shrink-0 ${r.score < lowScore ? 'text-danger' : 'text-warning'}`}>{stars(r.score)}</span>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-fg truncate">{r.contacts?.name || r.contacts?.phone || '—'}</p>
+              <p className="text-[10px] text-fg-subtle truncate">
+                {r.agents?.name || '—'} · {t(`settings.ratings.trigger.${r.trigger}`)}
+              </p>
+            </div>
+            <span className="text-[10px] text-fg-subtle flex-shrink-0">{localeFormatDateTime(r.answered_at)}</span>
+          </div>
+        ))}
       </div>
     </div>
   )
