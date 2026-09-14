@@ -16,6 +16,7 @@ const SettingsScreen = lazy(() => import('./screens/SettingsScreen'))
 const ReportsScreen = lazy(() => import('./screens/ReportsScreen'))
 const BroadcastScreen = lazy(() => import('./screens/BroadcastScreen'))
 const CommentsScreen = lazy(() => import('./screens/CommentsScreen'))
+const CallsScreen = lazy(() => import('./screens/CallsScreen'))
 
 function ScreenLoader() {
   return (
@@ -97,6 +98,7 @@ export default function App() {
         <Route path="/reports" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><ReportsScreen /></Suspense></PrivateRoute>} />
         <Route path="/broadcast" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><BroadcastScreen /></Suspense></PrivateRoute>} />
         <Route path="/comments" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><CommentsScreen /></Suspense></PrivateRoute>} />
+        <Route path="/calls" element={<PrivateRoute><Suspense fallback={<ScreenLoader />}><CallsScreen /></Suspense></PrivateRoute>} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     </>

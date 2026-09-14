@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
@@ -876,6 +876,7 @@ function ConnectedChannelsList() {
             {ch?.status_reason && (
               <p className="text-xs text-danger mt-2 bg-danger/5 rounded-lg px-2.5 py-1.5">{ch.status_reason}</p>
             )}
+            {ch?.platform === 'whatsapp' && ch?.status === 'active' && <CallingSettings channel={ch} />}
           </div>
           )
         })
@@ -1841,6 +1842,119 @@ function YoutubeConnectModal({ onClose }) {
           </button>
         </div>
       </div>
+    </div>
+  )
+}
+
+// مكالمات الرقم: تشغيل/إيقاف + ساعات الاتصال. ميتا نفسها هي اللي بتخفي زرار الاتصال برّه
+// المواعيد، فالعميل مايقدرش يرن أصلاً في وقت محدش موجود فيه — مش إننا نرفض بعد ما يرن
+function CallingSettings({ channel }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [state, setState] = useState(null)      // { calling, hours }
+  const [open, setOpen] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [form, setForm] = useState({ enabled: false, icon_visible: false, hours_enabled: true, open_time: '08:00', close_time: '02:00' })
+
+  const hhmmToInput = (v) => (v && v.length === 4 ? `${v.slice(0, 2)}:${v.slice(2)}` : v || '')
+
+  const load = useCallback(async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/calling`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setState(data)
+      setForm({
+        enabled: data.calling?.status === 'ENABLED',
+        icon_visible: data.calling?.call_icon_visibility === 'DEFAULT',
+        hours_enabled: data.calling?.call_hours?.status === 'ENABLED',
+        open_time: hhmmToInput(data.hours?.open_time) || '08:00',
+        close_time: hhmmToInput(data.hours?.close_time) || '02:00'
+      })
+    } catch { setState({ error: true }) }
+  }, [channel.id])
+
+  useEffect(() => { if (open && !state) load() }, [open, state, load])
+
+  const save = async (patch) => {
+    const next = { ...form, ...patch }
+    setForm(next); setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}/calling`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          enabled: next.enabled,
+          icon_visible: next.icon_visible,
+          hours: { enabled: next.hours_enabled, open_time: next.open_time, close_time: next.close_time }
+        })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setState(data)
+      toast.success(t('settings.channels.calling.saved'))
+    } catch (err) { toast.error(err.message); load() } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="mt-2 pt-2 border-t border-surface-3">
+      <button onClick={() => setOpen(o => !o)}
+        className="flex items-center gap-1.5 text-[11px] font-medium text-fg-muted hover:text-fg">
+        <Phone size={12} /> {t('settings.channels.calling.title')}
+        {state?.calling?.status === 'ENABLED' && (
+          <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-success/15 text-success">{t('settings.channels.calling.on')}</span>
+        )}
+      </button>
+
+      {open && (
+        <div className="mt-2 space-y-2.5">
+          {!state ? (
+            <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          ) : (<>
+            <label className="flex items-center justify-between gap-2">
+              <span className="text-xs text-fg">{t('settings.channels.calling.enable')}</span>
+              <input type="checkbox" checked={form.enabled} disabled={saving}
+                onChange={e => save({ enabled: e.target.checked })} className="accent-brand w-4 h-4" />
+            </label>
+
+            {form.enabled && (<>
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-xs text-fg">
+                  {t('settings.channels.calling.showIcon')}
+                  <span className="block text-[10px] text-fg-subtle">{t('settings.channels.calling.showIconHint')}</span>
+                </span>
+                <input type="checkbox" checked={form.icon_visible} disabled={saving}
+                  onChange={e => save({ icon_visible: e.target.checked })} className="accent-brand w-4 h-4 flex-shrink-0" />
+              </label>
+
+              <label className="flex items-center justify-between gap-2">
+                <span className="text-xs text-fg">{t('settings.channels.calling.limitHours')}</span>
+                <input type="checkbox" checked={form.hours_enabled} disabled={saving}
+                  onChange={e => save({ hours_enabled: e.target.checked })} className="accent-brand w-4 h-4" />
+              </label>
+
+              {form.hours_enabled && (
+                <div className="flex items-center gap-2">
+                  <label className="flex-1">
+                    <span className="block text-[10px] text-fg-subtle mb-0.5">{t('settings.channels.calling.from')}</span>
+                    <input type="time" value={form.open_time} disabled={saving}
+                      onChange={e => setForm(f => ({ ...f, open_time: e.target.value }))}
+                      onBlur={() => save({})}
+                      className="w-full bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg" />
+                  </label>
+                  <label className="flex-1">
+                    <span className="block text-[10px] text-fg-subtle mb-0.5">{t('settings.channels.calling.to')}</span>
+                    <input type="time" value={form.close_time} disabled={saving}
+                      onChange={e => setForm(f => ({ ...f, close_time: e.target.value }))}
+                      onBlur={() => save({})}
+                      className="w-full bg-surface-3 rounded-lg px-2 py-1.5 text-xs text-fg" />
+                  </label>
+                </div>
+              )}
+              <p className="text-[10px] text-fg-subtle">{t('settings.channels.calling.hoursHint')}</p>
+            </>)}
+          </>)}
+        </div>
+      )}
     </div>
   )
 }

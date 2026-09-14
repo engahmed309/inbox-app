@@ -1160,6 +1160,12 @@ export default function ConversationsScreen() {
                 <MessageSquareText size={15} />
               </button>
             )}
+            {(agent?.role === 'admin' || ['messages', 'both'].includes(agent?.access_scope)) && (
+              <button onClick={() => navigate('/calls')} title={t('callsLog.title')}
+                className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+                <Phone size={15} />
+              </button>
+            )}
             {agent?.role === 'admin' && (
               <button onClick={() => navigate('/broadcast')} title={t('conversations.sidebar.broadcastTitle')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">

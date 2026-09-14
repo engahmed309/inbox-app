@@ -312,6 +312,18 @@
         "connecting": "Connectingâ€¦",
         "connected": "{{name}} connected â€” comments will start arriving within minutes"
       },
+      "calling": {
+        "title": "Calls",
+        "on": "On",
+        "enable": "Accept calls on this number",
+        "showIcon": "Show the call button to customers",
+        "showIconHint": "When off, nobody can call unless we send them a message with a call button",
+        "limitHours": "Limit calling hours",
+        "from": "From",
+        "to": "To",
+        "hoursHint": "Outside these hours the call button disappears for customers, so they never ring a phone nobody is watching. A closing time earlier than the opening time means the next day.",
+        "saved": "Call settings saved"
+      },
       "telegram": {
         "title": "Connect a Telegram bot",
         "step1": "Open @BotFather on Telegram and send /newbot (or /mybots for an existing one).",
@@ -1444,6 +1456,19 @@
     "ZM": "Zambia",
     "ZW": "Zimbabwe",
     "PS": "Palestine"
+  },
+  "callsLog": {
+    "title": "Call log",
+    "noAccess": "Your account has no access to calls",
+    "empty": "No calls yet",
+    "openChat": "Open chat",
+    "answeredBy": "Answered by {{name}}",
+    "tabs": { "all": "All", "answered": "Answered", "missed": "Missed" },
+    "status": {
+      "missed": "Nobody answered",
+      "rejected": "Declined",
+      "failed": "Connection failed"
+    }
   },
   "calls": {
     "incoming": "Incoming call",
