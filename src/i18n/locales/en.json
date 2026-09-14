@@ -1484,6 +1484,22 @@
     "platformFacebook": "Facebook",
     "platformInstagram": "Instagram",
     "openOnYoutube": "Open on YouTube",
+    "platforms": {
+      "all": "All",
+      "facebook": "Facebook",
+      "instagram": "Instagram",
+      "youtube": "YouTube"
+    },
+    "videos": {
+      "button": "Videos",
+      "title": "Channel videos",
+      "hint": "Comments on recent videos arrive automatically. Use this list to reach an older video and pull its comments when you need them.",
+      "sync": "Pull",
+      "synced": "Pulled {{count}} comments",
+      "counts": "{{total}} on YouTube · {{stored}} here",
+      "commentsOff": "Comments are turned off on this video",
+      "loadMore": "Load 5 older"
+    },
     "refreshAvailable": "New updates â€” tap to load"
   }
 }

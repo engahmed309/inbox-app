@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle, Trash2 } from 'lucide-react'
+import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle, Trash2, Film, RefreshCw } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -16,6 +16,12 @@ const PLATFORM_ICONS = {
   instagram: <Instagram size={13} className="text-pink-400" />,
   youtube: <Youtube size={13} className="text-red-500" />,
 }
+const PLATFORM_TABS = [
+  { key: 'all', labelKey: 'comments.platforms.all', icon: null },
+  { key: 'facebook', labelKey: 'comments.platforms.facebook', icon: <Facebook size={12} className="text-blue-400" /> },
+  { key: 'instagram', labelKey: 'comments.platforms.instagram', icon: <Instagram size={12} className="text-pink-400" /> },
+  { key: 'youtube', labelKey: 'comments.platforms.youtube', icon: <Youtube size={12} className="text-red-500" /> },
+]
 
 export default function CommentsScreen() {
   const { t } = useTranslation()
@@ -23,8 +29,11 @@ export default function CommentsScreen() {
   const toast = useToast()
   const navigate = useNavigate()
   const [status, setStatus] = useState('new')
+  const [platform, setPlatform] = useState('all')
   const [comments, setComments] = useState([])
   const [counts, setCounts] = useState({})
+  const [byPlatform, setByPlatform] = useState({})
+  const [showVideos, setShowVideos] = useState(false)
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
@@ -35,21 +44,27 @@ export default function CommentsScreen() {
 
   const canSee = agent?.role === 'admin' || ['comments', 'both'].includes(agent?.access_scope)
 
+  const query = `status=${status}&platform=${platform}`
+
   const fetchCounts = useCallback(async () => {
     try {
-      const res = await apiFetch(`${API_URL}/comments/counts`)
+      const res = await apiFetch(`${API_URL}/comments/counts?platform=${platform}`)
       const data = await res.json()
-      if (res.ok) { setCounts(data.counts || {}); return data.counts || {} }
+      if (res.ok) {
+        setCounts(data.counts || {})
+        setByPlatform(data.byPlatform || {})
+        return data.counts || {}
+      }
     } catch { /* بنسيب العدادات القديمة معروضة */ }
     return null
-  }, [])
+  }, [platform])
 
   // بيرجّع القائمة لأول صفحة. بنستدعيها عند فتح التبويب وبعد أي إجراء — مش كل ٣٠ ثانية،
   // عشان القائمة ماتتحركش تحت إيد الموظف وهو بيقرا
   const load = useCallback(async () => {
     try {
       const [listRes, fresh] = await Promise.all([
-        apiFetch(`${API_URL}/comments?status=${status}&limit=${PAGE_SIZE}`),
+        apiFetch(`${API_URL}/comments?${query}&limit=${PAGE_SIZE}`),
         fetchCounts()
       ])
       const listData = await listRes.json()
@@ -59,13 +74,13 @@ export default function CommentsScreen() {
       }
       if (fresh) setSeenCount(fresh[status] ?? 0)
     } catch { /* هنسيب اللي معروض زي ما هو */ } finally { setLoading(false) }
-  }, [status, fetchCounts])
+  }, [query, status, fetchCounts])
 
   const loadMore = useCallback(async () => {
     if (loadingMore || !hasMore) return
     setLoadingMore(true)
     try {
-      const res = await apiFetch(`${API_URL}/comments?status=${status}&limit=${PAGE_SIZE}&offset=${comments.length}`)
+      const res = await apiFetch(`${API_URL}/comments?${query}&limit=${PAGE_SIZE}&offset=${comments.length}`)
       const data = await res.json()
       if (res.ok) {
         // بنستبعد المكرر: لو تعليق جديد وصل بين الصفحتين، الإزاحة بتتحرك وممكن صف يتكرر
@@ -76,7 +91,7 @@ export default function CommentsScreen() {
         setHasMore(!!data.hasMore)
       }
     } catch { /* بنسيب اللي اتحمّل */ } finally { setLoadingMore(false) }
-  }, [status, comments.length, hasMore, loadingMore])
+  }, [query, comments.length, hasMore, loadingMore])
 
   useEffect(() => {
     if (!canSee) return
@@ -153,6 +168,23 @@ export default function CommentsScreen() {
       <div className="flex items-center gap-3 px-4 pt-safe pt-4 pb-3 bg-surface-2 border-b border-surface-3">
         <button onClick={() => navigate('/')} className="text-fg-muted hover:text-fg"><BackArrow /></button>
         <span className="font-bold text-fg flex-1">{t('comments.title')}</span>
+        {/* اليوتيوب بيسحب الفيديوهات الجديدة لوحده — دي الطريقة للوصول لفيديو قديم */}
+        {platform === 'youtube' && (
+          <button onClick={() => setShowVideos(true)}
+            className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-surface-3 text-fg-muted hover:text-fg">
+            <Film size={12} /> {t('comments.videos.button')}
+          </button>
+        )}
+      </div>
+
+      {/* المنصة فوق والحالة تحتها — عدّاد المنصة بيعرض الجديد فيها مهما كان التبويب المفتوح */}
+      <div className="flex gap-1.5 px-4 pt-2 bg-surface-2 overflow-x-auto">
+        {PLATFORM_TABS.map(p => (
+          <button key={p.key} onClick={() => setPlatform(p.key)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium whitespace-nowrap ${platform === p.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+            {p.icon}{t(p.labelKey)}{byPlatform[p.key] ? ` (${byPlatform[p.key]})` : ''}
+          </button>
+        ))}
       </div>
 
       <div className="flex gap-1.5 px-4 py-2 bg-surface-2 border-b border-surface-3 overflow-x-auto">
@@ -281,6 +313,8 @@ export default function CommentsScreen() {
         )}
       </div>
 
+      {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
+
       {replyTo && (
         <ReplyModal comment={replyTo.comment} mode={replyTo.mode}
           onClose={() => setReplyTo(null)}
@@ -290,6 +324,106 @@ export default function CommentsScreen() {
             fetchCounts()
           }} />
       )}
+    </div>
+  )
+}
+
+// السحب التلقائي بيغطي أحدث الفيديوهات بس، عشان أرشيف القناة (أكتر من ١٢٠٠ فيديو) مايتصبّش
+// في شاشة المفروض تكون طابور شغل. دي الطريقة للوصول لفيديو قديم: تشوفه، تشوف فيه كام تعليق،
+// وتسحبه لما تحتاج — ٥ فيديوهات في المرة و"حمّل المزيد" للأقدم
+function YoutubeVideosModal({ onClose, onSynced }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [videos, setVideos] = useState([])
+  const [pageToken, setPageToken] = useState(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingMore, setLoadingMore] = useState(false)
+  const [syncing, setSyncing] = useState(null)
+
+  const fetchPage = useCallback(async (token) => {
+    const res = await apiFetch(`${API_URL}/youtube/videos?limit=5${token ? `&pageToken=${encodeURIComponent(token)}` : ''}`)
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+    return data
+  }, [])
+
+  useEffect(() => {
+    fetchPage(null)
+      .then(d => { setVideos(d.videos || []); setPageToken(d.nextPageToken || null) })
+      .catch(err => toast.error(err.message))
+      .finally(() => setLoading(false))
+  }, [fetchPage, toast])
+
+  const loadMore = async () => {
+    if (!pageToken || loadingMore) return
+    setLoadingMore(true)
+    try {
+      const d = await fetchPage(pageToken)
+      setVideos(prev => [...prev, ...(d.videos || [])])
+      setPageToken(d.nextPageToken || null)
+    } catch (err) { toast.error(err.message) } finally { setLoadingMore(false) }
+  }
+
+  const sync = async (video) => {
+    setSyncing(video.id)
+    try {
+      const res = await apiFetch(`${API_URL}/youtube/videos/${video.id}/sync`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('comments.videos.synced', { count: data.saved ?? 0 }))
+      setVideos(prev => prev.map(v => v.id === video.id ? { ...v, stored_count: (v.stored_count || 0) + (data.saved || 0) } : v))
+      onSynced?.()
+    } catch (err) { toast.error(err.message) } finally { setSyncing(null) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[480px] max-h-[85vh] flex flex-col">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3">
+          <Film size={15} className="text-red-500" />
+          <p className="flex-1 text-sm font-semibold text-fg">{t('comments.videos.title')}</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+
+        <p className="px-5 pt-3 text-[11px] text-fg-subtle">{t('comments.videos.hint')}</p>
+
+        <div className="flex-1 overflow-y-auto p-3 space-y-2">
+          {loading ? (
+            <div className="flex items-center justify-center h-24">
+              <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+            </div>
+          ) : videos.map(v => (
+            <div key={v.id} className="flex items-center gap-2.5 bg-surface-3 rounded-xl p-2">
+              {v.thumbnail && (
+                <img src={v.thumbnail} alt="" loading="lazy" className="w-16 h-10 rounded object-cover flex-shrink-0 bg-surface"
+                  onError={e => { e.target.style.display = 'none' }} />
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-fg truncate">{v.title || v.id}</p>
+                <p className="text-[10px] text-fg-subtle">
+                  {v.comment_count === null
+                    ? t('comments.videos.commentsOff')
+                    : t('comments.videos.counts', { total: v.comment_count, stored: v.stored_count ?? 0 })}
+                </p>
+              </div>
+              <button onClick={() => sync(v)} disabled={syncing === v.id || v.comment_count === null}
+                className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40 flex-shrink-0">
+                <RefreshCw size={11} className={syncing === v.id ? 'animate-spin' : ''} />
+                {t('comments.videos.sync')}
+              </button>
+            </div>
+          ))}
+
+          {pageToken && !loading && (
+            <button onClick={loadMore} disabled={loadingMore}
+              className="w-full py-2 rounded-xl bg-surface-3 text-fg-muted text-xs font-medium disabled:opacity-40">
+              {loadingMore ? t('comments.sending') : t('comments.videos.loadMore')}
+            </button>
+          )}
+        </div>
+      </div>
     </div>
   )
 }
