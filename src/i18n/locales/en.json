@@ -611,7 +611,8 @@
       "trigger": {
         "call": "after a call",
         "conversation_closed": "after a conversation closed"
-      }
+      },
+      "noAgent": "No agent assigned"
     }
   },
   "reports": {
@@ -626,7 +627,8 @@
       "performance": "Agent Performance",
       "volume": "Channel Volume",
       "tags": "Tags",
-      "export": "Export Data"
+      "export": "Export Data",
+      "ratings": "Ratings"
     },
     "ai": {
       "suggestedQuestions": {
@@ -787,6 +789,19 @@
       },
       "yes": "Yes",
       "no": "No"
+    },
+    "ratings": {
+      "title": "Agent ratings",
+      "description": "Customer ratings from 0 to 5, after every call and every closed conversation. Lowest average first.",
+      "empty": "No ratings in this period",
+      "overallAvg": "Overall average",
+      "totalRatings": "Total ratings",
+      "lowRatings": "Low ratings",
+      "count": "Count",
+      "low": "Low",
+      "high": "High",
+      "fromCalls": "From calls",
+      "noAgent": "No agent"
     }
   },
   "chat": {

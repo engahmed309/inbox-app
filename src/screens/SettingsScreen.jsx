@@ -1856,6 +1856,7 @@ function YoutubeConnectModal({ onClose }) {
 function RatingsTab() {
   const { t } = useTranslation()
   const toast = useToast()
+  const navigate = useNavigate()
   const [summary, setSummary] = useState(null)
   const [lowScore, setLowScore] = useState(3)
   const [list, setList] = useState([])
@@ -1946,16 +1947,23 @@ function RatingsTab() {
         {list.length === 0 ? (
           <p className="p-4 text-xs text-fg-subtle text-center">{t('settings.ratings.empty')}</p>
         ) : list.map(r => (
-          <div key={r.id} className="flex items-center gap-3 p-3">
+          // الضغط بيودّي للمحادثة نفسها — تقييم من غير ما تشوف الكلام اللي سببه مالوش قيمة
+          <button key={r.id} onClick={() => r.conversation_id && navigate(`/chat/${r.conversation_id}`)}
+            disabled={!r.conversation_id}
+            className="w-full flex items-center gap-3 p-3 text-start hover:bg-surface-3/60 disabled:hover:bg-transparent transition-colors">
             <span className={`text-sm flex-shrink-0 ${r.score < lowScore ? 'text-danger' : 'text-warning'}`}>{stars(r.score)}</span>
             <div className="flex-1 min-w-0">
-              <p className="text-xs text-fg truncate">{r.contacts?.name || r.contacts?.phone || '—'}</p>
+              {/* اسم الموظف هو المعلومة الأهم هنا — التقييم ده بتاع مين */}
+              <p className="text-xs font-semibold text-fg truncate">{r.agents?.name || t('settings.ratings.noAgent')}</p>
               <p className="text-[10px] text-fg-subtle truncate">
-                {r.agents?.name || '—'} · {t(`settings.ratings.trigger.${r.trigger}`)}
+                {r.contacts?.name || r.contacts?.phone || '—'} · {t(`settings.ratings.trigger.${r.trigger}`)}
               </p>
             </div>
-            <span className="text-[10px] text-fg-subtle flex-shrink-0">{localeFormatDateTime(r.answered_at)}</span>
-          </div>
+            <div className="flex items-center gap-1.5 flex-shrink-0">
+              <span className="text-[10px] text-fg-subtle">{localeFormatDateTime(r.answered_at)}</span>
+              {r.conversation_id && <MessageSquareText size={13} className="text-fg-subtle" />}
+            </div>
+          </button>
         ))}
       </div>
     </div>

@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate as localeFormatDate, formatTime as localeFormatTime } from '../lib/locale'
-import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2 } from 'lucide-react'
+import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -21,6 +21,7 @@ const SECTIONS = [
   { key: 'countries', labelKey: 'reports.sections.countries', icon: Globe },
   { key: 'attendance', labelKey: 'reports.sections.attendance', icon: Users2 },
   { key: 'performance', labelKey: 'reports.sections.performance', icon: Zap },
+  { key: 'ratings', labelKey: 'reports.sections.ratings', icon: Star },
   { key: 'volume', labelKey: 'reports.sections.volume', icon: Radio },
   { key: 'tags', labelKey: 'reports.sections.tags', icon: Tag },
   { key: 'export', labelKey: 'reports.sections.export', icon: Download },
@@ -83,6 +84,7 @@ export default function ReportsScreen() {
         {section === 'countries' && <CountriesTab />}
         {section === 'attendance' && <AttendanceTab />}
         {section === 'performance' && <PerformanceTab />}
+        {section === 'ratings' && <RatingsReportTab />}
         {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
         {section === 'export' && <ExportTab />}
@@ -1294,6 +1296,108 @@ function TagsReportTab() {
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+// ─── تقرير تقييمات الموظفين ──────────────────────────────────
+// العميل بيدّي رقم من ٠ لـ٥ بعد المكالمة أو بعد قفل المحادثة. الترتيب بالأقل متوسطًا الأول
+// لأن الغرض من الشاشة تلاقي المشكلة
+function RatingsReportTab() {
+  const { t } = useTranslation()
+  const [range, setRange] = useState('month')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [rows, setRows] = useState([])
+  const [overall, setOverall] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    try {
+      const res = await apiFetch(`${API_URL}/reports/ratings?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setRows(data.rows || [])
+      setOverall(data.overall || null)
+    } catch { setRows([]); setOverall(null) }
+    setLoading(false)
+  }
+
+  const bar = (value, total) => total > 0 ? `${Math.round((value / total) * 100)}%` : '0%'
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">{t('reports.ratings.title')}</h2>
+      <p className="text-xs text-fg-subtle -mt-2">{t('reports.ratings.description')}</p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !rows.length ? (
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.ratings.empty')}</p>
+      ) : (<>
+        {overall && (
+          <div className="grid grid-cols-3 gap-2">
+            <div className="bg-surface-2 rounded-xl p-3 border border-surface-3 text-center">
+              <p className="text-lg font-bold text-fg">{overall.average ?? '—'}</p>
+              <p className="text-[10px] text-fg-subtle">{t('reports.ratings.overallAvg')}</p>
+            </div>
+            <div className="bg-surface-2 rounded-xl p-3 border border-surface-3 text-center">
+              <p className="text-lg font-bold text-fg">{overall.total}</p>
+              <p className="text-[10px] text-fg-subtle">{t('reports.ratings.totalRatings')}</p>
+            </div>
+            <div className="bg-surface-2 rounded-xl p-3 border border-surface-3 text-center">
+              <p className={`text-lg font-bold ${overall.low > 0 ? 'text-danger' : 'text-fg'}`}>{overall.low}</p>
+              <p className="text-[10px] text-fg-subtle">{t('reports.ratings.lowRatings')}</p>
+            </div>
+          </div>
+        )}
+
+        <div className="space-y-2">
+          {rows.map(r => (
+            <div key={r.agent_id || 'none'} className="bg-surface-2 rounded-xl p-3 border border-surface-3">
+              <div className="flex items-center gap-2">
+                <span className="flex-1 min-w-0 text-sm text-fg font-medium truncate">
+                  {r.agent_name || t('reports.ratings.noAgent')}
+                </span>
+                <span className={`text-base font-bold ${r.average < 3 ? 'text-danger' : r.average < 4 ? 'text-warning' : 'text-success'}`}>
+                  {r.average}
+                </span>
+                <span className="text-[11px] text-fg-subtle">/ 5</span>
+              </div>
+
+              {/* توزيع التقييمات — متوسط ٤ من تقييمين مش زي متوسط ٤ من خمسين */}
+              <div className="flex h-1.5 rounded-full overflow-hidden mt-2 bg-surface-3">
+                <div className="bg-danger" style={{ width: bar(r.low, r.total) }} />
+                <div className="bg-warning" style={{ width: bar(r.mid, r.total) }} />
+                <div className="bg-success" style={{ width: bar(r.high, r.total) }} />
+              </div>
+
+              <div className="flex flex-wrap gap-x-3 gap-y-1 text-[11px] mt-2">
+                <span className="text-fg-muted">{t('reports.ratings.count')} <b className="text-fg">{r.total}</b></span>
+                <span className="text-danger">{t('reports.ratings.low')} <b>{r.low}</b></span>
+                <span className="text-success">{t('reports.ratings.high')} <b>{r.high}</b></span>
+                <span className="text-fg-muted">{t('reports.ratings.fromCalls')} <b className="text-fg">{r.from_calls}</b></span>
+              </div>
+            </div>
+          ))}
+        </div>
+      </>)}
     </div>
   )
 }
