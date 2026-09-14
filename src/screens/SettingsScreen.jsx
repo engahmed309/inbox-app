@@ -14,7 +14,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send
+  QrCode, Filter, Send, Youtube
 } from 'lucide-react'
 
 const TABS = [
@@ -647,6 +647,7 @@ const PLATFORM_META = {
   tiktok: { labelKey: 'settings.channels.platforms.tiktok', icon: Music2, color: 'text-fg' },
   whatsapp_qr: { labelKey: 'settings.channels.platforms.whatsapp_qr', icon: QrCode, color: 'text-emerald-400' },
   telegram: { labelKey: 'settings.channels.platforms.telegram', icon: Send, color: 'text-sky-400' },
+  youtube: { labelKey: 'settings.channels.platforms.youtube', icon: Youtube, color: 'text-red-500' },
 }
 
 function ChannelsTab() {
@@ -757,7 +758,7 @@ function ConnectedChannelsList() {
   return (
     <div className="space-y-3 pt-1">
       <CommentsIngestionToggle />
-      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram', 'youtube'].map(platform => {
         const meta = PLATFORM_META[platform]
         const metaLabel = t(meta.labelKey)
         const Icon = meta.icon
@@ -1536,6 +1537,7 @@ function ConnectNewChannel() {
   const [connecting, setConnecting] = useState(null)
   const [qrModal, setQrModal] = useState(null) // { channelId, qr, status }
   const [telegramModal, setTelegramModal] = useState(false)
+  const [youtubeModal, setYoutubeModal] = useState(false)
 
   const connectWhatsApp = async () => {
     if (!WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID) {
@@ -1722,11 +1724,11 @@ function ConnectNewChannel() {
     <>
     <div className="space-y-3 pt-1">
       <p className="text-xs text-fg-subtle -mt-1">{t('settings.channels.connectDesc')}</p>
-      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram'].map(platform => {
+      {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram', 'youtube'].map(platform => {
         const meta = PLATFORM_META[platform]
         const Icon = meta.icon
         const isConnecting = connecting === platform
-        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok, whatsapp_qr: connectWhatsappQr, telegram: () => setTelegramModal(true) }
+        const handlers = { whatsapp: connectWhatsApp, instagram: connectInstagram, facebook: connectFacebook, tiktok: connectTiktok, whatsapp_qr: connectWhatsappQr, telegram: () => setTelegramModal(true), youtube: () => setYoutubeModal(true) }
         return (
           <button key={platform}
             disabled={isConnecting}
@@ -1773,7 +1775,73 @@ function ConnectNewChannel() {
     )}
 
     {telegramModal && <TelegramConnectModal onClose={() => setTelegramModal(false)} />}
+    {youtubeModal && <YoutubeConnectModal onClose={() => setYoutubeModal(false)} />}
     </>
+  )
+}
+
+// يوتيوب مفيهوش ويب هوك للتعليقات، فالربط هنا مجرد مفتاح قراءة + لينك القناة — الباقي سحب
+// دوري من السيرفر. الرد والحذف محتاجين OAuth ومراجعة من جوجل، وده مرحلة تانية
+function YoutubeConnectModal({ onClose }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [apiKey, setApiKey] = useState('')
+  const [channelUrl, setChannelUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const connect = async () => {
+    if (!apiKey.trim() || !channelUrl.trim()) return
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/channels/youtube/connect`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey.trim(), channel_url: channelUrl.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('settings.channels.youtube.connected', { name: data.channel?.display_name || '' }))
+      onClose()
+    } catch (err) { toast.error(err.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !saving && onClose()}>
+      <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[460px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3">
+          <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
+            <Youtube size={15} className="text-red-500" />
+          </div>
+          <p className="flex-1 text-sm font-semibold text-fg">{t('settings.channels.youtube.title')}</p>
+          <button onClick={onClose} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="p-5 space-y-3">
+          <p className="text-xs text-fg-muted leading-relaxed">{t('settings.channels.youtube.intro')}</p>
+
+          <div>
+            <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.apiKeyLabel')}</label>
+            <input value={apiKey} onChange={e => setApiKey(e.target.value)} autoFocus dir="ltr"
+              placeholder="AIza..." spellCheck={false} autoComplete="off"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
+          </div>
+
+          <div>
+            <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.channelLabel')}</label>
+            <input value={channelUrl} onChange={e => setChannelUrl(e.target.value)} dir="ltr"
+              placeholder="https://www.youtube.com/@..." spellCheck={false} autoComplete="off"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+          </div>
+
+          <p className="text-[11px] text-fg-subtle">{t('settings.channels.youtube.readOnlyHint')}</p>
+
+          <button onClick={connect} disabled={saving || !apiKey.trim() || !channelUrl.trim()}
+            className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+            <Youtube size={15} /> {saving ? t('settings.channels.youtube.connecting') : t('settings.channels.youtube.connectButton')}
+          </button>
+        </div>
+      </div>
+    </div>
   )
 }
 

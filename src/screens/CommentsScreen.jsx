@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
-import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, ExternalLink, X, MessageCircle, Trash2 } from 'lucide-react'
+import { MessageSquare, Send, Check, EyeOff, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle, Trash2 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -14,6 +14,7 @@ const PAGE_SIZE = 30
 const PLATFORM_ICONS = {
   facebook: <Facebook size={13} className="text-blue-400" />,
   instagram: <Instagram size={13} className="text-pink-400" />,
+  youtube: <Youtube size={13} className="text-red-500" />,
 }
 
 export default function CommentsScreen() {
@@ -229,24 +230,33 @@ export default function CommentsScreen() {
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-2">
-              {!c.deleted_at && (
-                <button onClick={() => setReplyTo({ comment: c, mode: 'public' })}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20">
-                  <MessageCircle size={11} /> {c.public_reply_at ? t('comments.publicReplyAgain') : t('comments.publicReply')}
-                </button>
-              )}
-              {!c.private_replied_at && (
-                <button onClick={() => setReplyTo({ comment: c, mode: 'private' })}
+              {/* يوتيوب استقبال فقط دلوقتي — الرد والحذف محتاجين موافقة جوجل على التطبيق،
+                  فبنخفي الأزرار بدل ما الموظف يضغطها وتفشل */}
+              {c.platform === 'youtube' ? (
+                <a href={c.post_permalink || undefined} target="_blank" rel="noopener noreferrer"
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-surface-3 text-fg-muted hover:text-fg">
-                  <Send size={11} /> {t('comments.privateReply')}
-                </button>
-              )}
-              {!c.deleted_at && (
-                <button onClick={() => deleteComment(c)} disabled={deleting === c.id}
-                  className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-danger disabled:opacity-40">
-                  <Trash2 size={11} /> {t('comments.delete')}
-                </button>
-              )}
+                  <ExternalLink size={11} /> {t('comments.openOnYoutube')}
+                </a>
+              ) : (<>
+                {!c.deleted_at && (
+                  <button onClick={() => setReplyTo({ comment: c, mode: 'public' })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-brand/10 text-brand hover:bg-brand/20">
+                    <MessageCircle size={11} /> {c.public_reply_at ? t('comments.publicReplyAgain') : t('comments.publicReply')}
+                  </button>
+                )}
+                {!c.private_replied_at && (
+                  <button onClick={() => setReplyTo({ comment: c, mode: 'private' })}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium bg-surface-3 text-fg-muted hover:text-fg">
+                    <Send size={11} /> {t('comments.privateReply')}
+                  </button>
+                )}
+                {!c.deleted_at && (
+                  <button onClick={() => deleteComment(c)} disabled={deleting === c.id}
+                    className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-danger disabled:opacity-40">
+                    <Trash2 size={11} /> {t('comments.delete')}
+                  </button>
+                )}
+              </>)}
               {status !== 'handled' && (
                 <button onClick={() => setCommentStatus(c, 'handled')}
                   className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg">

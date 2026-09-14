@@ -3,8 +3,8 @@
     "title": "Broadcast",
     "newButton": "New",
     "list": {
-      "empty": "No broadcasts yet — tap \"New\" to start",
-      "templateAndCount": "Template: {{template}} — {{count}} customers",
+      "empty": "No broadcasts yet â€” tap \"New\" to start",
+      "templateAndCount": "Template: {{template}} â€” {{count}} customers",
       "multipleTemplates": "Multiple templates"
     },
     "status": {
@@ -50,19 +50,19 @@
       "channelModeFixed": "Specific number",
       "channelModeLastContacted": "Customer's last-contacted number",
       "channelModeFixedHint": "Every customer will be messaged from the same selected number, with one template",
-      "channelModeLastContactedHint": "Each customer will be messaged from the actual WhatsApp number they last talked to us on — this increases how many still have an open chat window. You'll need to pick a separate template per number, since templates are approved per number with Meta",
+      "channelModeLastContactedHint": "Each customer will be messaged from the actual WhatsApp number they last talked to us on â€” this increases how many still have an open chat window. You'll need to pick a separate template per number, since templates are approved per number with Meta",
       "calculateBreakdownButton": "Calculate breakdown by number",
       "pickTemplatePerChannel": "Pick a template for each number",
       "loadingTemplates": "Loading templates...",
-      "noTemplatesForChannel": "This number has no approved templates — its customers will be excluded",
-      "someChannelsSkippedConfirm": "Some numbers in the breakdown have no template selected — their customers won't be messaged. Continue?",
+      "noTemplatesForChannel": "This number has no approved templates â€” its customers will be excluded",
+      "someChannelsSkippedConfirm": "Some numbers in the breakdown have no template selected â€” their customers won't be messaged. Continue?",
       "templateLabel": "Approved template",
       "noTemplates": "This number has no approved templates yet",
       "changeTemplate": "Change template",
       "variablePlaceholder": "Variable {{n}}",
       "fillVariablesFirst": "Fill in all template variables first",
       "openMessageLabel": "Message for open-chat customers (cheaper than a template)",
-      "openMessageHint": "A plain message (no template cost) goes to customers whose chat has been active in the last 24 hours — you can edit it",
+      "openMessageHint": "A plain message (no template cost) goes to customers whose chat has been active in the last 24 hours â€” you can edit it",
       "openMessageRequired": "Write a message for open-chat customers",
       "previewButton": "Calculate count",
       "previewing": "Calculating...",
@@ -72,7 +72,7 @@
       "previewNoWhatsapp": "No WhatsApp (excluded)",
       "byChannelBreakdown": "Breakdown by number",
       "byChannelTotal": "Total: {{count}}",
-      "exceedsDailyLimit": "This exceeds this number's daily WhatsApp limit ({{limit}}) — it will automatically spread over about {{days}} days",
+      "exceedsDailyLimit": "This exceeds this number's daily WhatsApp limit ({{limit}}) â€” it will automatically spread over about {{days}} days",
       "willSendConfirm": "This will reach {{count}} real customers, {{templateCount}} of them billed as a paid template",
       "confirmSend": "Confirm send",
       "sending": "Sending...",
@@ -95,21 +95,21 @@
         "DOCUMENT": "Message file"
       },
       "headerMediaUpload": "Upload file",
-      "headerMediaUploading": "Uploading…",
+      "headerMediaUploading": "Uploadingâ€¦",
       "headerMediaReady": "File ready",
       "headerMediaChange": "Change",
       "headerMediaHint": "This template has media at the top, and WhatsApp requires the file with every message. The same file goes to every customer.",
       "headerMediaRequired": "Upload the template file before sending",
-      "headerMediaMixedFormats": "The numbers picked templates with different media types — the same file will be used for all, make sure it fits.",
+      "headerMediaMixedFormats": "The numbers picked templates with different media types â€” the same file will be used for all, make sure it fits.",
       "headerUploadFailed": "Could not upload the file",
       "recipientTagLabel": "Tags for people who receive it (optional)",
-      "recipientTagPlaceholder": "Type a new tag name…",
+      "recipientTagPlaceholder": "Type a new tag nameâ€¦",
       "recipientTagHint": "All of these are added to everyone the message actually reaches, so you can filter on them later or leave those people out of a future campaign.",
       "pacingLabel": "Sending speed",
       "pacingNow": "Send to everyone now",
       "pacingPaced": "Spread it out",
       "pacingNowHint": "Sends as fast as WhatsApp allows. Fine for small audiences only.",
-      "pacingPacedHint": "Sends a capped number each day, within hours you choose — safer for your number quality rating.",
+      "pacingPacedHint": "Sends a capped number each day, within hours you choose â€” safer for your number quality rating.",
       "dailyLimitLabel": "Daily maximum",
       "estimatedDaysHint": "At this rate the campaign takes about {{days}} days.",
       "sendWindowLabel": "Sending hours (Saudi time)",
@@ -118,11 +118,11 @@
       "startAtHint": "Leave empty to start now. Uses your device time.",
       "limitRecipientsLabel": "Send to part of the segment only",
       "limitRecipientsHint": "This many people will be picked at random from the segment.",
-      "limitRecipientsOf": "{{count}} of {{total}}, picked at random — send the rest later by excluding the tag.",
+      "limitRecipientsOf": "{{count}} of {{total}}, picked at random â€” send the rest later by excluding the tag.",
       "limitRecipientsOffHint": "Everyone in the segment will get the message.",
       "willSendConfirmCapped": "{{count}} of the {{total}} people in this segment will be contacted, about {{templateCount}} of them billed as paid templates.",
-      "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) — your chosen count is picked at random from it.",
-      "existingTags": "Existing tags — tap to add:",
+      "segmentNumbersNote": "The numbers below describe the whole segment ({{total}}) â€” your chosen count is picked at random from it.",
+      "existingTags": "Existing tags â€” tap to add:",
       "addTagButton": "Add",
       "tagIsNew": "new"
     }
@@ -183,7 +183,7 @@
       "maxConversationsLabel": "Maximum conversations",
       "conversationsCount": "{{count}} conversations",
       "saveSettings": "Save settings",
-      "savedCheck": "✓ Saved",
+      "savedCheck": "âœ“ Saved",
       "ellipsis": "...",
       "status": {
         "open": "Open",
@@ -212,13 +212,13 @@
       "inviteDesc": "They'll receive an email with a link to sign in and set their own password.",
       "sendingEllipsis": "Sending...",
       "sendInvite": "Send Invite",
-      "aiAgentDesc": "Automatically replies to new conversations — manage it from the \"AI Agent\" tab",
+      "aiAgentDesc": "Automatically replies to new conversations â€” manage it from the \"AI Agent\" tab",
       "deleteModal": {
         "title": "Delete {{name}}",
         "beforeCount": "This agent has",
         "afterCount": "open or follow-up conversation(s). Choose where they should go before deleting:",
         "reassignSpecific": "Transfer them all to a specific agent",
-        "selectAgentPlaceholder": "— Select an agent —",
+        "selectAgentPlaceholder": "â€” Select an agent â€”",
         "reassignAll": "Distribute them evenly across all agents (online or offline)",
         "reassignOnline": "Distribute them across online agents only",
         "confirmButton": "Distribute & Delete"
@@ -277,8 +277,8 @@
       "connectDesc": "Choose the channel you want to connect. You'll be redirected to Meta to select the page or account and approve permissions.",
       "connectButton": "Connect {{platform}}",
       "qrModalTitle": "Connect WhatsApp by Scanning a QR Code",
-      "qrInstructions1": "Open WhatsApp on your phone → Settings → Linked Devices → Link a Device, and scan this code.",
-      "qrInstructions2": "The code refreshes automatically every so often — keep this page open until it connects.",
+      "qrInstructions1": "Open WhatsApp on your phone â†’ Settings â†’ Linked Devices â†’ Link a Device, and scan this code.",
+      "qrInstructions2": "The code refreshes automatically every so often â€” keep this page open until it connects.",
       "messagingTier": {
         "tier50": "50 customers / 24 hours",
         "tier250": "250 customers / 24 hours",
@@ -299,21 +299,32 @@
         "whatsapp": "WhatsApp",
         "tiktok": "TikTok",
         "whatsapp_qr": "WhatsApp (Quick Pairing)",
-        "telegram": "Telegram"
+        "telegram": "Telegram",
+        "youtube": "YouTube"
+      },
+      "youtube": {
+        "title": "Connect a YouTube channel",
+        "intro": "YouTube does not push comments, so the app pulls them: recent videos every 5 minutes, and the whole archive once a day.",
+        "apiKeyLabel": "API key from Google Cloud",
+        "channelLabel": "Channel URL",
+        "readOnlyHint": "This key is read-only â€” it grants no permission to reply, delete, or reach anything private on the channel. Replying and deleting need Google to approve the app (a later stage).",
+        "connectButton": "Connect channel",
+        "connecting": "Connectingâ€¦",
+        "connected": "{{name}} connected â€” comments will start arriving within minutes"
       },
       "telegram": {
         "title": "Connect a Telegram bot",
         "step1": "Open @BotFather on Telegram and send /newbot (or /mybots for an existing one).",
-        "step2": "Copy the bot token — it looks like 123456789:AA...",
+        "step2": "Copy the bot token â€” it looks like 123456789:AA...",
         "step3": "Paste it here and press connect.",
-        "singleWebhookWarning": "⚠️ Telegram allows only one destination per bot. Connecting it here immediately disconnects it from any other system it is wired to (such as respond.io) — the two cannot run at once.",
+        "singleWebhookWarning": "âš ï¸ Telegram allows only one destination per bot. Connecting it here immediately disconnects it from any other system it is wired to (such as respond.io) â€” the two cannot run at once.",
         "connectButton": "Connect bot",
-        "connecting": "Connecting…",
+        "connecting": "Connectingâ€¦",
         "connected": "{{name}} connected"
       },
       "dailyLimitPrefix": "Daily limit:",
       "testInboxButton": "Test inbox",
-      "testInboxHint": "Opens WhatsApp on a chat with this number — send a message and check it reaches the app",
+      "testInboxHint": "Opens WhatsApp on a chat with this number â€” send a message and check it reaches the app",
       "testInboxMessage": "Inbox delivery test"
     },
     "templates": {
@@ -377,14 +388,14 @@
       "bodyPlaceholder": "Hi {{1}}, just a reminder about your appointment on {{2}}.",
       "variableUsageHint": "Use {{1}} and {{2}} for parts that change in each message (like the customer's name or the appointment date)",
       "examplesHeading": "Variable examples",
-      "examplesHint": "Meta requires these to understand and approve the template — they aren't shown to the customer",
+      "examplesHint": "Meta requires these to understand and approve the template â€” they aren't shown to the customer",
       "exampleForVariable": "Example for {{[[n]]}}",
       "optionalComponents": "Optional components",
       "headerLabel": "Header",
       "uploading": "Uploading...",
-      "changeSampleSuffix": "— Change",
+      "changeSampleSuffix": "â€” Change",
       "uploadSampleButton": "Upload a sample",
-      "sampleHint": "Meta needs a sample to review the template's appearance. The actual file sent to the customer is set at send time — this is for review only. (Image up to 5MB, video 16MB, file 100MB)",
+      "sampleHint": "Meta needs a sample to review the template's appearance. The actual file sent to the customer is set at send time â€” this is for review only. (Image up to 5MB, video 16MB, file 100MB)",
       "headerTextPlaceholder": "Message header",
       "headerExamplePlaceholder": "Example for the header variable",
       "footerLabel": "Footer",
@@ -410,11 +421,11 @@
       "nameLabel": "Tag name",
       "duplicateOrError": "This tag already exists, or an error occurred",
       "deleteConfirm": "Delete this tag? It will be removed from all customers who have it.",
-      "empty": "No tags yet — tap \"Add\" to create one"
+      "empty": "No tags yet â€” tap \"Add\" to create one"
     },
     "segments": {
       "newSegment": "New segment",
-      "empty": "No segments yet — tap \"New segment\" to create one",
+      "empty": "No segments yet â€” tap \"New segment\" to create one",
       "deleteConfirm": "Delete segment \"{{name}}\"?",
       "deleteError": "Failed to delete the segment",
       "contactCount": "{{count}} contacts",
@@ -468,14 +479,14 @@
       "step4": "4. If all agents are at capacity, the conversation stays unassigned temporarily.",
       "step5": "5. As soon as an agent becomes available (opens a chat or comes back online), waiting conversations are distributed to them automatically.",
       "followupToggleLabel": "Maximum wait time for a reply after follow-up",
-      "followupToggleSublabel": "When a customer sends a new message in a \"Follow-up\" conversation, it stays with the same agent as usual. If enabled, and the agent doesn't reply within this time, the conversation moves to another online agent — or is unassigned if no one is online.",
+      "followupToggleSublabel": "When a customer sends a new message in a \"Follow-up\" conversation, it stays with the same agent as usual. If enabled, and the agent doesn't reply within this time, the conversation moves to another online agent â€” or is unassigned if no one is online.",
       "minutesLabel": "Duration in minutes",
       "minutesHint": "For example, 60 = one hour. This setting only affects follow-up conversations that were reopened, not regular open conversations."
     },
     "ai": {
       "models": {
-        "claudeHaiku": "Claude Haiku 4.5 — fast and affordable (recommended)",
-        "claudeSonnet": "Claude Sonnet 4.5 — more powerful, more expensive",
+        "claudeHaiku": "Claude Haiku 4.5 â€” fast and affordable (recommended)",
+        "claudeSonnet": "Claude Sonnet 4.5 â€” more powerful, more expensive",
         "gptMini": "GPT-4o mini"
       },
       "sourceTitleRequired": "A title is required for the source",
@@ -495,12 +506,12 @@
       "allChannels": "All channels",
       "specificChannels": "Specific channels",
       "noChannelsConnected": "No channels connected",
-      "specificChannelsHint": "The AI will only reply on the channels selected here — any other channel is treated as if it were completely disabled.",
+      "specificChannelsHint": "The AI will only reply on the channels selected here â€” any other channel is treated as if it were completely disabled.",
       "testModeLabel": "Test mode",
-      "testModeSublabel": "When enabled, the AI only replies to the test customers selected below (you can add more than one) — all other customers are treated as if it were completely disabled",
+      "testModeSublabel": "When enabled, the AI only replies to the test customers selected below (you can add more than one) â€” all other customers are treated as if it were completely disabled",
       "testContactSearchPlaceholder": "Search for a customer by name or phone number to add them to testing...",
       "searching": "Searching...",
-      "testContactsHint": "If one of these customers already has an open conversation, open it and tap the \"AI\" button at the top of the chat to start testing on it right away — any new message from them will activate the test automatically.",
+      "testContactsHint": "If one of these customers already has an open conversation, open it and tap the \"AI\" button at the top of the chat to start testing on it right away â€” any new message from them will activate the test automatically.",
       "systemPromptLabel": "Instructions (System Prompt)",
       "systemPromptPlaceholder": "Write how you want the AI to behave, information about the clinic, prices, policies, and most importantly: it must never give any medical advice or diagnosis, and must immediately hand off any medical question to a human agent.",
       "permissionsHeading": "Permissions Granted to the AI",
@@ -512,9 +523,9 @@
       "perConversationCapLabel": "Per-conversation cap",
       "unitDollar": "Dollars ($)",
       "tokenUnit": "tokens",
-      "perConversationCapHint": "As soon as a single conversation reaches this cap, the AI stops on it and hands it off to a human agent automatically — regardless of other conversations.",
+      "perConversationCapHint": "As soon as a single conversation reaches this cap, the AI stops on it and hands it off to a human agent automatically â€” regardless of other conversations.",
       "usageHeading": "Current Month's Usage",
-      "noUsageYet": "No usage recorded yet — the AI engine is still being set up",
+      "noUsageYet": "No usage recorded yet â€” the AI engine is still being set up",
       "approxCost": "Approximate cost",
       "remainingBudget": "Remaining from monthly cap",
       "usageAgentLabel": "AI Agent (customer replies)",
@@ -538,10 +549,10 @@
       "wipeErrorPrefix": "An error occurred while wiping: {{message}}",
       "wiped": "All conversation and customer data has been wiped",
       "wipeTitle": "Wipe All Conversation and Customer Data",
-      "wipeDescription": "This action will permanently delete all conversations, messages, customers, and their associated tags — with no way to undo it. Agents and system settings (distribution, Lifecycle, fields, quick replies) will not be affected. Use this only if you want to start tracking conversations from scratch.",
+      "wipeDescription": "This action will permanently delete all conversations, messages, customers, and their associated tags â€” with no way to undo it. Agents and system settings (distribution, Lifecycle, fields, quick replies) will not be affected. Use this only if you want to start tracking conversations from scratch.",
       "typeToEnablePrefix": "Type",
       "typeToEnableSuffix": "to enable the button",
-      "wipedButton": "✓ Data wiped",
+      "wipedButton": "âœ“ Data wiped",
       "wipeButton": "Permanently wipe all conversation and customer data"
     },
     "comments": {
@@ -604,7 +615,7 @@
       "noCampaigns": "No campaigns available (make sure the ads account is set up correctly)",
       "wholeCampaign": "All ads in this campaign",
       "clearAll": "Clear all filters",
-      "channelOptionLabel": "{{platform}} — {{name}}"
+      "channelOptionLabel": "{{platform}} â€” {{name}}"
     },
     "common": {
       "all": "All",
@@ -617,7 +628,7 @@
       "metricNew": "New customers (first time)",
       "metricActive": "Active customers (monthly)",
       "descNew": "The number of new customers who contacted the clinic for the first time each day.",
-      "descActive": "The number of customers who contacted you each day — regardless of whether they're new or returning, or when they last contacted you. A customer is counted only once per month (the day of their first message that month); if they keep messaging for the rest of the month they won't be counted again, and the count resets the following month.",
+      "descActive": "The number of customers who contacted you each day â€” regardless of whether they're new or returning, or when they last contacted you. A customer is counted only once per month (the day of their first message that month); if they keep messaging for the rest of the month they won't be counted again, and the count resets the following month.",
       "totalNew": "Total new customers",
       "totalActive": "Total active customers (monthly)",
       "weekLabel": "Week of {{date}}"
@@ -631,7 +642,7 @@
     "overview": {
       "title": "Customer Reports",
       "allChannels": "All channels",
-      "dailyBreakdown": "New customers — daily breakdown",
+      "dailyBreakdown": "New customers â€” daily breakdown",
       "lifecycleDistribution": "Lifecycle stage distribution",
       "noStage": "No stage"
     },
@@ -650,7 +661,7 @@
       "statusDuration": "Status: {{duration}}",
       "actualDuration": "Actual: {{duration}}",
       "selectAtLeastOne": "Select at least one agent",
-      "dayDetailsTitle": "Day details — {{name}}",
+      "dayDetailsTitle": "Day details â€” {{name}}",
       "noDataForDay": "No data for {{date}}",
       "allDayOffline": "The agent was offline all day"
     },
@@ -659,7 +670,7 @@
       "minutesAgo": "{{count}}m ago",
       "hoursAgo": "{{count}}h ago",
       "daysAgo": "{{count}}d ago",
-      "none": "—"
+      "none": "â€”"
     },
     "duration": {
       "minutes": "{{count}}m",
@@ -668,7 +679,7 @@
     "tags": {
       "loadError": "Failed to load the tags report",
       "description": "The number of customers per tag, with the option to send a bulk message to those whose chats are still open and under 24 hours old (platform restrictions prevent replying after that).",
-      "noTags": "No tags yet — add them from Settings → Tags",
+      "noTags": "No tags yet â€” add them from Settings â†’ Tags",
       "noContactsOnTag": "No customers under this tag",
       "noName": "No name",
       "openChat": "Open chat",
@@ -676,18 +687,18 @@
       "contactsCount": "{{count}} customers",
       "eligibleCount": "{{count}} eligible for bulk message",
       "bulkMessageButton": "Bulk message ({{count}})",
-      "bulkModalTitle": "Bulk message — {{name}}",
+      "bulkModalTitle": "Bulk message â€” {{name}}",
       "bulkModalSubtitle": "This will be sent to {{count}} customers whose chats are still open and under 24 hours old.",
       "bulkPlaceholder": "Write the message to send...",
       "cancel": "Cancel",
       "send": "Send",
       "sendFailed": "Failed to send",
       "sendSuccess": "Sent to {{sent}} customers",
-      "sendSuccessFailedSuffix": " — {{failed}} failed"
+      "sendSuccessFailedSuffix": " â€” {{failed}} failed"
     },
     "performance": {
       "title": "Agent Performance",
-      "description": "Reply speed (average time from a customer's message to the agent's reply), the number of messages received and sent, and the number of distinct customers replied to — for the selected period.",
+      "description": "Reply speed (average time from a customer's message to the agent's reply), the number of messages received and sent, and the number of distinct customers replied to â€” for the selected period.",
       "avgReply": "Avg. reply: {{duration}}",
       "noTrackedReplies": "No tracked replies",
       "received": "Received:",
@@ -757,10 +768,10 @@
       "tiktok": "TikTok"
     },
     "windowExpired": {
-      "tiktok": "48 hours have passed since the customer's last message — TikTok rejects any reply after this period. The conversation will reopen only if the customer sends a new message.",
-      "whatsapp": "24 hours have passed since the customer's last message — WhatsApp no longer allows a regular message now; you must send a template pre-approved by Meta.",
-      "instagram": "24 hours have passed since the customer's last message — Instagram rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message.",
-      "facebook": "24 hours have passed since the customer's last message — Facebook rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message."
+      "tiktok": "48 hours have passed since the customer's last message â€” TikTok rejects any reply after this period. The conversation will reopen only if the customer sends a new message.",
+      "whatsapp": "24 hours have passed since the customer's last message â€” WhatsApp no longer allows a regular message now; you must send a template pre-approved by Meta.",
+      "instagram": "24 hours have passed since the customer's last message â€” Instagram rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message.",
+      "facebook": "24 hours have passed since the customer's last message â€” Facebook rejects any regular reply after this period. The conversation will reopen only if the customer sends a new message."
     },
     "search": {
       "placeholder": "Search this conversation...",
@@ -774,14 +785,14 @@
     "composer": {
       "internalNoteButton": "Internal note",
       "quickRepliesButton": "Quick replies",
-      "internalNoteHint": "Internal note — won't be sent to the customer, only staff can see it",
+      "internalNoteHint": "Internal note â€” won't be sent to the customer, only staff can see it",
       "internalNotePlaceholder": "Write your note for staff here...",
       "quickReplySearchPlaceholder": "Search quick replies...",
       "noQuickReplies": "No matching quick replies",
       "requestQuickReply": "Request a new quick reply from the admin",
       "recording": "Recording...",
-      "channelDisconnected": "The {{platform}} channel is disconnected from the app — reconnect it from Settings ← Channels to be able to reply.",
-      "contactBlocked": "This customer is blocked — you can't send them messages. You can unblock them from the contact details.",
+      "channelDisconnected": "The {{platform}} channel is disconnected from the app â€” reconnect it from Settings â† Channels to be able to reply.",
+      "contactBlocked": "This customer is blocked â€” you can't send them messages. You can unblock them from the contact details.",
       "aiRespondingNotice": "The AI Agent is currently replying to this conversation.",
       "takeOverButton": "Take over conversation",
       "sendApprovedTemplate": "Send approved template",
@@ -817,8 +828,8 @@
       "assignAiFailed": "Failed to hand the conversation to the AI, try again",
       "assignAiSuccess": "Conversation handed to the AI Agent",
       "suggestFailed": "Failed to generate a suggestion",
-      "tiktokImageOnlyFull": "TikTok accepts images only — it doesn't support sending video, audio, or files",
-      "tiktokImageOnlyShort": "TikTok accepts images only — it doesn't support sending video or files",
+      "tiktokImageOnlyFull": "TikTok accepts images only â€” it doesn't support sending video, audio, or files",
+      "tiktokImageOnlyShort": "TikTok accepts images only â€” it doesn't support sending video or files",
       "micPermissionRequired": "You must allow microphone access",
       "maxRecordReached": "The maximum recording time (3 minutes) was reached, recording stopped automatically",
       "textSentFileFailed": "The text message was sent, but the file failed to send: {{error}}",
@@ -831,16 +842,16 @@
     },
     "activity": {
       "statusChanged": "Changed the conversation status from \"{{from}}\" to \"{{to}}\"",
-      "statusChangedFollowUp": "Changed the conversation status from \"{{from}}\" to \"{{to}}\" — will return at {{time}}",
+      "statusChangedFollowUp": "Changed the conversation status from \"{{from}}\" to \"{{to}}\" â€” will return at {{time}}",
       "lifecycleChanged": "Changed the Lifecycle stage from \"{{from}}\" to \"{{to}}\""
     },
     "followUpNote": {
-      "prefix": "🔔 Follow-up ({{time}}): {{note}}"
+      "prefix": "ðŸ”” Follow-up ({{time}}): {{note}}"
     },
     "followUpModal": {
       "title": "Set follow-up time",
       "reopenLabel": "The conversation will reopen at",
-      "noteLabel": "Note (optional) — reminds you why you set the follow-up",
+      "noteLabel": "Note (optional) â€” reminds you why you set the follow-up",
       "notePlaceholder": "Example: the customer will pay tomorrow evening, follow up with them...",
       "confirm": "Confirm follow-up"
     },
@@ -863,13 +874,13 @@
     "library": {
       "title": "File library",
       "searchPlaceholder": "Search for a file...",
-      "empty": "No files in the library — add files from Settings ← Quick replies"
+      "empty": "No files in the library â€” add files from Settings â† Quick replies"
     },
     "template": {
       "chooseTitle": "Choose a template",
       "sendFromNumber": "Send from number",
       "perNumberHint": "Each number has its own approved templates",
-      "noneApproved": "There are no approved templates for this number. You can create a template from Settings ← Channels ← channel settings, but it requires Meta's approval first.",
+      "noneApproved": "There are no approved templates for this number. You can create a template from Settings â† Channels â† channel settings, but it requires Meta's approval first.",
       "fillVariables": "Fill in the variables",
       "valuePlaceholder": "Value #{{n}}",
       "preview": "Preview",
@@ -1020,7 +1031,7 @@
       "empty": "No conversations",
       "loadMore": "Load more",
       "loadError": "Failed to load conversations, please try again",
-      "updating": "Updating…"
+      "updating": "Updatingâ€¦"
     },
     "selection": {
       "enable": "Select",
@@ -1036,7 +1047,7 @@
       "bulkMessageTitle_few": "Bulk message to {{count}} conversations",
       "bulkMessageTitle_many": "Bulk message to {{count}} conversations",
       "bulkMessageTitle_other": "Bulk message to {{count}} conversations",
-      "messageHint": "This will only be sent to open or follow-up conversations still within the 24-hour window — the rest will be skipped automatically.",
+      "messageHint": "This will only be sent to open or follow-up conversations still within the 24-hour window â€” the rest will be skipped automatically.",
       "messagePlaceholder": "Type your message...",
       "statusChangeError": "Failed to change status",
       "statusChangeLogDescription": "Changed the conversation status to \"{{status}}\" (bulk update)",
@@ -1068,14 +1079,14 @@
       "otherAgent": "Another agent",
       "requestTransferButton": "Request transfer",
       "aiActiveTitle": "AI Agent is handling this conversation",
-      "adReferralTitle": "This contact came from a paid ad — needs attention"
+      "adReferralTitle": "This contact came from a paid ad â€” needs attention"
     },
     "contentTypes": {
-      "image": "📷 Photo",
-      "sticker": "👍 Sticker",
-      "video": "🎥 Video",
-      "audio": "🎵 Audio",
-      "file": "📎 File"
+      "image": "ðŸ“· Photo",
+      "sticker": "ðŸ‘ Sticker",
+      "video": "ðŸŽ¥ Video",
+      "audio": "ðŸŽµ Audio",
+      "file": "ðŸ“Ž File"
     },
     "time": {
       "now": "Now",
@@ -1124,19 +1135,19 @@
     },
     "tags": {
       "label": "Tags",
-      "addPlaceholder": "— Add a tag —",
+      "addPlaceholder": "â€” Add a tag â€”",
       "requestNew": "Request a new tag from the admin",
       "removedActivity": "Removed the tag \"{{name}}\" from the customer",
       "addedActivity": "Added the tag \"{{name}}\" to the customer"
     },
     "lifecycle": {
       "label": "Lifecycle stage",
-      "none": "— None —",
+      "none": "â€” None â€”",
       "requestNew": "Request a new stage from the admin"
     },
     "customFields": {
       "title": "Additional fields",
-      "selectPlaceholder": "— Select —"
+      "selectPlaceholder": "â€” Select â€”"
     },
     "dangerZone": {
       "title": "Danger zone",
@@ -1450,16 +1461,16 @@
     "ignore": "Ignore",
     "privateReplySent": "Private reply sent",
     "privateReplyTitle": "Private reply to {{name}}",
-    "privateReplyPlaceholder": "Write your private message…",
+    "privateReplyPlaceholder": "Write your private messageâ€¦",
     "privateReplyHint": "Sent as a private message. Meta allows one private reply per comment, within 7 days of it.",
     "sendPrivateReply": "Send private reply",
-    "sending": "Sending…",
+    "sending": "Sendingâ€¦",
     "privateReplyDone": "Private reply sent",
     "onPost": "On post:",
     "untitledPost": "Post with no caption",
     "publicReply": "Public reply",
     "publicReplyTitle": "Public reply to {{name}}",
-    "publicReplyPlaceholder": "Write your reply…",
+    "publicReplyPlaceholder": "Write your replyâ€¦",
     "publicReplyHint": "Posted publicly under the comment as the page, visible to everyone.",
     "sendPublicReply": "Post reply",
     "publicReplyDone": "Reply posted",
@@ -1472,6 +1483,8 @@
     "deleteFailed": "Could not delete the comment",
     "platformFacebook": "Facebook",
     "platformInstagram": "Instagram",
-    "refreshAvailable": "New updates — tap to load"
+    "openOnYoutube": "Open on YouTube",
+    "refreshAvailable": "New updates â€” tap to load"
   }
 }
+
