@@ -15,7 +15,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star
+  QrCode, Filter, Send, Youtube, Activity, Star, Package
 } from 'lucide-react'
 
 const TABS = [
@@ -24,6 +24,7 @@ const TABS = [
   { key: 'lifecycle', labelKey: 'settings.tabs.lifecycle', icon: Tag },
   { key: 'tags', labelKey: 'settings.tabs.tags', icon: Tag },
   { key: 'fields', labelKey: 'settings.tabs.fields', icon: List },
+  { key: 'packages', labelKey: 'settings.tabs.packages', icon: Package },
   { key: 'quickreplies', labelKey: 'settings.tabs.quickReplies', icon: MessageSquareText },
   { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
@@ -76,6 +77,7 @@ export default function SettingsScreen() {
         {tab === 'lifecycle' && <LifecycleTab />}
         {tab === 'tags' && <TagsTab />}
         {tab === 'fields' && <FieldsTab />}
+        {tab === 'packages' && <PackagesTab />}
         {tab === 'quickreplies' && <QuickRepliesTab agent={agent} />}
         {tab === 'roundrobin' && <RoundRobinTab />}
         {tab === 'ai' && <AiAgentTab />}
@@ -2372,6 +2374,163 @@ function LifecycleTab() {
           )}
         </div>
       ))}
+    </div>
+  )
+}
+
+// ─── Packages Tab ──────────────────────────────────────────
+// أنواع الباقات (استشارة، متابعة أسبوعين/شهر/٣ شهور...) اللي بتظهر في ملف العميل، + إعدادات
+// تذكير التجديد التلقائي: لما باقة عميل تستحق، السيرفر بيفتح محادثته تاني ويحط ملاحظة داخلية
+// (checkPackageReminders في index.js) — هنا بنتحكم فيه: نوعه شغال ولا لأ، نص الملاحظة، وقبل
+// الانتهاء بكام يوم يتبعت
+function PackagesTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [packages, setPackages] = useState([])
+  const [showAdd, setShowAdd] = useState(false)
+  const [form, setForm] = useState({ name: '', default_duration_days: '' })
+  const [editingId, setEditingId] = useState(null)
+  const [editForm, setEditForm] = useState({ name: '', default_duration_days: '' })
+  const [settings, setSettings] = useState(null)
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const [{ data: pkgs }, { data: st }] = await Promise.all([
+        supabase.from('contact_packages').select('*').order('sort_order'),
+        supabase.from('app_settings').select('package_reminder_enabled, package_reminder_note, package_reminder_offset_days').eq('id', true).maybeSingle()
+      ])
+      setPackages(pkgs || [])
+      if (st) setSettings(st)
+    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
+
+  const add = async () => {
+    if (!form.name.trim()) return
+    await supabase.from('contact_packages').insert({
+      name: form.name.trim(),
+      default_duration_days: form.default_duration_days ? Number(form.default_duration_days) : null,
+      sort_order: packages.length
+    })
+    setForm({ name: '', default_duration_days: '' })
+    setShowAdd(false)
+    load()
+  }
+
+  const remove = async (id) => {
+    if (!confirm(t('settings.packages.deleteConfirm'))) return
+    await supabase.from('contact_packages').delete().eq('id', id)
+    load()
+  }
+
+  const startEdit = (p) => { setEditingId(p.id); setEditForm({ name: p.name, default_duration_days: p.default_duration_days ?? '' }) }
+  const saveEdit = async () => {
+    if (!editForm.name.trim()) return
+    await supabase.from('contact_packages').update({
+      name: editForm.name.trim(),
+      default_duration_days: editForm.default_duration_days ? Number(editForm.default_duration_days) : null
+    }).eq('id', editingId)
+    setEditingId(null)
+    load()
+  }
+
+  const saveSetting = async (patch) => {
+    try {
+      const { error } = await supabase.from('app_settings').update(patch).eq('id', true)
+      if (error) throw error
+      setSettings(s => ({ ...s, ...patch }))
+      toast.success(t('settings.packages.saved'))
+    } catch (err) { toast.error(err.message) }
+  }
+
+  if (loading) return <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+
+  return (
+    <div className="p-4 space-y-5">
+      <div>
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="font-semibold text-fg">{t('settings.packages.title')}</h2>
+          <button onClick={() => setShowAdd(!showAdd)}
+            className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
+            <Plus size={14} /> {t('settings.common.add')}
+          </button>
+        </div>
+        <p className="text-xs text-fg-subtle mb-3">{t('settings.packages.desc')}</p>
+
+        <div className="space-y-2.5">
+          {showAdd && (
+            <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+              <InputField label={t('settings.packages.nameLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
+              <InputField label={t('settings.packages.durationLabel')} type="number" value={form.default_duration_days}
+                onChange={v => setForm({ ...form, default_duration_days: v })} placeholder={t('settings.packages.durationPlaceholder')} />
+              <div className="flex gap-2">
+                <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
+                <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
+              </div>
+            </div>
+          )}
+
+          {packages.map(p => (
+            <div key={p.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
+              {editingId === p.id ? (
+                <>
+                  <input autoFocus value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                    className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <input type="number" value={editForm.default_duration_days}
+                    onChange={e => setEditForm({ ...editForm, default_duration_days: e.target.value })}
+                    placeholder={t('settings.packages.durationPlaceholder')}
+                    className="w-24 flex-shrink-0 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
+                  <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+                </>
+              ) : (
+                <>
+                  <span className="flex-1 text-sm text-fg">{p.name}</span>
+                  <span className="text-xs text-fg-subtle">
+                    {p.default_duration_days ? t('settings.packages.daysCount', { count: p.default_duration_days }) : t('settings.packages.noDuration')}
+                  </span>
+                  <button onClick={() => startEdit(p)} className="text-fg-muted hover:text-brand"><Edit2 size={14} /></button>
+                  <button onClick={() => remove(p.id)} className="text-fg-muted hover:text-danger"><Trash2 size={14} /></button>
+                </>
+              )}
+            </div>
+          ))}
+          {packages.length === 0 && !showAdd && (
+            <p className="text-xs text-fg-subtle text-center py-4">{t('settings.packages.empty')}</p>
+          )}
+        </div>
+      </div>
+
+      {settings && (
+        <div className="pt-4 border-t border-surface-3 space-y-3">
+          <h3 className="font-semibold text-fg text-sm">{t('settings.packages.reminderTitle')}</h3>
+          <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-3">
+            <Toggle label={t('settings.packages.reminderEnable')} sublabel={t('settings.packages.reminderEnableHint')}
+              value={!!settings.package_reminder_enabled} onChange={v => saveSetting({ package_reminder_enabled: v })} />
+            {settings.package_reminder_enabled && (
+              <>
+                <div>
+                  <label className="block text-xs text-fg-muted mb-1">{t('settings.packages.offsetLabel')}</label>
+                  <input type="number" min="0" defaultValue={settings.package_reminder_offset_days ?? 0}
+                    onBlur={e => { const v = Math.max(0, Number(e.target.value) || 0); if (v !== settings.package_reminder_offset_days) saveSetting({ package_reminder_offset_days: v }) }}
+                    className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <p className="text-[10px] text-fg-subtle mt-1">{t('settings.packages.offsetHint')}</p>
+                </div>
+                <div>
+                  <label className="block text-xs text-fg-muted mb-1">{t('settings.packages.noteLabel')}</label>
+                  <textarea rows={2} defaultValue={settings.package_reminder_note || ''}
+                    placeholder={t('settings.packages.notePlaceholder')}
+                    onBlur={e => { if (e.target.value !== settings.package_reminder_note) saveSetting({ package_reminder_note: e.target.value }) }}
+                    className="w-full bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  <p className="text-[10px] text-fg-subtle mt-1">{t('settings.packages.noteHint')}</p>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   )
 }

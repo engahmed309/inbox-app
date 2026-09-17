@@ -8,7 +8,7 @@ import { formatDate } from '../lib/locale'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
 import { COUNTRY_MAP } from '../lib/countries'
-import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio } from 'lucide-react'
+import { X, Save, User, Globe, Package, Tag, Ban, ShieldCheck, Trash2, Send, Copy, Check, Radio, Calendar, Edit2 } from 'lucide-react'
 
 const FIELD_LABEL_KEYS = { name: 'settings.common.name', phone: 'contactSidebar.fields.phone', country: 'contactSidebar.fields.country', notes: 'contactSidebar.fields.notes' }
 
@@ -72,6 +72,8 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     country: contact?.country || '',
     notes: contact?.notes || '',
     lifecycle_stage_id: contact?.lifecycle_stage_id || '',
+    package_id: contact?.package_id || '',
+    package_expires_at: contact?.package_expires_at || null,
   })
   const [connectedChannels, setConnectedChannels] = useState([])
 
@@ -94,6 +96,9 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const [allTags, setAllTags] = useState([])
   const [contactTags, setContactTags] = useState([])
   const [requestModalType, setRequestModalType] = useState(null) // 'tag' | 'lifecycle' | null
+  const [packages, setPackages] = useState([])
+  const [packageModal, setPackageModal] = useState(null) // { packageId, expiresAt } | null
+  const [savingPackage, setSavingPackage] = useState(false)
 
   useEffect(() => {
     loadData()
@@ -108,6 +113,9 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
     const { data: allTagsData } = await supabase.from('tags').select('*').order('name')
     setAllTags(allTagsData || [])
+
+    const { data: pkgs } = await supabase.from('contact_packages').select('*').order('sort_order')
+    setPackages(pkgs || [])
 
     if (contact?.id) {
       const { data: vals } = await supabase
@@ -136,6 +144,53 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
       setContactTags(prev => [...prev, tag])
       logActivity(conv?.id, agent?.id, t('contactSidebar.tags.addedActivity', { name: tag.name }))
     }
+  }
+
+  const todayPlusDays = (days) => {
+    const d = new Date()
+    d.setDate(d.getDate() + (days || 0))
+    return d.toISOString().slice(0, 10)
+  }
+
+  // اختيار باقة جديدة بيفتح دياولوج يسأل عن معاد التجديد/الانتهاء — بيتحفظ فورًا (مش مستني
+  // زرار "حفظ" العام) عشان الموظف ميقفلش السايدبار وينسى. package_reminder_sent_at بيترجع
+  // null عشان لو كان فيه تذكير اتبعت قبل كده على معاد قديم، الدورة تبدأ تاني على المعاد الجديد
+  const onPackageSelect = (packageId) => {
+    if (!packageId) { clearPackage(); return }
+    const pkg = packages.find(p => p.id === packageId)
+    setPackageModal({ packageId, expiresAt: pkg?.default_duration_days ? todayPlusDays(pkg.default_duration_days) : '' })
+  }
+
+  const openEditPackageDate = () => {
+    setPackageModal({ packageId: form.package_id, expiresAt: form.package_expires_at ? form.package_expires_at.slice(0, 10) : '' })
+  }
+
+  const clearPackage = async () => {
+    const { data: updated, error } = await supabase.from('contacts')
+      .update({ package_id: null, package_expires_at: null, package_reminder_sent_at: null })
+      .eq('id', contact.id).select().single()
+    if (error) { toast.error(t('contactSidebar.package.saveError')); return }
+    setForm(f => ({ ...f, package_id: '', package_expires_at: null }))
+    onUpdate(updated)
+    logActivity(conv?.id, agent?.id, t('contactSidebar.package.activityCleared'))
+  }
+
+  const confirmPackage = async () => {
+    setSavingPackage(true)
+    const expiresAtIso = packageModal.expiresAt ? new Date(`${packageModal.expiresAt}T00:00:00`).toISOString() : null
+    const { data: updated, error } = await supabase.from('contacts')
+      .update({ package_id: packageModal.packageId, package_expires_at: expiresAtIso, package_reminder_sent_at: null })
+      .eq('id', contact.id).select().single()
+    setSavingPackage(false)
+    if (error) { toast.error(t('contactSidebar.package.saveError')); return }
+    setForm(f => ({ ...f, package_id: packageModal.packageId, package_expires_at: expiresAtIso }))
+    onUpdate(updated)
+    const pkgName = packages.find(p => p.id === packageModal.packageId)?.name || ''
+    logActivity(conv?.id, agent?.id, expiresAtIso
+      ? t('contactSidebar.package.activitySetWithDate', { package: pkgName, date: formatDate(expiresAtIso) })
+      : t('contactSidebar.package.activitySet', { package: pkgName }))
+    setPackageModal(null)
+    toast.success(t('contactSidebar.package.saved'))
   }
 
   const save = async () => {
@@ -342,6 +397,38 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             )}
           </div>
 
+          {/* الباقة — اختيار باقة بيفتح دياولوج معاد التجديد/الانتهاء فورًا */}
+          {packages.length > 0 && (
+            <div>
+              <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1">
+                <Package size={12} /> {t('contactSidebar.package.label')}
+              </label>
+              <select
+                value={form.package_id}
+                onChange={e => onPackageSelect(e.target.value)}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
+              >
+                <option value="">{t('contactSidebar.package.none')}</option>
+                {packages.map(p => (
+                  <option key={p.id} value={p.id}>{p.name}</option>
+                ))}
+              </select>
+              {form.package_id && (
+                <div className="mt-1.5 flex items-center justify-between gap-2">
+                  <span className="flex items-center gap-1 text-xs text-fg-muted">
+                    <Calendar size={11} />
+                    {form.package_expires_at
+                      ? t('contactSidebar.package.expiresOn', { date: formatDate(form.package_expires_at) })
+                      : t('contactSidebar.package.noExpiry')}
+                  </span>
+                  <button onClick={openEditPackageDate} className="flex items-center gap-1 text-xs text-brand hover:underline flex-shrink-0">
+                    <Edit2 size={10} /> {t('contactSidebar.package.editDate')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
           {/* Custom Fields */}
           {customFields.length > 0 && (
             <div>
@@ -419,6 +506,37 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
       {requestModalType && (
         <RequestAdminModal type={requestModalType} onClose={() => setRequestModalType(null)} />
+      )}
+
+      {packageModal && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !savingPackage && setPackageModal(null)}>
+          <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-3.5 border-b border-surface-3">
+              <Package size={16} className="text-brand" />
+              <span className="font-semibold text-fg text-sm">{t('contactSidebar.package.modalTitle')}</span>
+            </div>
+            <div className="p-4 space-y-3.5">
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.package.expiryLabel')}</label>
+                <input type="date" value={packageModal.expiresAt}
+                  onChange={e => setPackageModal(m => ({ ...m, expiresAt: e.target.value }))}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                <p className="text-[10px] text-fg-subtle mt-1">{t('contactSidebar.package.expiryHint')}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-surface-3">
+              <button onClick={() => setPackageModal(null)} disabled={savingPackage}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg transition-colors disabled:opacity-50">
+                {t('chat.common.cancel')}
+              </button>
+              <button onClick={confirmPackage} disabled={savingPackage}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-brand text-white hover:bg-brand-dark transition-colors disabled:opacity-50 flex items-center justify-center gap-2">
+                {savingPackage ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('contactSidebar.package.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   )

@@ -151,6 +151,7 @@
       "lifecycle": "Lifecycle",
       "tags": "Tags",
       "fields": "Fields",
+      "packages": "Packages",
       "quickReplies": "Quick Replies",
       "roundRobin": "Distribution",
       "ai": "AI Agent",
@@ -614,6 +615,26 @@
         "conversation_closed": "after a conversation closed"
       },
       "noAgent": "No agent assigned"
+    },
+    "packages": {
+      "title": "Package types",
+      "desc": "The packages an agent can pick in a contact's file. Add a default duration and the dialog will prefill the expiry date with it — the agent can still change it.",
+      "nameLabel": "Package name",
+      "durationLabel": "Default duration (days)",
+      "durationPlaceholder": "Optional",
+      "daysCount": "{{count}} days",
+      "noDuration": "No default duration",
+      "empty": "No packages added yet",
+      "deleteConfirm": "Delete this package type?",
+      "saved": "Saved",
+      "reminderTitle": "Package renewal reminder",
+      "reminderEnable": "Enable automatic reminder",
+      "reminderEnableHint": "When a customer's package expiry is due, their conversation reopens and an internal note is added automatically",
+      "offsetLabel": "Remind this many days before expiry",
+      "offsetHint": "0 = sent on the expiry day itself",
+      "noteLabel": "Internal note text",
+      "notePlaceholder": "{package} package for {name} has ended — send them a renewal message 🔄",
+      "noteHint": "Use {name} for the customer's name and {package} for the package name — both get substituted automatically"
     }
   },
   "reports": {
@@ -1214,7 +1235,23 @@
     },
     "customFields": {
       "title": "Additional fields",
-      "selectPlaceholder": "â€” Select â€”"
+      "selectPlaceholder": "— Select —"
+    },
+    "package": {
+      "label": "Package",
+      "none": "— None —",
+      "expiresOn": "Expires on {{date}}",
+      "noExpiry": "No expiry date set",
+      "editDate": "Edit date",
+      "modalTitle": "Package renewal/expiry date",
+      "expiryLabel": "Renewal or expiry date",
+      "expiryHint": "Leave blank if this package (e.g. a one-time consultation) has no renewal date",
+      "confirm": "Save",
+      "saved": "Package saved",
+      "saveError": "Failed to save the package",
+      "activitySet": "Picked package \"{{package}}\" with no renewal date",
+      "activitySetWithDate": "Picked package \"{{package}}\" — renews {{date}}",
+      "activityCleared": "Removed the customer's package"
     },
     "dangerZone": {
       "title": "Danger zone",
