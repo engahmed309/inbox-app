@@ -543,7 +543,7 @@ function MaxConversationsField({ value, onChange }) {
 
 function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   const { t } = useTranslation()
-  const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations, access_scope: agent.access_scope || 'messages' })
+  const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations, access_scope: agent.access_scope || 'messages', can_view_calls: agent.can_view_calls !== false })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
   const toast = useToast()
 
@@ -580,6 +580,7 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
           </div>
           <AccessScopeField value={form.access_scope} onChange={v => setForm({ ...form, access_scope: v })} />
           <Toggle label={t('settings.agents.seeAllConversations')} value={form.can_see_all_conversations} onChange={v => setForm({ ...form, can_see_all_conversations: v })} />
+          <Toggle label={t('settings.agents.canViewCalls')} value={form.can_view_calls} onChange={v => setForm({ ...form, can_view_calls: v })} />
           <div className="flex gap-2">
             <button onClick={() => onUpdate(form)} className="flex-1 py-2 bg-brand rounded-xl text-sm text-white">{t('settings.common.save')}</button>
             <button onClick={onEdit} className="px-3 py-2 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>

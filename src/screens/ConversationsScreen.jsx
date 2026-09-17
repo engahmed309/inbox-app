@@ -1160,7 +1160,8 @@ export default function ConversationsScreen() {
                 <MessageSquareText size={15} />
               </button>
             )}
-            {(agent?.role === 'admin' || ['messages', 'both'].includes(agent?.access_scope)) && (
+            {(agent?.role === 'admin' ||
+              (['messages', 'both'].includes(agent?.access_scope) && agent?.can_view_calls !== false)) && (
               <button onClick={() => navigate('/calls')} title={t('callsLog.title')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
                 <Phone size={15} />

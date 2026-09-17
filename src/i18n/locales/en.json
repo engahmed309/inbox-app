@@ -231,6 +231,7 @@
       "manualAddTitle": "Add an Agent Manually",
       "manualAddIntro": "Set an email and password for the agent, and they'll be able to sign in right away.",
       "seeAllConversations": "Can see all conversations",
+      "canViewCalls": "Can view the call log",
       "inviteTitle": "Invite an Agent by Email",
       "inviteDesc": "They'll receive an email with a link to sign in and set their own password.",
       "sendingEllipsis": "Sending...",

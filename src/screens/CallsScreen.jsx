@@ -25,7 +25,8 @@ export default function CallsScreen() {
   const [hasMore, setHasMore] = useState(false)
   const sentinelRef = useRef(null)
 
-  const canSee = agent?.role === 'admin' || ['messages', 'both'].includes(agent?.access_scope)
+  const canSee = agent?.role === 'admin' ||
+    (['messages', 'both'].includes(agent?.access_scope) && agent?.can_view_calls !== false)
 
   const load = useCallback(async () => {
     try {

@@ -116,6 +116,8 @@ export default function CallCenter() {
 
     const ch = supabase.channel('agents:calls')
       .on('broadcast', { event: 'incoming-call' }, ({ payload }) => {
+        // مرحلة الرنين الفردي: المكالمة بترن عند الموظف المعيّن بس، مش عندنا كلنا
+        if (payload.target_agent_id && payload.target_agent_id !== agent.id) return
         setActive(a => { if (!a) { setIncoming(payload); startRinging() } return a })
       })
       .on('broadcast', { event: 'call-taken' }, ({ payload }) => {
@@ -135,7 +137,7 @@ export default function CallCenter() {
       .catch(() => {})
 
     return () => { supabase.removeChannel(ch) }
-  }, [canTakeCalls, startRinging, stopRinging, teardown])
+  }, [canTakeCalls, agent?.id, startRinging, stopRinging, teardown])
 
   // عدّاد مدة المكالمة
   useEffect(() => {
