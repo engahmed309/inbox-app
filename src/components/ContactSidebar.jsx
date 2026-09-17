@@ -412,36 +412,46 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
           </div>
 
           {/* الباقة — اختيار باقة بيفتح دياولوج معاد التجديد/الانتهاء فورًا */}
-          {packages.length > 0 && (
-            <div>
-              <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1">
-                <Package size={12} /> {t('contactSidebar.package.label')}
-              </label>
-              <select
-                value={form.package_id}
-                onChange={e => onPackageSelect(e.target.value)}
-                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
-              >
-                <option value="">{t('contactSidebar.package.none')}</option>
-                {packages.map(p => (
-                  <option key={p.id} value={p.id}>{p.name}</option>
-                ))}
-              </select>
-              {form.package_id && (
-                <div className="mt-1.5 flex items-center justify-between gap-2">
-                  <span className="flex items-center gap-1 text-xs text-fg-muted">
-                    <Calendar size={11} />
-                    {form.package_expires_at
-                      ? t('contactSidebar.package.expiresOn', { date: formatDate(form.package_expires_at) })
-                      : t('contactSidebar.package.noExpiry')}
-                  </span>
-                  <button onClick={openEditPackageDate} className="flex items-center gap-1 text-xs text-brand hover:underline flex-shrink-0">
-                    <Edit2 size={10} /> {t('contactSidebar.package.editDate')}
-                  </button>
-                </div>
-              )}
-            </div>
-          )}
+          <div>
+            <label className="flex items-center gap-1.5 text-xs text-fg-muted mb-1">
+              <Package size={12} /> {t('contactSidebar.package.label')}
+            </label>
+            {packages.length > 0 ? (
+              <>
+                <select
+                  value={form.package_id}
+                  onChange={e => onPackageSelect(e.target.value)}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
+                >
+                  <option value="">{t('contactSidebar.package.none')}</option>
+                  {packages.map(p => (
+                    <option key={p.id} value={p.id}>{p.name}</option>
+                  ))}
+                </select>
+                {form.package_id && (
+                  <div className="mt-1.5 flex items-center justify-between gap-2">
+                    <span className="flex items-center gap-1 text-xs text-fg-muted">
+                      <Calendar size={11} />
+                      {form.package_expires_at
+                        ? t('contactSidebar.package.expiresOn', { date: formatDate(form.package_expires_at) })
+                        : t('contactSidebar.package.noExpiry')}
+                    </span>
+                    <button onClick={openEditPackageDate} className="flex items-center gap-1 text-xs text-brand hover:underline flex-shrink-0">
+                      <Edit2 size={10} /> {t('contactSidebar.package.editDate')}
+                    </button>
+                  </div>
+                )}
+              </>
+            ) : (
+              <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-xs text-fg-subtle">{t('contactSidebar.package.noneDefined')}</div>
+            )}
+            {agent?.role !== 'admin' && (
+              <button onClick={() => setRequestModalType('package')}
+                className="flex items-center gap-1.5 text-xs text-brand mt-1.5 hover:underline">
+                <Send size={11} /> {t('contactSidebar.package.requestNew')}
+              </button>
+            )}
+          </div>
 
           {/* Custom Fields */}
           {customFields.length > 0 && (

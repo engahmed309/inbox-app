@@ -1240,6 +1240,8 @@
     "package": {
       "label": "Package",
       "none": "— None —",
+      "noneDefined": "No packages defined yet",
+      "requestNew": "Request a new package from the admin",
       "expiresOn": "Expires on {{date}}",
       "noExpiry": "No expiry date set",
       "editDate": "Edit date",
@@ -1290,13 +1292,16 @@
     "titles": {
       "tag": "New tag request",
       "lifecycle": "New Lifecycle stage request",
-      "quickReply": "New quick reply request"
+      "quickReply": "New quick reply request",
+      "package": "New package request"
     },
     "nameLabels": {
       "tag": "Tag name",
       "lifecycle": "Stage name",
-      "quickReply": "Name (used after / in the conversation)"
+      "quickReply": "Name (used after / in the conversation)",
+      "package": "Package name"
     },
+    "durationLabel": "Default duration in days (optional)",
     "nameRequired": "Please enter a name first",
     "sendFailed": "Failed to send the request",
     "sentSuccess": "Your request was sent to the admin, you'll be notified when they respond",

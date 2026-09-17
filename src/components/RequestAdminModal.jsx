@@ -9,14 +9,15 @@ import { X, Paperclip } from 'lucide-react'
 // جرس الإشعارات، ولو حد منهم وافق بيتضاف العنصر على طول من غير ما الموظف يحتاج يعمل حاجة تانية
 export default function RequestAdminModal({ type, onClose }) {
   const { t } = useTranslation()
-  const TITLES = { tag: t('requestAdminModal.titles.tag'), lifecycle: t('requestAdminModal.titles.lifecycle'), quick_reply: t('requestAdminModal.titles.quickReply') }
-  const NAME_LABELS = { tag: t('requestAdminModal.nameLabels.tag'), lifecycle: t('requestAdminModal.nameLabels.lifecycle'), quick_reply: t('requestAdminModal.nameLabels.quickReply') }
+  const TITLES = { tag: t('requestAdminModal.titles.tag'), lifecycle: t('requestAdminModal.titles.lifecycle'), quick_reply: t('requestAdminModal.titles.quickReply'), package: t('requestAdminModal.titles.package') }
+  const NAME_LABELS = { tag: t('requestAdminModal.nameLabels.tag'), lifecycle: t('requestAdminModal.nameLabels.lifecycle'), quick_reply: t('requestAdminModal.nameLabels.quickReply'), package: t('requestAdminModal.nameLabels.package') }
   const { agent } = useAuth()
   const toast = useToast()
   const [name, setName] = useState('')
   const [color, setColor] = useState(type === 'lifecycle' ? '#3B82F6' : '#6366F1')
   const [text, setText] = useState('')
   const [file, setFile] = useState(null)
+  const [durationDays, setDurationDays] = useState('')
   const [saving, setSaving] = useState(false)
 
   const fileType = (f) => f.type.startsWith('image') ? 'image' : f.type.startsWith('video') ? 'video' : f.type.startsWith('audio') ? 'audio' : 'file'
@@ -39,6 +40,7 @@ export default function RequestAdminModal({ type, onClose }) {
           payload.file_type = fileType(file)
         }
       }
+      if (type === 'package' && durationDays) payload.default_duration_days = Number(durationDays)
       const res = await apiFetch(`${API_URL}/agent-requests`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -77,6 +79,15 @@ export default function RequestAdminModal({ type, onClose }) {
                   className="w-10 h-10 rounded-lg bg-surface-3 border border-surface-3 cursor-pointer" />
                 <span className="text-sm text-fg-muted">{color}</span>
               </div>
+            </div>
+          )}
+
+          {type === 'package' && (
+            <div>
+              <label className="block text-xs text-fg-muted mb-1">{t('requestAdminModal.durationLabel')}</label>
+              <input type="number" min="0" value={durationDays} onChange={e => setDurationDays(e.target.value)}
+                placeholder={t('settings.packages.durationPlaceholder')}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
             </div>
           )}
 
