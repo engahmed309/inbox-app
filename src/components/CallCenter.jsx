@@ -45,6 +45,9 @@ export default function CallCenter() {
   const audioCtxRef = useRef(null)
   const activeRef = useRef(null)
   const tokenRef = useRef(null)
+  // مكالمة تانية وصلت والموظف لسه ماردش على الأولى — كانت بتستبدل incoming على طول من غير أي
+  // أثر، فالمكالمة الأولى تختفي من الشاشة (البصري بس، السيرفر لسه فاكرها) من غير ما الموظف ياخد باله
+  const incomingQueueRef = useRef([])
 
   const canTakeCalls = agent && ['messages', 'both'].includes(agent.access_scope || 'both')
 
@@ -111,6 +114,13 @@ export default function CallCenter() {
   }, [stopRinging])
 
   // ─── الاشتراك في بث المكالمات ─────────────────────────────
+  // لو فيه مكالمة معروضة بالفعل ووحدة جديدة وصلت، بنحطها في طابور بدل ما تستبدل المعروضة —
+  // ولما المعروضة تتحل (اتردّت من حد تاني، خلصت، أو الموظف نفسه ردّ/رفض) بنطلع التالية من الطابور
+  const showNextFromQueue = useCallback(() => {
+    const next = incomingQueueRef.current.shift()
+    if (next) { setIncoming(next); startRinging() }
+  }, [startRinging])
+
   useEffect(() => {
     if (!canTakeCalls) return
 
@@ -118,26 +128,47 @@ export default function CallCenter() {
       .on('broadcast', { event: 'incoming-call' }, ({ payload }) => {
         // مرحلة الرنين الفردي: المكالمة بترن عند الموظف المعيّن بس، مش عندنا كلنا
         if (payload.target_agent_id && payload.target_agent_id !== agent.id) return
-        setActive(a => { if (!a) { setIncoming(payload); startRinging() } return a })
+        setActive(a => {
+          if (a) return a // في مكالمة شغالة بالفعل، الطابور مش هيتاخد باله دلوقتي أصلاً
+          setIncoming(cur => {
+            if (cur) { incomingQueueRef.current.push(payload); return cur } // فيه مكالمة معروضة بالفعل — تنضم للطابور
+            startRinging()
+            return payload
+          })
+          return a
+        })
       })
       .on('broadcast', { event: 'call-taken' }, ({ payload }) => {
-        // موظف تاني سبقنا — بطّل رنين من غير ما تلمس مكالمة شغالة عندنا
-        setIncoming(cur => (cur?.call_id === payload.call_id ? (stopRinging(), null) : cur))
+        // موظف تاني سبقنا — بطّل رنين من غير ما تلمس مكالمة شغالة عندنا، واطلع التالية لو فيه
+        incomingQueueRef.current = incomingQueueRef.current.filter(c => c.call_id !== payload.call_id)
+        setIncoming(cur => {
+          if (cur?.call_id !== payload.call_id) return cur
+          stopRinging(); showNextFromQueue(); return null
+        })
       })
       .on('broadcast', { event: 'call-ended' }, ({ payload }) => {
-        setIncoming(cur => (cur?.call_id === payload.call_id ? (stopRinging(), null) : cur))
-        setActive(cur => { if (cur?.call_id === payload.call_id) { teardown(); return null } return cur })
+        incomingQueueRef.current = incomingQueueRef.current.filter(c => c.call_id !== payload.call_id)
+        setIncoming(cur => {
+          if (cur?.call_id !== payload.call_id) return cur
+          stopRinging(); showNextFromQueue(); return null
+        })
+        setActive(cur => { if (cur?.call_id === payload.call_id) { teardown(); showNextFromQueue(); return null } return cur })
       })
       .subscribe()
 
     // لو الموظف فتح البرنامج ومكالمة بترن خلاص، مش هيوصله البث اللي فات
     apiFetch(`${API_URL}/calls/ringing`)
       .then(r => r.json())
-      .then(d => { if (d.calls?.length) { setIncoming(d.calls[0]); startRinging() } })
+      .then(d => {
+        if (!d.calls?.length) return
+        const [first, ...rest] = d.calls
+        incomingQueueRef.current.push(...rest)
+        setIncoming(first); startRinging()
+      })
       .catch(() => {})
 
     return () => { supabase.removeChannel(ch) }
-  }, [canTakeCalls, agent?.id, startRinging, stopRinging, teardown])
+  }, [canTakeCalls, agent?.id, startRinging, stopRinging, teardown, showNextFromQueue])
 
   // عدّاد مدة المكالمة
   useEffect(() => {
@@ -219,12 +250,18 @@ export default function CallCenter() {
     if (!incoming) return
     const id = incoming.call_id
     stopRinging(); setIncoming(null)
+    showNextFromQueue()
     try { await apiFetch(`${API_URL}/calls/${id}/reject`, { method: 'POST' }) } catch { /* انتهت خلاص */ }
   }
 
   const hangup = async () => {
-    const id = active?.call_id
+    // activeRef مش active state — hangup بتتنادى كمان من جوه pc.onconnectionstatechange، اللي
+    // بيتربط مرة واحدة جوه answer() قبل ما setActive(incoming) ينفّذ. لو استخدمنا active هنا،
+    // الدالة كانت بتفضل شايفة القيمة القديمة (null) من وقت ما اتعرّفت، فمعرّف المكالمة كان
+    // بيطلع undefined دايمًا والسيرفر مايتقالوش "المكالمة خلصت" لو الاتصال فشل أثناء مكالمة شغالة
+    const id = activeRef.current?.call_id
     teardown()
+    showNextFromQueue()
     if (id) { try { await apiFetch(`${API_URL}/calls/${id}/hangup`, { method: 'POST' }) } catch { /* انتهت خلاص */ } }
   }
 

@@ -188,6 +188,7 @@
       "savingEllipsis": "Saving...",
       "addingEllipsis": "Adding...",
       "retry": "Retry",
+      "loadError": "Couldn't load the data",
       "unlimited": "Unlimited",
       "limited": "Limited",
       "errorWithMessage": "Error: {{message}}",
@@ -584,6 +585,17 @@
     "danger": {
       "wipeConfirmPhrase": "delete everything",
       "wipeErrorPrefix": "An error occurred while wiping: {{message}}",
+      "wipePartialError": "Wiping stopped at \"{{step}}\" and did not finish: {{message}}. Steps before it were deleted; steps after it still remain — check the data before retrying.",
+      "tables": {
+        "messages": "Messages",
+        "conversationReads": "Conversation read log",
+        "assignmentLog": "Conversation assignment log",
+        "activityLog": "Conversation activity log",
+        "conversations": "Conversations",
+        "contactTags": "Customer tags",
+        "customFields": "Customer custom fields",
+        "contacts": "Customers"
+      },
       "wiped": "All conversation and customer data has been wiped",
       "wipeTitle": "Wipe All Conversation and Customer Data",
       "wipeDescription": "This action will permanently delete all conversations, messages, customers, and their associated tags â€” with no way to undo it. Agents and system settings (distribution, Lifecycle, fields, quick replies) will not be affected. Use this only if you want to start tracking conversations from scratch.",

@@ -1028,11 +1028,13 @@ function AttendanceTab() {
     setLoadingSummaries(false)
   }
 
+  // prev ممكن يكون لسه null (الموظفين لسه ما اتحملوش) لو المستخدم ضغط بسرعة قبل ما القايمة
+  // تتحمّل — .includes/.length على null كان بيرمي استثناء
   const toggleAgent = (id) => {
-    setSelectedAgentIds(prev => prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id])
+    setSelectedAgentIds(prev => (prev || []).includes(id) ? (prev || []).filter(x => x !== id) : [...(prev || []), id])
   }
   const toggleAll = () => {
-    setSelectedAgentIds(prev => prev.length === agents.length ? [] : agents.map(a => a.id))
+    setSelectedAgentIds(prev => (prev || []).length === agents.length ? [] : agents.map(a => a.id))
   }
 
   const dayTotalMs = 24 * 60 * 60 * 1000

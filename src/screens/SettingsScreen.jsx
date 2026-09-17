@@ -2270,6 +2270,7 @@ function TelegramConnectModal({ onClose }) {
 // ─── Lifecycle Tab ────────────────────────────────────────
 function LifecycleTab() {
   const { t } = useTranslation()
+  const toast = useToast()
   const [stages, setStages] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', color: '#3B82F6', icon: '' })
@@ -2284,7 +2285,8 @@ function LifecycleTab() {
   }
 
   const add = async () => {
-    await supabase.from('lifecycle_stages').insert({ ...form, icon: form.icon.trim() || null, stage_order: stages.length })
+    const { error } = await supabase.from('lifecycle_stages').insert({ ...form, icon: form.icon.trim() || null, stage_order: stages.length })
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setForm({ name: '', color: '#3B82F6', icon: '' })
     setShowAdd(false)
     loadStages()
@@ -2292,14 +2294,16 @@ function LifecycleTab() {
 
   const remove = async (id) => {
     if (!confirm(t('settings.lifecycle.deleteConfirm'))) return
-    await supabase.from('lifecycle_stages').delete().eq('id', id)
+    const { error } = await supabase.from('lifecycle_stages').delete().eq('id', id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     loadStages()
   }
 
   const startEdit = (s) => { setEditingId(s.id); setEditName(s.name); setEditIcon(s.icon || '') }
   const saveEdit = async () => {
     if (!editName.trim()) return
-    await supabase.from('lifecycle_stages').update({ name: editName.trim(), icon: editIcon.trim() || null }).eq('id', editingId)
+    const { error } = await supabase.from('lifecycle_stages').update({ name: editName.trim(), icon: editIcon.trim() || null }).eq('id', editingId)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setEditingId(null)
     loadStages()
   }
@@ -2312,10 +2316,12 @@ function LifecycleTab() {
     const reordered = [...stages]
     reordered[index] = b; reordered[otherIndex] = a
     setStages(reordered)
-    await Promise.all([
+    const results = await Promise.all([
       supabase.from('lifecycle_stages').update({ stage_order: otherIndex }).eq('id', a.id),
       supabase.from('lifecycle_stages').update({ stage_order: index }).eq('id', b.id),
     ])
+    const failed = results.find(r => r.error)
+    if (failed) { toast.error(t('settings.common.errorWithMessage', { message: failed.error.message })); loadStages(); return }
     loadStages()
   }
 
@@ -2414,11 +2420,12 @@ function PackagesTab() {
 
   const add = async () => {
     if (!form.name.trim()) return
-    await supabase.from('contact_packages').insert({
+    const { error } = await supabase.from('contact_packages').insert({
       name: form.name.trim(),
       default_duration_days: form.default_duration_days ? Number(form.default_duration_days) : null,
       sort_order: packages.length
     })
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setForm({ name: '', default_duration_days: '' })
     setShowAdd(false)
     load()
@@ -2426,17 +2433,19 @@ function PackagesTab() {
 
   const remove = async (id) => {
     if (!confirm(t('settings.packages.deleteConfirm'))) return
-    await supabase.from('contact_packages').delete().eq('id', id)
+    const { error } = await supabase.from('contact_packages').delete().eq('id', id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     load()
   }
 
   const startEdit = (p) => { setEditingId(p.id); setEditForm({ name: p.name, default_duration_days: p.default_duration_days ?? '' }) }
   const saveEdit = async () => {
     if (!editForm.name.trim()) return
-    await supabase.from('contact_packages').update({
+    const { error } = await supabase.from('contact_packages').update({
       name: editForm.name.trim(),
       default_duration_days: editForm.default_duration_days ? Number(editForm.default_duration_days) : null
     }).eq('id', editingId)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setEditingId(null)
     load()
   }
@@ -2659,8 +2668,10 @@ function TagsTab() {
 
   const remove = async (id) => {
     if (!confirm(t('settings.tags.deleteConfirm'))) return
-    await supabase.from('contact_tags').delete().eq('tag_id', id)
-    await supabase.from('tags').delete().eq('id', id)
+    const { error: linkErr } = await supabase.from('contact_tags').delete().eq('tag_id', id)
+    if (linkErr) { toast.error(t('settings.common.errorWithMessage', { message: linkErr.message })); return }
+    const { error } = await supabase.from('tags').delete().eq('id', id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     loadTags()
   }
 
@@ -2733,6 +2744,7 @@ function TagsTab() {
 // ─── Custom Fields Tab ────────────────────────────────────
 function FieldsTab() {
   const { t } = useTranslation()
+  const toast = useToast()
   const [fields, setFields] = useState([])
   const [showAdd, setShowAdd] = useState(false)
   const [form, setForm] = useState({ name: '', field_type: 'text', options: '' })
@@ -2754,7 +2766,8 @@ function FieldsTab() {
         ? { choices: form.options.split(',').map(s => s.trim()) }
         : null
     }
-    await supabase.from('custom_field_definitions').insert(payload)
+    const { error } = await supabase.from('custom_field_definitions').insert(payload)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setForm({ name: '', field_type: 'text', options: '' })
     setShowAdd(false)
     loadFields()
@@ -2762,14 +2775,16 @@ function FieldsTab() {
 
   const remove = async (id) => {
     if (!confirm(t('settings.fields.deleteConfirm'))) return
-    await supabase.from('custom_field_definitions').delete().eq('id', id)
+    const { error } = await supabase.from('custom_field_definitions').delete().eq('id', id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     loadFields()
   }
 
   const startEdit = (f) => { setEditingId(f.id); setEditName(f.name) }
   const saveEdit = async () => {
     if (!editName.trim()) return
-    await supabase.from('custom_field_definitions').update({ name: editName.trim() }).eq('id', editingId)
+    const { error } = await supabase.from('custom_field_definitions').update({ name: editName.trim() }).eq('id', editingId)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setEditingId(null)
     loadFields()
   }
@@ -2880,10 +2895,11 @@ function QuickRepliesTab({ agent }) {
         file_url = urlData.publicUrl
         file_type = fileType(file)
       }
-      await supabase.from('quick_replies').insert({
+      const { error: insertErr } = await supabase.from('quick_replies').insert({
         name: form.name.trim(), text: form.text.trim() || null,
         file_url, file_type, created_by: agent?.id
       })
+      if (insertErr) throw insertErr
       setForm({ name: '', text: '' })
       setFile(null)
       setShowAdd(false)
@@ -2904,7 +2920,8 @@ function QuickRepliesTab({ agent }) {
       const path = qr.file_url.split('/inbox-media/')[1]
       if (path) await supabase.storage.from('inbox-media').remove([path])
     }
-    await supabase.from('quick_replies').delete().eq('id', qr.id)
+    const { error } = await supabase.from('quick_replies').delete().eq('id', qr.id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     load()
   }
 
@@ -3004,6 +3021,7 @@ const DISTRIBUTION_MODES = [
 
 function RoundRobinTab() {
   const { t } = useTranslation()
+  const toast = useToast()
   const [mode, setMode] = useState('least_busy')
   const [followupEnabled, setFollowupEnabled] = useState(false)
   const [followupMinutes, setFollowupMinutes] = useState(60)
@@ -3022,12 +3040,13 @@ function RoundRobinTab() {
 
   const save = async () => {
     setSaving(true)
-    await supabase.from('app_settings').update({
+    const { error } = await supabase.from('app_settings').update({
       distribution_mode: mode,
       followup_reassign_enabled: followupEnabled,
       followup_reassign_minutes: followupMinutes
     }).eq('id', true)
     setSaving(false)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
   }
@@ -3111,18 +3130,23 @@ function AiAgentTab() {
   const [testContactResults, setTestContactResults] = useState([])
   const [searchingContact, setSearchingContact] = useState(false)
   const [channels, setChannels] = useState([])
+  const [loadError, setLoadError] = useState(false)
 
   useEffect(() => { load() }, [])
 
   const load = async () => {
     setLoading(true)
-    const [{ data: s }, { data: src }, { data: usageRows }, { data: chans }] = await Promise.all([
+    setLoadError(false)
+    const [{ data: s, error: settingsErr }, { data: src }, { data: usageRows }, { data: chans }] = await Promise.all([
       supabase.from('ai_settings').select('*').limit(1).single(),
       supabase.from('ai_knowledge_sources').select('*').order('created_at', { ascending: false }),
       supabase.from('ai_usage_log').select('input_tokens, output_tokens, cost_usd, source')
         .gte('day', new Date(new Date().getFullYear(), new Date().getMonth(), 1).toISOString().slice(0, 10)),
       supabase.from('channels').select('id, platform, display_name, custom_name, status').order('platform')
     ])
+    // .single() بيرجع error لو الصف مش موجود أو فيه أكتر من واحد — من غيرها كان التاب بيفضل
+    // شكله "بيحمّل" للأبد (loading بيتصفّر فعلاً، بس settings بتفضل null فمفيش أي حاجة تترسم)
+    if (settingsErr) { console.error('AI settings load error:', settingsErr.message); setLoadError(true); setLoading(false); return }
     setSettings(s)
     setSources(src || [])
     setChannels(chans || [])
@@ -3233,6 +3257,13 @@ function AiAgentTab() {
     await supabase.from('ai_knowledge_sources').delete().eq('id', id)
     load()
   }
+
+  if (loadError) return (
+    <div className="flex flex-col items-center justify-center h-32 gap-2">
+      <p className="text-sm text-danger">{t('settings.common.loadError')}</p>
+      <button onClick={load} className="text-xs text-brand hover:underline">{t('settings.common.retry')}</button>
+    </div>
+  )
 
   if (loading || !settings) return (
     <div className="flex items-center justify-center h-32">
@@ -3526,20 +3557,29 @@ function DangerZoneTab() {
     if (confirmText !== WIPE_CONFIRM_PHRASE) return
     setWiping(true)
     try {
-      // بالترتيب الصح عشان مانصطدمش بقيود الـ foreign key
-      await supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('conversation_reads').delete().neq('conversation_id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('conversation_assignment_log').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('conversation_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('contact_tags').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('contact_custom_fields').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000')
-      await supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+      // بالترتيب الصح عشان مانصطدمش بقيود الـ foreign key. كل خطوة لازم تتأكد من نجاحها فعليًا —
+      // لو خطوة فشلت (RLS، شبكة، أي سبب) واستمرينا من غير ما نلاحظ، كنا ممكن نقول "تم المسح ✓"
+      // ونصف البيانات لسه موجود جزئيًا، أو العكس. لو أي خطوة فشلت، بنوقف فورًا ونقول بالظبط
+      // وصلنا فين، بدل رسالة نجاح عامة مش دقيقة
+      const steps = [
+        { table: 'messages', label: t('settings.danger.tables.messages'), run: () => supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'conversation_reads', label: t('settings.danger.tables.conversationReads'), run: () => supabase.from('conversation_reads').delete().neq('conversation_id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'conversation_assignment_log', label: t('settings.danger.tables.assignmentLog'), run: () => supabase.from('conversation_assignment_log').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'conversation_activity_log', label: t('settings.danger.tables.activityLog'), run: () => supabase.from('conversation_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'conversations', label: t('settings.danger.tables.conversations'), run: () => supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'contact_tags', label: t('settings.danger.tables.contactTags'), run: () => supabase.from('contact_tags').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'contact_custom_fields', label: t('settings.danger.tables.customFields'), run: () => supabase.from('contact_custom_fields').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000') },
+        { table: 'contacts', label: t('settings.danger.tables.contacts'), run: () => supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
+      ]
+      for (const step of steps) {
+        const { error } = await step.run()
+        if (error) throw new Error(t('settings.danger.wipePartialError', { step: step.label, message: error.message }))
+      }
       setDone(true)
       setConfirmText('')
       toast.success(t('settings.danger.wiped'))
     } catch (err) {
-      toast.error(t('settings.danger.wipeErrorPrefix', { message: err.message }))
+      toast.error(err.message)
     } finally {
       setWiping(false)
     }
