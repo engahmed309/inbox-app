@@ -1276,7 +1276,8 @@
     "activityLog": {
       "fieldChanged": "غيّر {{field}} من \"{{oldVal}}\" إلى \"{{newVal}}\""
     },
-    "saveButton": "حفظ التغييرات"
+    "saveButton": "حفظ التغييرات",
+    "saveError": "حدث خطأ أثناء الحفظ — حاول مرة أخرى"
   },
   "setPassword": {
     "passwordTooShort": "يجب ألا تقل كلمة المرور عن ٦ أحرف",

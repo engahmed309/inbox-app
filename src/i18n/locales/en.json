@@ -1276,7 +1276,8 @@
     "activityLog": {
       "fieldChanged": "Changed {{field}} from \"{{oldVal}}\" to \"{{newVal}}\""
     },
-    "saveButton": "Save changes"
+    "saveButton": "Save changes",
+    "saveError": "Something went wrong while saving — please try again"
   },
   "setPassword": {
     "passwordTooShort": "Password must be at least 6 characters",

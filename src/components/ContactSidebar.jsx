@@ -232,12 +232,23 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
       }
     }
 
-    const { data: updated } = await supabase
+    // lifecycle_stage_id و package_id أعمدة uuid — سترنج فاضي '' (قيمة "بدون") بيرفضه بوستجرس
+    // بـ"invalid input syntax for type uuid" لأي عمود من النوع ده، وده كان بيفشّل تحديث الصف
+    // كله بصمت (الكود مكنش بيتاكد من error) يعني حتى الاسم والدولة والملاحظات مكنوش بيتسجلوا لو
+    // كان فيه أي عمود uuid فاضي معاهم في نفس الحفظة — ده أصل مشكلة "الدولة بتختفي بعد الحفظ"
+    const payload = { ...form, lifecycle_stage_id: form.lifecycle_stage_id || null, package_id: form.package_id || null }
+
+    const { data: updated, error: saveErr } = await supabase
       .from('contacts')
-      .update(form)
+      .update(payload)
       .eq('id', contact.id)
       .select()
       .single()
+    if (saveErr) {
+      toast.error(t('contactSidebar.saveError'))
+      setSaving(false)
+      return
+    }
     if (updated) onUpdate(updated)
 
     // Save custom fields
