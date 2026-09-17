@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode, MessageSquareText } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode, MessageSquareText, Pin } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 import i18n from '../i18n'
@@ -351,6 +351,11 @@ export default function ConversationsScreen() {
   const [conversations, setConversations] = useState(screenCache.conversations || [])
   const [agentsMap, setAgentsMap] = useState(screenCache.agentsMap)
   const [lastMessages, setLastMessages] = useState(screenCache.lastMessages) // { conv_id: content }
+  // تثبيت محادثة خاص بكل موظف — مش ظاهر لباقي الموظفين. pinnedIds بيحدد شكل أيقونة الدبوس على
+  // أي كارت (من القائمة العادية أو من pinnedConvs)، وpinnedConvs بيغطي محادثة مثبتة وقعت بره
+  // الصفحة المحمّلة حاليًا (بعد تحديث فلتر مثلاً) عشان تفضل ظاهرة فوق برضه
+  const [pinnedIds, setPinnedIds] = useState(new Set())
+  const [pinnedConvs, setPinnedConvs] = useState([])
   const [status, setStatus] = useState(screenCache.status)
   const [channel, setChannel] = useState(screenCache.channel)
   const [search, setSearch] = useState(screenCache.search)
@@ -832,6 +837,52 @@ export default function ConversationsScreen() {
     }
   }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll, selectedLifecycle, selectedTagIds, selectedAdIds, dateFrom, dateTo, unrepliedOnly])
 
+  // محادثات الموظف الحالي المثبتة — pinnedIds بيتحسب من جدول conversation_pins مفلتر على
+  // agent_id بتاعه بس (كل موظف بيشوف تثبيتاته هو، مش تثبيتات زمايله)، وpinnedConvs بيجيب
+  // البيانات الكاملة بتاعتهم عشان لو محادثة مثبتة وقعت بره الصفحة المحمّلة حاليًا تفضل ظاهرة فوق
+  const loadPinned = useCallback(async () => {
+    if (!agent?.id) return
+    const { data: pins, error: pinsErr } = await supabase.from('conversation_pins')
+      .select('conversation_id').eq('agent_id', agent.id).order('pinned_at', { ascending: false })
+    if (pinsErr) { console.error('فشل تحميل المحادثات المثبتة:', pinsErr.message); return }
+    const ids = (pins || []).map(p => p.conversation_id)
+    setPinnedIds(new Set(ids))
+    if (!ids.length) { setPinnedConvs([]); return }
+    let q = supabase.from('conversations')
+      .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
+      .in('id', ids)
+    if (!canSeeAll) q = q.eq('assigned_agent_id', agent.id)
+    if (status !== 'all') q = q.eq('status', status)
+    const { data, error } = await q
+    if (error) { console.error('فشل تحميل بيانات المحادثات المثبتة:', error.message); return }
+    setPinnedConvs((data || []).map(c => ({ ...c, myUnread: false })))
+  }, [agent?.id, canSeeAll, status])
+
+  useEffect(() => { loadPinned() }, [loadPinned])
+
+  const togglePin = async (conv) => {
+    const isPinned = pinnedIds.has(conv.id)
+    if (isPinned) {
+      setPinnedIds(prev => { const next = new Set(prev); next.delete(conv.id); return next })
+      const { error } = await supabase.from('conversation_pins')
+        .delete().eq('conversation_id', conv.id).eq('agent_id', agent.id)
+      if (error) {
+        setPinnedIds(prev => new Set(prev).add(conv.id)) // فشل — رجّع الحالة زي ما كانت
+        toast.error(t('conversations.card.pinError'))
+        return
+      }
+      setPinnedConvs(prev => prev.filter(c => c.id !== conv.id))
+    } else {
+      setPinnedIds(prev => new Set(prev).add(conv.id))
+      const { error } = await supabase.from('conversation_pins')
+        .insert({ conversation_id: conv.id, agent_id: agent.id })
+      if (error) {
+        setPinnedIds(prev => { const next = new Set(prev); next.delete(conv.id); return next })
+        toast.error(t('conversations.card.pinError'))
+      }
+    }
+  }
+
   // لو موظف لقى في نتايج البحث محادثة متعينة لزميله، بدل ما يفتحها على طول بيبعت طلب نقل —
   // بيوصل إشعار لصاحب المحادثة وهو يقبل أو يرفض
   const requestTransfer = async (conv) => {
@@ -1114,7 +1165,16 @@ export default function ConversationsScreen() {
   // البحث بقى بيتم من الداتا بيز مباشرة (searchConversations)، فـ conversations بالفعل النتيجة النهائية.
   // لو لوحة بناء شريحة مفتوحة دلوقتي وبتعمل معاينة حية، نوري نتيجتها بدل القائمة العادية مؤقتًا —
   // من غير ما نلمس conversations نفسها، عشان لما اللوحة تتقفل القائمة الأصلية ترجع زي ما كانت فورًا
-  const filtered = conversations
+  //
+  // المثبتة بتترفع فوق بس لو مش في وضع بحث — نتايج البحث ليها ترتيبها الخاص، ورفع محادثة مثبتة
+  // فوقها حتى لو مش مطابقة لنص البحث كان هيبقى مربك
+  const filtered = useMemo(() => {
+    if (search.trim() || !pinnedIds.size) return conversations
+    const pinned = [...pinnedConvs.filter(c => !conversations.some(mc => mc.id === c.id)), ...conversations.filter(c => pinnedIds.has(c.id))]
+      .sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
+    const rest = conversations.filter(c => !pinnedIds.has(c.id))
+    return [...pinned, ...rest]
+  }, [conversations, pinnedConvs, pinnedIds, search])
 
   const agentStatusBtn = agent?.status || 'online'
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
@@ -1478,6 +1538,8 @@ export default function ConversationsScreen() {
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
                   isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id}
                   onRequestTransfer={() => requestTransfer(conv)}
+                  isPinned={pinnedIds.has(conv.id)}
+                  onTogglePin={() => togglePin(conv)}
                 />
               ))}
               {conversations.length >= visibleLimit && (
@@ -1586,7 +1648,7 @@ export default function ConversationsScreen() {
   )
 }
 
-function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer }) {
+function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, selected, onToggleSelect, onClick, isForeign, onRequestTransfer, isPinned, onTogglePin }) {
   const { t } = useTranslation()
   const contact = conv.contacts
 
@@ -1679,7 +1741,16 @@ function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, se
               </span>
             )}
           </span>
-          <span className="text-xs text-fg-subtle flex-shrink-0">{timeAgo(conv.last_message_at)}</span>
+          <span className="flex items-center gap-1 flex-shrink-0">
+            {onTogglePin && (
+              <span onClick={e => { e.stopPropagation(); onTogglePin() }}
+                title={isPinned ? t('conversations.card.unpin') : t('conversations.card.pin')}
+                className={`p-0.5 -m-0.5 rounded transition-colors ${isPinned ? 'text-brand' : 'text-fg-subtle/40 hover:text-fg-subtle'}`}>
+                <Pin size={12} className={isPinned ? 'fill-current' : ''} />
+              </span>
+            )}
+            <span className="text-xs text-fg-subtle">{timeAgo(conv.last_message_at)}</span>
+          </span>
         </div>
         <div className="flex items-center justify-between gap-2 mt-0.5">
           <span className="text-xs text-fg-muted truncate flex-1">

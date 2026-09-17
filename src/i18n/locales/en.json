@@ -1179,7 +1179,10 @@
       "otherAgent": "Another agent",
       "requestTransferButton": "Request transfer",
       "aiActiveTitle": "AI Agent is handling this conversation",
-      "adReferralTitle": "This contact came from a paid ad â€” needs attention"
+      "adReferralTitle": "This contact came from a paid ad â€” needs attention",
+      "pin": "Pin conversation",
+      "unpin": "Unpin",
+      "pinError": "Something went wrong, please try again"
     },
     "contentTypes": {
       "image": "ðŸ“· Photo",

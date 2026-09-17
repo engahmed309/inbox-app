@@ -1179,7 +1179,10 @@
       "otherAgent": "موظف آخر",
       "requestTransferButton": "طلب النقل",
       "aiActiveTitle": "الـ AI Agent يعمل على هذه المحادثة",
-      "adReferralTitle": "هذا العميل قادم من إعلان مموّل — يحتاج إلى اهتمام"
+      "adReferralTitle": "هذا العميل قادم من إعلان مموّل — يحتاج إلى اهتمام",
+      "pin": "تثبيت المحادثة",
+      "unpin": "إلغاء التثبيت",
+      "pinError": "حدث خطأ، حاول مرة أخرى"
     },
     "contentTypes": {
       "image": "📷 صورة",
