@@ -413,6 +413,9 @@ export default function ConversationsScreen() {
   // دلوقتي وقت وصول الرد، عشان أرفض أي نتيجة قديمة بدل ما تكتب فوق العرض الصح
   const selectedSegmentIdRef = useRef(selectedSegmentId)
   useEffect(() => { selectedSegmentIdRef.current = selectedSegmentId }, [selectedSegmentId])
+  // رقم تسلسلي لكل نداء لـ fetchConversations — لو نداءين اتلحقوا مع بعض (تبديل فلتر بسرعة)،
+  // الرد اللي يوصل الأول لو كان أقدم (رقمه أصغر) بيتجاهل تمامًا مهما وصل الأول ولا الأخير
+  const fetchSeqRef = useRef(0)
   const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
@@ -479,6 +482,11 @@ export default function ConversationsScreen() {
   }, [])
 
   const fetchConversations = useCallback(async () => {
+    // رقم النداء ده — لو نداء تاني اتبعت بعدنا (فلتر اتغيّر تاني بسرعة) قبل ما ده يخلص، أي setState
+    // هنا لازم يتجاهل لأنه أقدم من الرد الحالي على الشاشة
+    const mySeq = ++fetchSeqRef.current
+    const stillCurrent = () => fetchSeqRef.current === mySeq
+
     // لو فيه شريحة (segment) مختارة، الباك إند هو اللي بيحل الفلتر (AND/OR على أكتر من جدول) ويرجّع
     // صفحة محادثات جاهزة — مش سلسلة فلاتر Supabase العادية تحت. باقي الشاشة (فتح شات، رد، إلخ)
     // بيشتغل بالظبط زي أي محادثة عادية لأن الشكل الراجع مطابق لشكل conversations العادي
@@ -492,7 +500,7 @@ export default function ConversationsScreen() {
         if (!res.ok) throw new Error(data.error || t('conversations.list.loadError'))
         // الطلب ده ممكن ياخد وقت والمستخدم يكون غيّر الشريحة أو شالها خلال ده — لو كده تجاهل
         // الرد القديم ده تمامًا، مش هيكتب فوق العرض الصح الحالي
-        if (selectedSegmentIdRef.current !== requestedSegmentId) return
+        if (selectedSegmentIdRef.current !== requestedSegmentId || !stillCurrent()) return
         // مفيش حساب دقيق لـ"غير مقروءة ليا أنا بالذات" هنا (ده محتاج readsMap اللي بيتحسب تحت
         // للمسار العادي بس) — نفس التبسيط المستخدم في مسار البحث (searchConversations) تحت
         const convs = (data.conversations || []).map(c => ({ ...c, myUnread: false }))
@@ -502,11 +510,12 @@ export default function ConversationsScreen() {
 
         if (convs.length > 0) {
           const ids = convs.map(c => c.id)
-          const { data: msgs } = await supabase
-            .from('messages').select('conversation_id, content, content_type, direction, created_at')
-            .in('conversation_id', ids).neq('content_type', 'note').order('created_at', { ascending: false })
+          // get_last_messages() بترجع صف واحد بالظبط لكل معرّف محادثة (DISTINCT ON في القاعدة نفسها)،
+          // بدل استعلام عام بحد أقصى ١٠٠٠ صف كان ممكن تاكله محادثة واحدة نشطة جدًا وتسيب باقي
+          // الصفحة من غير "آخر رسالة" ظاهرة
+          const { data: msgs } = await supabase.rpc('get_last_messages', { conversation_ids: ids })
           const lastMap = {}
-          msgs?.forEach(m => { if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m })
+          msgs?.forEach(m => { lastMap[m.conversation_id] = m })
           setLastMessages(lastMap); screenCache.lastMessages = lastMap
 
           const contactIds = convs.map(c => c.contact_id).filter(Boolean)
@@ -523,6 +532,7 @@ export default function ConversationsScreen() {
       return
     }
 
+    try {
     // فلتر المرحلة وفلتر التاج الاتنين بيتطبّقوا بـ join على contacts (مش بجلب كل معرّفات العملاء
     // وبعتها في .in()). التاج كان لسه بالطريقة القديمة لأن أعداده كانت صغيرة — لحد ما تاج حملة
     // وصل لأكتر من ١٥٠٠ عميل، وساعتها بقى فيه عطلين مع بعض: الرابط بيعدّي الحد المسموح فالطلب
@@ -571,7 +581,8 @@ export default function ConversationsScreen() {
     const fetchAllPaged = async (buildQuery) => {
       const PAGE = 1000
       const CONCURRENCY = 8
-      const { data: first, count } = await buildQuery().range(0, PAGE - 1)
+      const { data: first, count, error: firstErr } = await buildQuery().range(0, PAGE - 1)
+      if (firstErr) console.error('fetchAllPaged error:', firstErr.message)
       let all = first || []
       const total = count ?? all.length
       if (total > PAGE) {
@@ -579,7 +590,10 @@ export default function ConversationsScreen() {
         for (let offset = PAGE; offset < total; offset += PAGE) pageIdxs.push(offset)
         for (let i = 0; i < pageIdxs.length; i += CONCURRENCY) {
           const batch = pageIdxs.slice(i, i + CONCURRENCY)
-          const results = await Promise.all(batch.map(offset => buildQuery().range(offset, offset + PAGE - 1).then(r => r.data || [])))
+          const results = await Promise.all(batch.map(offset => buildQuery().range(offset, offset + PAGE - 1).then(r => {
+            if (r.error) console.error('fetchAllPaged page error:', r.error.message)
+            return r.data || []
+          })))
           results.forEach(page => { all = all.concat(page) })
         }
       }
@@ -610,6 +624,8 @@ export default function ConversationsScreen() {
           .eq('status', 'open'))
       })
     ])
+    // فلتر تاني اتغيّر وإحنا لسه مستنيين الردود دي — نسيب النداء الأحدث يكمّل ويكتب هو بس
+    if (!stillCurrent()) return
 
     if (canSeeAll) {
       const aCounts = {}
@@ -672,28 +688,22 @@ export default function ConversationsScreen() {
     const { data, error } = await query
     if (error) { console.error(error); toast.error(t('conversations.list.loadError')); setLoading(false); return }
     // نداء قديم من قبل ما شريحة تتختار ممكن يكون لسه طاير من الـ Realtime ويرجع رده متأخر — لو
-    // فيه شريحة مختارة دلوقتي فعليًا، تجاهل الرد القديم ده تمامًا (مش هيكتب فوق عرض الشريحة الصح)
-    if (selectedSegmentIdRef.current) return
+    // فيه شريحة مختارة دلوقتي فعليًا، تجاهل الرد القديم ده تمامًا (مش هيكتب فوق عرض الشريحة الصح).
+    // وبرضه لو فيه نداء أحدث اتبعت بعدنا (فلتر اتغيّر بسرعة)، سيبه هو اللي يكتب النتيجة
+    if (selectedSegmentIdRef.current || !stillCurrent()) return
 
     const convs = (data || []).map(c => ({ ...c, myUnread: isUnreadForMe(c) }))
     setConversations(convs); screenCache.conversations = convs
     setLoading(false)
 
-    // جيب آخر رسالة لكل محادثة + التاجات
+    // جيب آخر رسالة لكل محادثة + التاجات. get_last_messages() بترجع صف واحد بالظبط لكل معرّف
+    // (DISTINCT ON في القاعدة نفسها) — بدل استعلام عام بحد أقصى ١٠٠٠ صف كان ممكن تاكله محادثة
+    // واحدة نشطة جدًا وتسيب باقي الصفحة من غير "آخر رسالة" ظاهرة خالص
     if (convs.length > 0) {
       const ids = convs.map(c => c.id)
-      const { data: msgs } = await supabase
-        .from('messages')
-        .select('conversation_id, content, content_type, direction, created_at')
-        .in('conversation_id', ids)
-        .neq('content_type', 'note') // الملاحظات الداخلية متتحسبش كـ"آخر رسالة" في معاينة القائمة
-        .order('created_at', { ascending: false })
-
-      // خد آخر رسالة لكل محادثة
+      const { data: msgs } = await supabase.rpc('get_last_messages', { conversation_ids: ids })
       const lastMap = {}
-      msgs?.forEach(m => {
-        if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m
-      })
+      msgs?.forEach(m => { lastMap[m.conversation_id] = m })
       setLastMessages(lastMap); screenCache.lastMessages = lastMap
 
       const contactIds = convs.map(c => c.contact_id).filter(Boolean)
@@ -708,6 +718,12 @@ export default function ConversationsScreen() {
         setContactTagsMap(ctMap); screenCache.contactTagsMap = ctMap
       }
     }
+    } catch (err) {
+      // خطأ غير متوقع (زي انقطاع شبكة مفاجئ) — من غير الـ catch ده، دائرة التحميل كانت ممكن
+      // تفضل دايرة للأبد لأن setLoading(false) ماكنش بيتنفذ في المسار ده أصلاً
+      console.error('fetchConversations error:', err)
+      if (stillCurrent()) { toast.error(t('conversations.list.loadError')); setLoading(false) }
+    }
   }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
 
   // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
@@ -718,6 +734,13 @@ export default function ConversationsScreen() {
     if (!q) return
     setLoading(true)
     try {
+      // فلتر التاج بيتطلب تقاطع مع contact_tags — بنحسبه مرة واحدة هنا ونستخدمه في الفرعين تحت
+      let tagFilteredContactIds = null
+      if (selectedTagIds.length > 0) {
+        const { data: ctRows } = await supabase.from('contact_tags').select('contact_id').in('tag_id', selectedTagIds)
+        tagFilteredContactIds = new Set((ctRows || []).map(r => r.contact_id))
+      }
+
       let query;
       if (searchType === 'contact') {
         // بندور على اسم العميل أو رقم هاتفه (للواتساب) أو الـ platform_id في جدول contacts نفسه،
@@ -725,12 +748,16 @@ export default function ConversationsScreen() {
         // مؤقت "زائر ####" (آخر ٤ أرقام من platform_id) — الاسم ده مش محفوظ في القاعدة، فلو حد
         // نسخ ولصق "زائر ####" كامل من الشاشة، بنشيل كلمة "زائر" ونبحث بالأرقام بس عشان تلاقيه
         const cleaned = q.replace(/^زائر\s*/, '').trim() || q
-        const { data: contactRows } = await supabase
+        let contactQuery = supabase
           .from('contacts')
           .select('id')
           .or(`name.ilike.%${cleaned}%,phone.ilike.%${cleaned}%,platform_id.ilike.%${cleaned}%`)
           .limit(300)
-        const contactIds = [...new Set((contactRows || []).map(c => c.id))]
+        // فلتر Lifecycle النشط في الشريط الجانبي لازم يتحترم في نتايج البحث كمان، مش يتجاهل بصمت
+        if (selectedLifecycle) contactQuery = contactQuery.eq('lifecycle_stage_id', selectedLifecycle)
+        const { data: contactRows } = await contactQuery
+        let contactIds = [...new Set((contactRows || []).map(c => c.id))]
+        if (tagFilteredContactIds) contactIds = contactIds.filter(id => tagFilteredContactIds.has(id))
         query = supabase.from('conversations')
           .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .in('contact_id', contactIds.length ? contactIds : ['00000000-0000-0000-0000-000000000000'])
@@ -739,9 +766,15 @@ export default function ConversationsScreen() {
         msgQuery = searchType === 'comment' ? msgQuery.eq('content_type', 'note') : msgQuery.neq('content_type', 'note')
         const { data: msgs } = await msgQuery
         const convIds = [...new Set((msgs || []).map(m => m.conversation_id))]
-        query = supabase.from('conversations')
-          .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
+        // هنا الفلترة بـ lifecycle/tag لازم تتعمل بـ join على contacts (زي القائمة العادية)، مش على
+        // نتايج الرسايل نفسها — !inner عشان الشرط يتفرض فعليًا بدل ما يتجاهل
+        const needsContactJoin = Boolean(selectedLifecycle) || Boolean(tagFilteredContactIds)
+        let convQuery = supabase.from('conversations')
+          .select(`*, contacts${needsContactJoin ? '!inner' : ''}(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))`)
           .in('id', convIds.length ? convIds : ['00000000-0000-0000-0000-000000000000'])
+        if (selectedLifecycle) convQuery = convQuery.eq('contacts.lifecycle_stage_id', selectedLifecycle)
+        if (tagFilteredContactIds) convQuery = convQuery.in('contacts.id', [...tagFilteredContactIds])
+        query = convQuery
       }
 
       query = query.order('last_message_at', { ascending: false }).limit(200)
@@ -757,6 +790,12 @@ export default function ConversationsScreen() {
       else if (agentFilter === 'ai') query = query.eq('ai_active', true)
       else if (agentFilter) query = query.eq('assigned_agent_id', agentFilter)
       else if (viewMode === 'mine') query = query.eq('assigned_agent_id', agent?.id)
+      // باقي الفلاتر النشطة في الشريط الجانبي (حملة إعلانية، مدى تاريخ، "محتاجة رد") — كانت بتتجاهل
+      // تمامًا وقت البحث رغم إنها شكلها ظاهر ومفعّل في الواجهة
+      if (selectedAdIds.length > 0) query = query.in('ad_referral->>ad_id', selectedAdIds)
+      if (dateFrom) query = query.gte('created_at', `${dateFrom}T00:00:00`)
+      if (dateTo) query = query.lte('created_at', `${dateTo}T23:59:59`)
+      if (unrepliedOnly) query = query.gt('unread_count', 0)
 
       const { data, error } = await query
       if (error) { console.error(error); toast.error(t('conversations.search.error')); setLoading(false); return }
@@ -767,14 +806,9 @@ export default function ConversationsScreen() {
 
       if (convs.length > 0) {
         const ids = convs.map(c => c.id)
-        const { data: msgs } = await supabase
-          .from('messages')
-          .select('conversation_id, content, content_type, direction, created_at')
-          .in('conversation_id', ids)
-          .neq('content_type', 'note')
-          .order('created_at', { ascending: false })
+        const { data: msgs } = await supabase.rpc('get_last_messages', { conversation_ids: ids })
         const lastMap = {}
-        msgs?.forEach(m => { if (!lastMap[m.conversation_id]) lastMap[m.conversation_id] = m })
+        msgs?.forEach(m => { lastMap[m.conversation_id] = m })
         setLastMessages(lastMap); screenCache.lastMessages = lastMap
 
         const contactIds = convs.map(c => c.contact_id).filter(Boolean)
@@ -796,7 +830,7 @@ export default function ConversationsScreen() {
       toast.error(t('conversations.search.error'))
       setLoading(false)
     }
-  }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll])
+  }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll, selectedLifecycle, selectedTagIds, selectedAdIds, dateFrom, dateTo, unrepliedOnly])
 
   // لو موظف لقى في نتايج البحث محادثة متعينة لزميله، بدل ما يفتحها على طول بيبعت طلب نقل —
   // بيوصل إشعار لصاحب المحادثة وهو يقبل أو يرفض
@@ -821,7 +855,9 @@ export default function ConversationsScreen() {
   useEffect(() => {
     if (!agent) return
     if (!search.trim()) {
-      if (searchMountedRef.current) fetchConversations()
+      // نفس مؤشر التحميل المستخدم مع تغيير الفلاتر — من غيره، مسح مربع البحث كان بيرجّع القائمة
+      // العادية من غير أي إشارة إنها بتحمّل، فنتايج البحث القديمة كانت بتفضل ثابتة على الشاشة
+      if (searchMountedRef.current) { setFetching(true); fetchConversations().finally(() => setFetching(false)) }
       searchMountedRef.current = true
       return
     }

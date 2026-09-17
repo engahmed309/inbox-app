@@ -54,7 +54,8 @@ export default function NotificationBell() {
 
   const markRead = async (n) => {
     if (n.is_read) return
-    await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
+    if (error) { console.error('فشل تعليم الإشعار كمقروء:', error.message); return }
     setItems(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
   }
 

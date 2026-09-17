@@ -136,11 +136,13 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const toggleTag = async (tag) => {
     const has = contactTags.some(tg => tg.id === tag.id)
     if (has) {
-      await supabase.from('contact_tags').delete().eq('contact_id', contact.id).eq('tag_id', tag.id)
+      const { error } = await supabase.from('contact_tags').delete().eq('contact_id', contact.id).eq('tag_id', tag.id)
+      if (error) { toast.error(t('chat.toast.genericErrorPrefix', { message: error.message })); return }
       setContactTags(prev => prev.filter(tg => tg.id !== tag.id))
       logActivity(conv?.id, agent?.id, t('contactSidebar.tags.removedActivity', { name: tag.name }))
     } else {
-      await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
+      const { error } = await supabase.from('contact_tags').insert({ contact_id: contact.id, tag_id: tag.id })
+      if (error) { toast.error(t('chat.toast.genericErrorPrefix', { message: error.message })); return }
       setContactTags(prev => [...prev, tag])
       logActivity(conv?.id, agent?.id, t('contactSidebar.tags.addedActivity', { name: tag.name }))
     }
@@ -252,13 +254,16 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     if (updated) onUpdate(updated)
 
     // Save custom fields
+    let customFieldErr = null
     for (const [fieldId, value] of Object.entries(customValues)) {
-      await supabase.from('contact_custom_fields').upsert({
+      const { error } = await supabase.from('contact_custom_fields').upsert({
         contact_id: contact.id,
         field_definition_id: fieldId,
         value
       }, { onConflict: 'contact_id,field_definition_id' })
+      if (error) customFieldErr = error
     }
+    if (customFieldErr) toast.error(t('contactSidebar.saveError'))
     setOriginalCustomValues(customValues)
 
     for (const change of changes) {

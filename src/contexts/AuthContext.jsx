@@ -30,10 +30,12 @@ export function AuthProvider({ children }) {
   async function setStatus(agentId, status) {
     if (!agentId) return
     const now = new Date().toISOString()
-    await supabase.from('agents').update({ status, last_seen_at: now }).eq('id', agentId)
+    const { error: statusErr } = await supabase.from('agents').update({ status, last_seen_at: now }).eq('id', agentId)
+    if (statusErr) { console.error('فشل تحديث حالة الموظف:', statusErr.message); return }
     // بنسجل كل تغيير حالة في لوج منفصل، عشان نقدر نبني تقرير حضور/غياب لاحقاً (من امتى لحد امتى كان أونلاين كل يوم)
     // لازم await هنا — كويري سوبابيز lazy، لو محدش عمل await/.then() ليها الطلب مبيتبعتش للسيرفر خالص
-    await supabase.from('agent_status_log').insert({ agent_id: agentId, status, changed_at: now })
+    const { error: logErr } = await supabase.from('agent_status_log').insert({ agent_id: agentId, status, changed_at: now })
+    if (logErr) console.error('فشل تسجيل تغيير الحالة في سجل الحضور:', logErr.message)
     setAgent(prev => prev && prev.id === agentId ? { ...prev, status, is_online: status === 'online', last_seen_at: now } : prev)
     // لما موظف يبقى متاح، حاول توزّع أي محادثات كانت مستنية موظف فاضي
     if (status === 'online') {
@@ -63,7 +65,8 @@ export function AuthProvider({ children }) {
 
     let finalAgent = ag
     if (Object.keys(updates).length) {
-      const { data: updated } = await supabase.from('agents').update(updates).eq('id', ag.id).select().single()
+      const { data: updated, error: syncErr } = await supabase.from('agents').update(updates).eq('id', ag.id).select().single()
+      if (syncErr) console.error('فشل مزامنة بيانات الملف الشخصي من جوجل:', syncErr.message)
       if (updated) finalAgent = updated
     }
 

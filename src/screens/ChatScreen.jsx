@@ -238,19 +238,23 @@ export default function ChatScreen() {
       return merged
     })
 
+    // آخر ٢٠٠ حدث كفاية جدًا لعرض التايم لاين — من غير حد أقصى كان بيتجاب السجل كامل من الأول
+    // في كل مرة (بما فيها كل حدث لحظي/polling)، وده بيكبر للأبد لمحادثة اتفتحت/اتقفلت كتير
     const { data: logs } = await supabase
       .from('conversation_assignment_log')
       .select('*, assigned_to_agent:assigned_to(name), assigned_by_agent:assigned_by(name)')
       .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setAssignLogs(logs || [])
+      .order('created_at', { ascending: false })
+      .limit(200)
+    setAssignLogs((logs || []).slice().reverse())
 
     const { data: activity } = await supabase
       .from('conversation_activity_log')
       .select('*')
       .eq('conversation_id', id)
-      .order('created_at', { ascending: true })
-    setActivityLogs(activity || [])
+      .order('created_at', { ascending: false })
+      .limit(200)
+    setActivityLogs((activity || []).slice().reverse())
   }, [id, scrollToBottom])
 
   useEffect(() => {
@@ -258,6 +262,9 @@ export default function ChatScreen() {
     firstLoadDoneRef.current = false
     setHasMoreMessages(false)
     setMessages([])
+    // لو الموظف نقل بسرعة بين محادثتين قبل ما تحميل الأولى يخلص، رد الأولى المتأخر كان ممكن يكتب
+    // فوق عرض المحادثة الثانية (اسم عميل غلط، رسايل غلط) — cancelled بيمنع أي setState من نداء قديم
+    let cancelled = false
     const loadData = async () => {
       // Conversation + Contact
       const { data: convData } = await supabase
@@ -265,6 +272,7 @@ export default function ChatScreen() {
         .select('*, contacts(*)')
         .eq('id', id)
         .single()
+      if (cancelled) return
       if (convData) {
         setConv(convData)
         setContact(convData.contacts)
@@ -274,20 +282,24 @@ export default function ChatScreen() {
       if (convData?.assigned_agent_id) {
         const { data: ag } = await supabase
           .from('agents').select('name, avatar_url').eq('id', convData.assigned_agent_id).single()
+        if (cancelled) return
         if (ag) setConv(prev => ({ ...prev, agentName: ag.name, agentAvatarUrl: ag.avatar_url }))
       }
 
       // Messages + Assignment log
       await fetchMessages(false)
+      if (cancelled) return
       scrollToBottom(false)
 
       // ملحوظة: مبنعملش "mark as read" عالمي هنا — المحادثة تفضل غير مقروءة للكل لحد ما نرد فعلياً.
       // بس بمجرد ما الموظف ده يفتح الشات، نسجّل قراءته الشخصية (خاصة بيه بس)
       if (agent?.id) {
         // await ضروري هنا — كويري سوبابيز lazy، من غير await/.then() الطلب مبيتبعتش خالص للسيرفر
-        await supabase.from('conversation_reads')
+        const { error: readErr } = await supabase.from('conversation_reads')
           .upsert({ conversation_id: id, agent_id: agent.id, read_at: new Date().toISOString() })
+        if (readErr) console.error('فشل تسجيل قراءة المحادثة:', readErr.message)
       }
+      if (cancelled) return
       // إيصال قراءة فعلي على المنصة نفسها (تيك أزرق للعميل) — منفصل تمامًا عن القراءة الداخلية فوق
       apiFetch(`${API_URL}/conversations/${id}/mark-seen`, { method: 'POST' }).catch(() => {})
 
@@ -296,24 +308,29 @@ export default function ChatScreen() {
         try {
           const chRes = await apiFetch(`${API_URL}/conversations/${id}/channels`)
           const chData = await chRes.json()
+          if (cancelled) return
           setConnectedChannels(chData.channels || [])
-        } catch { setConnectedChannels([]) }
+        } catch { if (!cancelled) setConnectedChannels([]) }
       } else {
         setConnectedChannels([])
       }
+      if (cancelled) return
       setSelectedChannelId(convData?.channel_id || null)
 
       // Agents list (لأي agent يقدر يعيّن/يستلم محادثات) — بنستبعد صف الـ AI Agent نفسه، عشان
       // مربع "تعيين" ده لتحويل المحادثة لموظف بشري بس، مش وسيلة لتفعيل رد الـ AI
       const { data: ags } = await supabase.from('agents').select('id, name, is_online, status, avatar_url').neq('role', 'ai').order('name')
+      if (cancelled) return
       setAgents(ags || [])
 
       // Quick replies
       const { data: qrs } = await supabase.from('quick_replies').select('*').order('name')
+      if (cancelled) return
       setQuickReplies(qrs || [])
 
       // Lifecycle stages
       const { data: lcs } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
+      if (cancelled) return
       setLifecycles(lcs || [])
     }
 
@@ -432,6 +449,7 @@ export default function ChatScreen() {
     }, 6000)
 
     return () => {
+      cancelled = true
       realtimeRef.current?.unsubscribe()
       typingChannelRef.current?.unsubscribe()
       clearInterval(typingCleanup)
@@ -562,8 +580,9 @@ export default function ChatScreen() {
       }
       await fetchMessages()
       // اتردّ فعلاً، دلوقتي بس تتعلّم "مقروءة"
-      await supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
-      setConv(prev => prev ? { ...prev, unread_count: 0 } : prev)
+      const { error: unreadErr } = await supabase.from('conversations').update({ unread_count: 0 }).eq('id', id)
+      if (unreadErr) console.error('فشل تصفير عداد غير المقروء بعد الرد:', unreadErr.message)
+      else setConv(prev => prev ? { ...prev, unread_count: 0 } : prev)
     } catch (err) {
       setMessages(prev => prev.filter(m => m.id !== tempId))
       if (textSent) {
@@ -718,9 +737,10 @@ export default function ChatScreen() {
   const assignAgent = async (agentId) => {
     const { error } = await supabase.from('conversations').update({ assigned_agent_id: agentId }).eq('id', id)
     if (error) { toast.error(t('chat.toast.assignFailed')); return }
-    await supabase.from('conversation_assignment_log').insert({
+    const { error: logErr } = await supabase.from('conversation_assignment_log').insert({
       conversation_id: id, assigned_to: agentId, assigned_by: agent?.id
     })
+    if (logErr) console.error('فشل تسجيل التعيين في السجل:', logErr.message)
     const ag = agents.find(a => a.id === agentId)
     setConv(prev => ({ ...prev, agentName: ag?.name, agentAvatarUrl: ag?.avatar_url, assigned_agent_id: agentId }))
     setShowAssign(false)
@@ -733,8 +753,10 @@ export default function ChatScreen() {
     if (error) { toast.error(t('chat.toast.takeOverFailed')); return }
     setConv(prev => ({ ...prev, ai_active: false }))
     if (!conv?.assigned_agent_id && agent?.id) {
-      await supabase.from('conversations').update({ assigned_agent_id: agent.id }).eq('id', id)
-      await supabase.from('conversation_assignment_log').insert({ conversation_id: id, assigned_to: agent.id, assigned_by: agent?.id })
+      const { error: assignErr } = await supabase.from('conversations').update({ assigned_agent_id: agent.id }).eq('id', id)
+      if (assignErr) { toast.error(t('chat.toast.assignFailed')); return }
+      const { error: logErr } = await supabase.from('conversation_assignment_log').insert({ conversation_id: id, assigned_to: agent.id, assigned_by: agent?.id })
+      if (logErr) console.error('فشل تسجيل التعيين في السجل:', logErr.message)
       setConv(prev => ({ ...prev, assigned_agent_id: agent.id, agentName: agent.name, agentAvatarUrl: agent.avatar_url }))
     }
     toast.success(t('chat.toast.takeOverSuccess'))
@@ -972,12 +994,14 @@ export default function ChatScreen() {
     return [...msgItems, ...logItems, ...activityItems].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
   }, [messages, assignLogs, activityLogs, searchQuery])
 
-  const groupedMessages = timeline.reduce((groups, item) => {
+  // كان بيتحسب من غير useMemo، يعني بيتعاد حساب تجميع الرسايل كلها بالتاريخ مع كل إعادة رسم للشاشة —
+  // بما فيها كل ضغطة زرار وانت بتكتب رد. بيتحسب تاني بس لو الـ timeline نفسه اتغيّر فعلاً
+  const groupedMessages = useMemo(() => timeline.reduce((groups, item) => {
     const date = formatDate(item.created_at)
     if (!groups[date]) groups[date] = []
     groups[date].push(item)
     return groups
-  }, {})
+  }, {}), [timeline])
 
   return (
     <div className="h-full flex flex-col bg-surface overflow-hidden">

@@ -108,7 +108,8 @@ export default function PushNotificationToggle() {
   const toggleSound = async () => {
     const next = !soundEnabled
     setSoundEnabled(next)
-    await supabase.from('agents').update({ notify_sound_enabled: next }).eq('id', agent.id)
+    const { error } = await supabase.from('agents').update({ notify_sound_enabled: next }).eq('id', agent.id)
+    if (error) { setSoundEnabled(!next); toast.error(t('chat.toast.genericErrorPrefix', { message: error.message })) }
   }
 
   return (

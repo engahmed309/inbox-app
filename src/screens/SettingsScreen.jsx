@@ -193,7 +193,8 @@ function AgentsTab() {
   }
 
   const updateAgent = async (id, updates) => {
-    await supabase.from('agents').update(updates).eq('id', id)
+    const { error } = await supabase.from('agents').update(updates).eq('id', id)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     loadAgents()
     setEditId(null)
   }
@@ -246,9 +247,13 @@ function AgentsTab() {
         assignments = convIds.map((id, i) => ({ convId: id, agentId: pool[i % pool.length].id }))
       }
 
+      // لو تحويل أي محادثة فشل، لازم نوقف قبل ما نمسح الموظف نهائي — غير كده المحادثة دي كانت
+      // هتفضل من غير موظف من غير ما حد يلاحظ، لأن الموظف الأصلي بقى ممسوح خلاص
       for (const a of assignments) {
-        await supabase.from('conversations').update({ assigned_agent_id: a.agentId }).eq('id', a.convId)
-        await supabase.from('conversation_assignment_log').insert({ conversation_id: a.convId, assigned_to: a.agentId, assigned_by: null })
+        const { error: assignErr } = await supabase.from('conversations').update({ assigned_agent_id: a.agentId }).eq('id', a.convId)
+        if (assignErr) throw new Error(t('settings.common.errorWithMessage', { message: assignErr.message }))
+        const { error: logErr } = await supabase.from('conversation_assignment_log').insert({ conversation_id: a.convId, assigned_to: a.agentId, assigned_by: null })
+        if (logErr) console.error('فشل تسجيل التحويل في السجل:', logErr.message)
       }
 
       await deleteAgentFully(deleteTarget.agent.id)
