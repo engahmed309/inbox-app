@@ -189,6 +189,20 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     logActivity(conv?.id, agent?.id, expiresAtIso
       ? t('contactSidebar.package.activitySetWithDate', { package: pkgName, date: formatDate(expiresAtIso) })
       : t('contactSidebar.package.activitySet', { package: pkgName }))
+
+    // الخط اللي فات في الأكتيفيتي مختصر — هنا بنشرح بوضوح في الشات نفسه إيه اللي حصل وإيه اللي
+    // هيحصل بعدين، عشان أي موظف يفتح المحادثة يفهم الموضوع من غير ما يرجع لملف العميل
+    if (conv?.id) {
+      const noteText = expiresAtIso
+        ? t('contactSidebar.package.noteWithDate', { package: pkgName, date: formatDate(expiresAtIso) })
+        : t('contactSidebar.package.noteWithoutDate', { package: pkgName })
+      apiFetch(`${API_URL}/notes`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: conv.id, content: noteText })
+      }).catch(() => {})
+    }
+
     setPackageModal(null)
     toast.success(t('contactSidebar.package.saved'))
   }

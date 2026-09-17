@@ -1251,7 +1251,9 @@
       "saveError": "Failed to save the package",
       "activitySet": "Picked package \"{{package}}\" with no renewal date",
       "activitySetWithDate": "Picked package \"{{package}}\" — renews {{date}}",
-      "activityCleared": "Removed the customer's package"
+      "activityCleared": "Removed the customer's package",
+      "noteWithDate": "📦 Package \"{{package}}\" was set for this customer, renewing/expiring on {{date}}.\nWhen it's due, this conversation will automatically reopen with an internal note reminding you to send them a renewal message.",
+      "noteWithoutDate": "📦 Package \"{{package}}\" was set for this customer with no renewal date — no automatic reminder will be sent."
     },
     "dangerZone": {
       "title": "Danger zone",
