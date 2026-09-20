@@ -1358,6 +1358,9 @@
   "notificationBell": {
     "title": "Notifications",
     "noNotifications": "No notifications",
+    "filterAll": "All",
+    "filterUnread": "Unread",
+    "filterRead": "Read",
     "respondFailed": "Failed to respond to the request",
     "transferAccepted": "The conversation was transferred to them",
     "requestRejected": "The request was rejected",

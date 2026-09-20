@@ -15,21 +15,34 @@ export default function NotificationBell() {
   const toast = useToast()
   const navigate = useNavigate()
   const [items, setItems] = useState([])
+  const [unreadCount, setUnreadCount] = useState(0)
+  const [filter, setFilter] = useState('all') // 'all' | 'unread' | 'read'
   const [open, setOpen] = useState(false)
   const [busyId, setBusyId] = useState(null)
   const wrapRef = useRef(null)
+  // الـrealtime callback بيتعمل مرة واحدة لكل موظف، فبيقرا الفلتر الحالي من ref مش من الـstate
+  const filterRef = useRef(filter)
+  filterRef.current = filter
 
-  const unreadCount = items.filter(n => !n.is_read).length
-
+  // الفلتر بيتطبّق في الكويري نفسه (مش على أول ٣٠ إشعار محمّلين بس) — وعداد غير المقروءة على
+  // الجرس كويري منفصل، عشان يفضل صح حتى لو الفلتر المختار "المقروءة"
   const load = async () => {
     if (!agent?.id) return
-    const { data } = await supabase
+    let q = supabase
       .from('notifications')
       .select('*, from_agent:from_agent_id(name), conversations(id, contacts(name))')
       .eq('agent_id', agent.id)
       .order('created_at', { ascending: false })
       .limit(30)
+    if (filterRef.current === 'unread') q = q.eq('is_read', false)
+    else if (filterRef.current === 'read') q = q.eq('is_read', true)
+    const [{ data, error }, { count }] = await Promise.all([
+      q,
+      supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('agent_id', agent.id).eq('is_read', false)
+    ])
+    if (error) { console.error('فشل تحميل الإشعارات:', error.message); return }
     setItems(data || [])
+    setUnreadCount(count || 0)
   }
 
   useEffect(() => {
@@ -44,6 +57,12 @@ export default function NotificationBell() {
     return () => { supabase.removeChannel(channel) }
   }, [agent?.id])
 
+  const filterMountedRef = useRef(false)
+  useEffect(() => {
+    if (!filterMountedRef.current) { filterMountedRef.current = true; return } // أول تحميل بيعمله الـeffect اللي فوق
+    load()
+  }, [filter])
+
   useEffect(() => {
     const onClickOutside = (e) => {
       if (wrapRef.current && !wrapRef.current.contains(e.target)) setOpen(false)
@@ -56,7 +75,9 @@ export default function NotificationBell() {
     if (n.is_read) return
     const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
     if (error) { console.error('فشل تعليم الإشعار كمقروء:', error.message); return }
+    // بتفضل ظاهرة في مكانها حتى في فلتر "غير المقروءة" لحد ما القايمة تتحدّث، بدل ما تختفي من تحت إيد المستخدم
     setItems(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
+    setUnreadCount(c => Math.max(0, c - 1))
   }
 
   const openNotification = (n) => {
@@ -122,6 +143,14 @@ export default function NotificationBell() {
       {open && (
         <div className="absolute top-full end-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
           <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">{t('notificationBell.title')}</div>
+          <div className="flex gap-1.5 px-3 py-2 border-b border-surface-3">
+            {['all', 'unread', 'read'].map(f => (
+              <button key={f} onClick={() => setFilter(f)}
+                className={`flex-1 px-2 py-1 rounded-lg text-xs font-medium transition-colors ${filter === f ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                {t(`notificationBell.filter${f[0].toUpperCase()}${f.slice(1)}`)}
+              </button>
+            ))}
+          </div>
           {items.length === 0 && (
             <p className="text-center text-fg-subtle text-sm py-8">{t('notificationBell.noNotifications')}</p>
           )}

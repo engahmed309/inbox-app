@@ -1358,6 +1358,9 @@
   "notificationBell": {
     "title": "الإشعارات",
     "noNotifications": "لا توجد إشعارات",
+    "filterAll": "الكل",
+    "filterUnread": "غير المقروءة",
+    "filterRead": "المقروءة",
     "respondFailed": "فشل الرد على الطلب",
     "transferAccepted": "تم تحويل المحادثة إليه",
     "requestRejected": "تم رفض الطلب",

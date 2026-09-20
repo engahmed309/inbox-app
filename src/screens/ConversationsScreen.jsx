@@ -1023,6 +1023,12 @@ export default function ConversationsScreen() {
       debounceTimerRef.current = setTimeout(fetchConversations, 1500)
     }
 
+    // لما الـeffect ده يتنضّف (فلتر اتغيّر) القناة القديمة بتتقفل، وحدث الإقفال بيوصل لـcallback الـsubscribe
+    // بتاعها بعد ما الـeffect الجديد بدأ فعلاً — من غير الفلاج ده كان بينادي fetchConversations
+    // بتاعة الفلتر القديم بعد جلب الفلتر الجديد، فبتكسب (آخر نداء بيكسب في fetchSeqRef) والقايمة
+    // تفضل بالفلتر اللي قبله: اضغط موظف = مفيش تغيير، اضغط "الكل" = تظهر محادثات الموظف
+    let disposed = false
+
     // Realtime على conversations — لو فيه بحث شغال دلوقتي منعملش تحديث تلقائي، عشان منقاطعش
     // نتايج البحث الحالية؛ البحث نفسه هيتحدّث لوحده لما نص البحث يتغيّر
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
@@ -1031,6 +1037,7 @@ export default function ConversationsScreen() {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, debouncedFetch)
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch) // تحديث آخر رسالة
       .subscribe((status) => {
+        if (disposed) return
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
           realtimeHealthyRef.current = false
           if (!searchActiveRef.current) fetchConversations()
@@ -1052,6 +1059,7 @@ export default function ConversationsScreen() {
     }, 75000)
 
     return () => {
+      disposed = true
       realtimeRef.current?.unsubscribe()
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
@@ -1168,13 +1176,21 @@ export default function ConversationsScreen() {
   //
   // المثبتة بتترفع فوق بس لو مش في وضع بحث — نتايج البحث ليها ترتيبها الخاص، ورفع محادثة مثبتة
   // فوقها حتى لو مش مطابقة لنص البحث كان هيبقى مربك
+  //
+  // محادثة مثبتة خارج الصفحة المحمّلة (pinnedConvs) بتتضاف بس لو مفيش أي فلتر بيضيّق القايمة — لو
+  // فيه فلتر (موظف/قناة/مرحلة/تاج/تاريخ...) هي مالهاش بيانات مطابقة له أصلاً، وإضافتها كانت بتدخّل
+  // محادثات مش من الفلتر في النتيجة. المثبتة اللي جوه النتيجة فعلاً بتفضل بتترفع فوق عادي
+  const hasNarrowingFilter = Boolean(agentFilter) || viewMode === 'mine' || channel !== 'all' || Boolean(selectedLifecycle)
+    || selectedTagIds.length > 0 || selectedAdIds.length > 0 || Boolean(dateFrom) || Boolean(dateTo)
+    || unrepliedOnly || Boolean(selectedSegmentId)
   const filtered = useMemo(() => {
     if (search.trim() || !pinnedIds.size) return conversations
-    const pinned = [...pinnedConvs.filter(c => !conversations.some(mc => mc.id === c.id)), ...conversations.filter(c => pinnedIds.has(c.id))]
+    const outsidePage = hasNarrowingFilter ? [] : pinnedConvs.filter(c => !conversations.some(mc => mc.id === c.id))
+    const pinned = [...outsidePage, ...conversations.filter(c => pinnedIds.has(c.id))]
       .sort((a, b) => new Date(b.last_message_at) - new Date(a.last_message_at))
     const rest = conversations.filter(c => !pinnedIds.has(c.id))
     return [...pinned, ...rest]
-  }, [conversations, pinnedConvs, pinnedIds, search])
+  }, [conversations, pinnedConvs, pinnedIds, search, hasNarrowingFilter])
 
   const agentStatusBtn = agent?.status || 'online'
   // على الديسكتوب بيتحكم فيها زر الطي (sidebarOpen)، وعلى الموبايل القائمة دايماً موسّعة لما تتفتح
