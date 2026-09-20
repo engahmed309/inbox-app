@@ -1678,8 +1678,6 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
 
   const isOut = msg.direction === 'outbound'
   const isTemp = msg._temp
-  const showTime = !prev ||
-    Math.abs(new Date(msg.created_at) - new Date(prev.created_at)) > 300000
 
   // اسم الموظف اللي بعت الرسالة دي — بيظهر لما يتغيّر عن اللي قبله عشان نتراك لو المحادثة اتنقلت بين موظفين
   const senderName = isOut ? agentsMap?.[msg.sent_by_agent_id] : null
@@ -1687,9 +1685,6 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
 
   return (
     <div className={`flex flex-col mb-1 ${isOut ? 'items-end' : 'items-start'}`}>
-      {showTime && !isTemp && (
-        <span className="text-xs text-fg-subtle mb-1 px-1">{formatTime(msg.created_at)}</span>
-      )}
       {showSender && !isTemp && (
         <span className="flex items-center gap-1 text-[11px] text-brand-light mb-0.5 px-1">
           <User size={10} /> {senderName}
@@ -1749,17 +1744,21 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
           </span>
         )}
       </div>
-      {isOut && (
-        // الفشل لازم يبان بوضوح — الموظف محتاج يعرف إن الرسالة موصلتش عشان يتصرف،
-        // مش يفتكرها وصلت لأن شكلها زي أي رسالة مبعوتة
-        <span className={`text-xs mt-0.5 px-1 flex items-center gap-1 ${
-          msg.status === 'failed' ? 'text-danger' : msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
-          {isTemp ? <span className="animate-pulse">...</span>
-            : msg.status === 'failed' ? <><Ban size={11} className="inline shrink-0" /> <span>{t('chat.bubble.sendFailedStatus')}{msg.status_reason ? `: ${msg.status_reason}` : ''}</span></>
-            : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
-            : <Check size={12} className="inline" />}
-        </span>
-      )}
+      {/* وقت كل رسالة (بالدقيقة) تحت فقاعتها — مش وقت واحد لكل مجموعة رسايل — عشان الأدمن يقدر
+          يحسب الموظف اتأخر قد إيه بين رسالة العميل وردّه. الفشل لازم يبان بوضوح: الموظف محتاج يعرف
+          إن الرسالة موصلتش عشان يتصرف، مش يفتكرها وصلت لأن شكلها زي أي رسالة مبعوتة */}
+      <span className={`text-[11px] mt-0.5 px-1 flex items-center gap-1 ${
+        isOut && msg.status === 'failed' ? 'text-danger' : isOut && msg.status === 'read' ? 'text-brand' : 'text-fg-subtle'}`}>
+        {isTemp ? <span className="animate-pulse">...</span> : (
+          <>
+            <span>{formatTime(msg.created_at)}</span>
+            {isOut && (msg.status === 'failed'
+              ? <><Ban size={11} className="inline shrink-0" /> <span>{t('chat.bubble.sendFailedStatus')}{msg.status_reason ? `: ${msg.status_reason}` : ''}</span></>
+              : msg.status === 'delivered' || msg.status === 'read' ? <CheckCheck size={12} className="inline" />
+              : <Check size={12} className="inline" />)}
+          </>
+        )}
+      </span>
     </div>
   )
 }
