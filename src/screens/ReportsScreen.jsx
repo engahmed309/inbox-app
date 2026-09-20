@@ -1414,6 +1414,7 @@ function PerformanceTab() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [rows, setRows] = useState([])
+  const [delays, setDelays] = useState([])
   const [agents, setAgents] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -1439,23 +1440,29 @@ function PerformanceTab() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       setRows(data.rows || [])
+      setDelays(data.delays || [])
     } catch {
       setRows([])
+      setDelays([])
     }
     setLoading(false)
   }
 
   const stats = useMemo(() => {
     const perAgent = Object.fromEntries(rows.map(r => [r.agent_id, r]))
+    const delayPerAgent = Object.fromEntries(delays.map(d => [d.agent_id, d]))
     return agents.map(a => {
       const st = perAgent[a.id]
+      const dl = delayPerAgent[a.id]
       const avgReplyMs = st?.avg_reply_seconds != null ? Number(st.avg_reply_seconds) * 1000 : null
       return {
         agent: a, sent: st?.sent || 0, received: st?.received || 0,
-        customers: st?.customers || 0, avgReplyMs
+        customers: st?.customers || 0, avgReplyMs,
+        delayed: dl?.delayed || 0, escalated: dl?.escalated || 0,
+        longestWaitMs: dl ? dl.longest_minutes * 60000 : null
       }
     }).sort((a, b) => b.sent - a.sent)
-  }, [rows, agents])
+  }, [rows, delays, agents])
 
   return (
     <div className="p-4 space-y-4">
@@ -1472,7 +1479,7 @@ function PerformanceTab() {
         <div className="flex items-center justify-center h-32">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
         </div>
-      ) : stats.every(s => s.sent === 0 && s.received === 0) ? (
+      ) : stats.every(s => s.sent === 0 && s.received === 0 && s.delayed === 0) ? (
         <p className="text-center text-fg-subtle text-sm py-10">{t('reports.common.noMessages')}</p>
       ) : (
         <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
@@ -1489,6 +1496,15 @@ function PerformanceTab() {
                 <span className="text-fg-muted">{t('reports.performance.received')} <b className="text-fg">{s.received}</b></span>
                 <span className="text-fg-muted">{t('reports.performance.sent')} <b className="text-fg">{s.sent}</b></span>
                 <span className="text-fg-muted">{t('reports.performance.respondedCustomers')} <b className="text-fg">{s.customers}</b></span>
+              </div>
+              <div className="flex items-center gap-4 text-xs mt-1.5 flex-wrap" title={t('reports.performance.delaysHint')}>
+                <span className="text-fg-muted">{t('reports.performance.delays')} <b className={s.delayed > 0 ? 'text-danger' : 'text-fg'}>{s.delayed}</b></span>
+                {s.delayed > 0 && (
+                  <>
+                    <span className="text-fg-muted">{t('reports.performance.escalated')} <b className="text-fg">{s.escalated}</b></span>
+                    <span className="text-fg-muted">{t('reports.performance.longestWait')} <b className="text-fg">{formatDuration(s.longestWaitMs)}</b></span>
+                  </>
+                )}
               </div>
             </div>
           ))}

@@ -815,7 +815,11 @@
       "noTrackedReplies": "لا توجد ردود مسجّلة",
       "received": "استقبل:",
       "sent": "أرسل:",
-      "respondedCustomers": "عملاء تم الرد عليهم:"
+      "respondedCustomers": "عملاء تم الرد عليهم:",
+      "delays": "مرات التأخير:",
+      "escalated": "وصلت للأدمن:",
+      "longestWait": "أطول انتظار:",
+      "delaysHint": "التأخير = رسالة عميل عدّت حد التنبيه (من إعدادات تنبيهات التأخير) من غير رد"
     },
     "volume": {
       "title": "رسائل القنوات",

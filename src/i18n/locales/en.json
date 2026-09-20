@@ -815,7 +815,11 @@
       "noTrackedReplies": "No tracked replies",
       "received": "Received:",
       "sent": "Sent:",
-      "respondedCustomers": "Customers replied to:"
+      "respondedCustomers": "Customers replied to:",
+      "delays": "Delays:",
+      "escalated": "Escalated to admin:",
+      "longestWait": "Longest wait:",
+      "delaysHint": "A delay is a customer message that passed the alert threshold (set in Delay alerts settings) with no reply"
     },
     "volume": {
       "title": "Channel Message Volume",
