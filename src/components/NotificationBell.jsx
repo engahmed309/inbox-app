@@ -5,7 +5,7 @@ import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../lib/locale'
-import { Bell, Check, X, UserPlus, Tag } from 'lucide-react'
+import { Bell, Check, X, UserPlus, Tag, Clock } from 'lucide-react'
 
 // جرس الإشعارات — ثابت فوق كل الشاشات بعد تسجيل الدخول. أول استخدام له طلبات نقل المحادثات
 // بين الموظفين، وممكن نضيفله أنواع تانية بعدين بنفس الشكل
@@ -130,7 +130,9 @@ export default function NotificationBell() {
               className={`px-4 py-3 border-b border-surface-3 last:border-0 cursor-pointer hover:bg-surface-3/40 transition-colors ${!n.is_read ? 'bg-brand/5' : ''}`}>
               <div className="flex items-start gap-2">
                 <div className="w-7 h-7 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0 mt-0.5">
-                  {n.type === 'admin_request' ? <Tag size={13} className="text-brand" /> : <UserPlus size={13} className="text-brand" />}
+                  {n.type === 'admin_request' ? <Tag size={13} className="text-brand" />
+                    : n.type === 'response_delay' ? <Clock size={13} className="text-danger" />
+                    : <UserPlus size={13} className="text-brand" />}
                 </div>
                 <div className="flex-1 min-w-0">
                   <p className="text-sm text-fg font-medium">{n.title}</p>

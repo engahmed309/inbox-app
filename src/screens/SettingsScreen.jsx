@@ -15,7 +15,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star, Package
+  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock
 } from 'lucide-react'
 
 const TABS = [
@@ -30,6 +30,7 @@ const TABS = [
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
   { key: 'segments', labelKey: 'settings.tabs.segments', icon: Filter },
   { key: 'ratings', labelKey: 'settings.tabs.ratings', icon: Star },
+  { key: 'responsealerts', labelKey: 'settings.tabs.responseAlerts', icon: Clock },
   { key: 'health', labelKey: 'settings.tabs.health', icon: Activity },
   { key: 'danger', labelKey: 'settings.tabs.danger', icon: AlertTriangle },
 ]
@@ -83,6 +84,7 @@ export default function SettingsScreen() {
         {tab === 'ai' && <AiAgentTab />}
         {tab === 'segments' && <SegmentsTab />}
         {tab === 'ratings' && <RatingsTab />}
+        {tab === 'responsealerts' && <ResponseAlertsTab />}
         {tab === 'health' && <SystemHealthTab />}
         {tab === 'danger' && <DangerZoneTab />}
       </div>
@@ -2544,6 +2546,139 @@ function PackagesTab() {
             )}
           </div>
         </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Response Alerts Tab ──────────────────────────────────
+// تنبيهات تأخير الرد على العملاء — الفحص نفسه شغال في الباك إند (responseAlerts.js)، وهنا بس
+// الإعدادات: الحدود، ساعات الدوام (بالدقايق من منتصف الليل)، المنطقة الزمنية، والموظفين المستثنيين
+const RESPONSE_ALERT_TIMEZONES = ['Africa/Cairo', 'Asia/Riyadh', 'Asia/Dubai']
+const minutesToTime = (m) => `${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`
+const timeToMinutes = (s) => { const [h, m] = (s || '0:0').split(':').map(Number); return (h || 0) * 60 + (m || 0) }
+
+function ResponseAlertsTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [settings, setSettings] = useState(null)
+  const [agents, setAgents] = useState([])
+  const [loading, setLoading] = useState(true)
+
+  const load = useCallback(async () => {
+    try {
+      const [{ data: st, error: stErr }, { data: ag, error: agErr }] = await Promise.all([
+        supabase.from('app_settings').select('response_alert_enabled, response_alert_agent_minutes, response_alert_admin_minutes, response_alert_max_repeats, response_alert_start_minute, response_alert_end_minute, response_alert_timezone, response_alert_excluded_agent_ids, response_alert_ignore_thanks').eq('id', true).maybeSingle(),
+        supabase.from('agents').select('id, name, role').order('name')
+      ])
+      if (stErr) throw stErr
+      if (agErr) throw agErr
+      if (st) setSettings(st)
+      setAgents(ag || [])
+    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
+
+  const saveSetting = async (patch) => {
+    try {
+      const { error } = await supabase.from('app_settings').update(patch).eq('id', true)
+      if (error) throw error
+      setSettings(s => ({ ...s, ...patch }))
+      toast.success(t('settings.responseAlerts.saved'))
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const saveNumber = (key, min, max) => (e) => {
+    const v = Math.min(max, Math.max(min, Math.round(Number(e.target.value)) || min))
+    e.target.value = v
+    if (v !== settings[key]) saveSetting({ [key]: v })
+  }
+
+  const toggleExcluded = (id) => {
+    const cur = settings.response_alert_excluded_agent_ids || []
+    saveSetting({ response_alert_excluded_agent_ids: cur.includes(id) ? cur.filter(x => x !== id) : [...cur, id] })
+  }
+
+  if (loading) return <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+  if (!settings) return null
+
+  const inputCls = 'w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand'
+  const excluded = settings.response_alert_excluded_agent_ids || []
+
+  return (
+    <div className="p-4 space-y-4">
+      <p className="text-xs text-fg-subtle">{t('settings.responseAlerts.desc')}</p>
+
+      <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-3">
+        <Toggle label={t('settings.responseAlerts.enable')} sublabel={t('settings.responseAlerts.enableHint')}
+          value={!!settings.response_alert_enabled} onChange={v => saveSetting({ response_alert_enabled: v })} />
+        {settings.response_alert_enabled && (
+          <>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.agentMinutes')}</label>
+                <input type="number" min="1" max="1440" defaultValue={settings.response_alert_agent_minutes}
+                  onBlur={saveNumber('response_alert_agent_minutes', 1, 1440)} className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.adminMinutes')}</label>
+                <input type="number" min="1" max="1440" defaultValue={settings.response_alert_admin_minutes}
+                  onBlur={saveNumber('response_alert_admin_minutes', 1, 1440)} className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.maxRepeats')}</label>
+              <input type="number" min="1" max="10" defaultValue={settings.response_alert_max_repeats}
+                onBlur={saveNumber('response_alert_max_repeats', 1, 10)} className={inputCls} />
+              <p className="text-[10px] text-fg-subtle mt-1">{t('settings.responseAlerts.minutesHint')}</p>
+            </div>
+            <Toggle label={t('settings.responseAlerts.ignoreThanks')} sublabel={t('settings.responseAlerts.ignoreThanksHint')}
+              value={!!settings.response_alert_ignore_thanks} onChange={v => saveSetting({ response_alert_ignore_thanks: v })} />
+          </>
+        )}
+      </div>
+
+      {settings.response_alert_enabled && (
+        <>
+          <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-3">
+            <h3 className="font-semibold text-fg text-sm">{t('settings.responseAlerts.hoursTitle')}</h3>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.startLabel')}</label>
+                <input type="time" defaultValue={minutesToTime(settings.response_alert_start_minute)}
+                  onBlur={e => { const v = timeToMinutes(e.target.value); if (e.target.value && v !== settings.response_alert_start_minute) saveSetting({ response_alert_start_minute: v }) }}
+                  className={inputCls} />
+              </div>
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.endLabel')}</label>
+                <input type="time" defaultValue={minutesToTime(settings.response_alert_end_minute)}
+                  onBlur={e => { const v = timeToMinutes(e.target.value); if (e.target.value && v !== settings.response_alert_end_minute) saveSetting({ response_alert_end_minute: v }) }}
+                  className={inputCls} />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.timezoneLabel')}</label>
+              <select value={settings.response_alert_timezone} onChange={e => saveSetting({ response_alert_timezone: e.target.value })} className={inputCls}>
+                {RESPONSE_ALERT_TIMEZONES.map(z => <option key={z} value={z}>{t(`settings.responseAlerts.tz.${z}`)}</option>)}
+              </select>
+            </div>
+            <p className="text-[10px] text-fg-subtle">{t('settings.responseAlerts.hoursHint')}</p>
+          </div>
+
+          <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-2">
+            <h3 className="font-semibold text-fg text-sm">{t('settings.responseAlerts.excludedTitle')}</h3>
+            <p className="text-[10px] text-fg-subtle">{t('settings.responseAlerts.excludedHint')}</p>
+            <div className="divide-y divide-surface-3">
+              {agents.map(a => (
+                <label key={a.id} className="flex items-center justify-between gap-2 py-2 cursor-pointer">
+                  <span className="text-sm text-fg">{a.name}</span>
+                  <input type="checkbox" checked={excluded.includes(a.id)} onChange={() => toggleExcluded(a.id)} className="accent-brand w-4 h-4" />
+                </label>
+              ))}
+            </div>
+          </div>
+        </>
       )}
     </div>
   )

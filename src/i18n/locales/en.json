@@ -152,6 +152,7 @@
       "tags": "Tags",
       "fields": "Fields",
       "packages": "Packages",
+      "responseAlerts": "Delay alerts",
       "quickReplies": "Quick Replies",
       "roundRobin": "Distribution",
       "ai": "AI Agent",
@@ -610,6 +611,30 @@
       "offHint": "Comments are not being saved. Anything arriving while this is off will not appear later.",
       "paused": "Comment intake paused",
       "resumed": "Comment intake resumed"
+    },
+    "responseAlerts": {
+      "desc": "When a customer messages and nobody replies, the assigned agent is nudged first, then the admin. Only working hours count toward the delay.",
+      "saved": "Saved",
+      "enable": "Enable response-delay alerts",
+      "enableHint": "Conversations with no assigned agent alert the admin too",
+      "agentMinutes": "Alert the agent after (minutes)",
+      "adminMinutes": "Alert the admin after (minutes)",
+      "minutesHint": "The alert repeats at the same interval while the customer is still waiting (e.g. 20, then 40, then 60).",
+      "maxRepeats": "Max alerts per message",
+      "hoursTitle": "Working hours",
+      "hoursHint": "Delay is counted inside working hours only — a message received after closing starts counting when the shift opens. If the end is earlier than the start (e.g. 8 AM to 3 AM) the shift crosses midnight. Start = end means no limit (24h).",
+      "startLabel": "Shift start",
+      "endLabel": "Shift end",
+      "timezoneLabel": "Time zone",
+      "tz": {
+        "Africa/Cairo": "Cairo",
+        "Asia/Riyadh": "Riyadh",
+        "Asia/Dubai": "Dubai"
+      },
+      "ignoreThanks": "Ignore closing messages",
+      "ignoreThanksHint": "Such as thanks, ok, emoji-only or a sticker — they need no reply, so they raise no alert",
+      "excludedTitle": "Excluded agents",
+      "excludedHint": "No alerts (to the agent or the admin) are sent for these agents' conversations."
     },
     "ratings": {
       "desc": "Customer ratings of the service. Lowest-rated agents first.",
