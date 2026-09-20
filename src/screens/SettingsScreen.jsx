@@ -2568,7 +2568,7 @@ function ResponseAlertsTab() {
   const load = useCallback(async () => {
     try {
       const [{ data: st, error: stErr }, { data: ag, error: agErr }] = await Promise.all([
-        supabase.from('app_settings').select('response_alert_enabled, response_alert_agent_minutes, response_alert_admin_minutes, response_alert_max_repeats, response_alert_start_minute, response_alert_end_minute, response_alert_timezone, response_alert_excluded_agent_ids, response_alert_ignore_thanks').eq('id', true).maybeSingle(),
+        supabase.from('app_settings').select('response_alert_enabled, response_alert_agent_minutes, response_alert_admin_minutes, response_alert_max_repeats, response_alert_start_minute, response_alert_end_minute, response_alert_timezone, response_alert_excluded_agent_ids, response_alert_ignore_thanks, response_alert_ignore_phrases').eq('id', true).maybeSingle(),
         supabase.from('agents').select('id, name, role').order('name')
       ])
       if (stErr) throw stErr
@@ -2635,6 +2635,19 @@ function ResponseAlertsTab() {
             </div>
             <Toggle label={t('settings.responseAlerts.ignoreThanks')} sublabel={t('settings.responseAlerts.ignoreThanksHint')}
               value={!!settings.response_alert_ignore_thanks} onChange={v => saveSetting({ response_alert_ignore_thanks: v })} />
+            {settings.response_alert_ignore_thanks && (
+              <div>
+                <label className="block text-xs text-fg-muted mb-1">{t('settings.responseAlerts.ignorePhrases')}</label>
+                <textarea rows={3} defaultValue={(settings.response_alert_ignore_phrases || []).join('\n')}
+                  placeholder={t('settings.responseAlerts.ignorePhrasesPlaceholder')}
+                  onBlur={e => {
+                    const list = [...new Set(e.target.value.split('\n').map(x => x.trim()).filter(Boolean))]
+                    if (JSON.stringify(list) !== JSON.stringify(settings.response_alert_ignore_phrases || [])) saveSetting({ response_alert_ignore_phrases: list })
+                  }}
+                  className={inputCls + ' resize-none'} />
+                <p className="text-[10px] text-fg-subtle mt-1">{t('settings.responseAlerts.ignorePhrasesHint')}</p>
+              </div>
+            )}
           </>
         )}
       </div>

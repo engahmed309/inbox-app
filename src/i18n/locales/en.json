@@ -633,6 +633,9 @@
       },
       "ignoreThanks": "Ignore closing messages",
       "ignoreThanksHint": "Such as thanks, ok, emoji-only or a sticker — they need no reply, so they raise no alert",
+      "ignorePhrases": "Extra phrases to ignore",
+      "ignorePhrasesPlaceholder": "I will send it\nGod bless you",
+      "ignorePhrasesHint": "One phrase per line. A short message containing it (plus a couple of words at most) raises no alert. Thanks, blessings, insha'Allah and ok are recognised automatically, and any message with a question always alerts.",
       "excludedTitle": "Excluded agents",
       "excludedHint": "No alerts (to the agent or the admin) are sent for these agents' conversations."
     },
