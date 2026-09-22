@@ -15,11 +15,12 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock
+  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2
 } from 'lucide-react'
 
 const TABS = [
   { key: 'agents', labelKey: 'settings.tabs.agents', icon: Users },
+  { key: 'teams', labelKey: 'settings.tabs.teams', icon: Users2 },
   { key: 'channels', labelKey: 'settings.tabs.channels', icon: Radio },
   { key: 'lifecycle', labelKey: 'settings.tabs.lifecycle', icon: Tag },
   { key: 'tags', labelKey: 'settings.tabs.tags', icon: Tag },
@@ -74,6 +75,7 @@ export default function SettingsScreen() {
 
       <div className="flex-1 overflow-y-auto">
         {tab === 'agents' && <AgentsTab />}
+        {tab === 'teams' && <TeamsTab />}
         {tab === 'channels' && <ChannelsTab />}
         {tab === 'lifecycle' && <LifecycleTab />}
         {tab === 'tags' && <TagsTab />}
@@ -100,8 +102,8 @@ function AgentsTab() {
   const [counts, setCounts] = useState({}) // { agent_id: {open, follow_up, closed} }
   const [totals, setTotals] = useState({ open: 0, follow_up: 0, closed: 0 })
   const [addMode, setAddMode] = useState('closed') // 'closed' | 'choice' | 'manual' | 'invite'
-  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
-  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+  const [form, setForm] = useState({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false, access_scope: 'messages' })
+  const [inviteForm, setInviteForm] = useState({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false, access_scope: 'messages' })
   const [loading, setLoading] = useState(false)
   const [editId, setEditId] = useState(null)
   const [deleteTarget, setDeleteTarget] = useState(null) // { agent, convCount }
@@ -164,7 +166,7 @@ function AgentsTab() {
       })
       if (!res.ok) throw new Error(await res.text())
       setAddMode('closed')
-      setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+      setForm({ name: '', email: '', password: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false, access_scope: 'messages' })
       loadAgents()
       toast.success(t('settings.agents.addedSuccess'))
     } catch (err) {
@@ -184,7 +186,7 @@ function AgentsTab() {
       })
       if (!res.ok) throw new Error(await res.text())
       setAddMode('closed')
-      setInviteForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false })
+      setInviteForm({ name: '', email: '', role: 'agent', max_conversations: 10, can_see_all_conversations: false, access_scope: 'messages' })
       loadAgents()
       toast.success(t('settings.agents.inviteSentSuccess'))
     } catch (err) {
@@ -331,6 +333,7 @@ function AgentsTab() {
             value={form.can_see_all_conversations}
             onChange={v => setForm({ ...form, can_see_all_conversations: v })}
           />
+          <AccessScopeField value={form.access_scope} onChange={v => setForm({ ...form, access_scope: v })} />
           <div className="flex gap-2 pt-1">
             <button onClick={addAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
@@ -364,6 +367,7 @@ function AgentsTab() {
             value={inviteForm.can_see_all_conversations}
             onChange={v => setInviteForm({ ...inviteForm, can_see_all_conversations: v })}
           />
+          <AccessScopeField value={inviteForm.access_scope} onChange={v => setInviteForm({ ...inviteForm, access_scope: v })} />
           <div className="flex gap-2 pt-1">
             <button onClick={inviteAgent} disabled={loading}
               className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium disabled:opacity-60">
@@ -3300,6 +3304,200 @@ const DISTRIBUTION_MODES = [
   { key: 'round_robin', labelKey: 'settings.roundRobin.modes.roundRobin.label', descKey: 'settings.roundRobin.modes.roundRobin.desc' },
 ]
 
+function AgentAvatar({ agent, size = 22 }) {
+  const [broken, setBroken] = useState(false)
+  if (agent?.avatar_url && !broken) {
+    return <img src={agent.avatar_url} onError={() => setBroken(true)} alt="" loading="lazy"
+      style={{ width: size, height: size }} className="rounded-full object-cover flex-shrink-0" />
+  }
+  return (
+    <div style={{ width: size, height: size }} className="rounded-full bg-surface-3 flex items-center justify-center text-fg-muted font-semibold flex-shrink-0">
+      <span style={{ fontSize: size * 0.45 }}>{agent?.name?.[0]?.toUpperCase() || '?'}</span>
+    </div>
+  )
+}
+
+// ─── الفرق (Teams) ──────────────────────────────────────────
+// مجموعات موظفين بتتحكم في توزيع المحادثات و/أو التعليقات. نفس الموظف ينفع يكون عضو في أكتر
+// من فريق. أنهي فريق فعليًا بيتحكم في التوزيع بيتحدد من تاب "التوزيع" (فريق الرسائل / فريق
+// التعليقات) — هنا بس إدارة الفرق نفسها (الاسم، وضع التوزيع الخاص بيه، والأعضاء)
+function TeamsTab() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [teams, setTeams] = useState([])
+  const [allAgents, setAllAgents] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [showAdd, setShowAdd] = useState(false)
+  const [newName, setNewName] = useState('')
+  const [expandedId, setExpandedId] = useState(null)
+
+  const load = useCallback(async () => {
+    try {
+      const [res, { data: agents }] = await Promise.all([
+        apiFetch(`${API_URL}/teams`),
+        supabase.from('agents').select('id, name, avatar_url, status, access_scope').eq('role', 'agent').order('name')
+      ])
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setTeams(data.teams || [])
+      setAllAgents(agents || [])
+    } catch (err) { toast.error(err.message) } finally { setLoading(false) }
+  }, [toast])
+
+  useEffect(() => { load() }, [load])
+
+  const createTeam = async () => {
+    if (!newName.trim()) return
+    try {
+      const res = await apiFetch(`${API_URL}/teams`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: newName.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setNewName(''); setShowAdd(false)
+      load()
+      toast.success(t('settings.teams.created'))
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const updateTeam = async (id, patch) => {
+    try {
+      const res = await apiFetch(`${API_URL}/teams/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch)
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      load()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const deleteTeam = async (team) => {
+    if (!confirm(t('settings.teams.deleteConfirm', { name: team.name }))) return
+    try {
+      const res = await apiFetch(`${API_URL}/teams/${team.id}`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      load()
+      toast.success(t('settings.teams.deleted'))
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const toggleMember = async (team, agentId, isMember) => {
+    try {
+      const res = isMember
+        ? await apiFetch(`${API_URL}/teams/${team.id}/members/${agentId}`, { method: 'DELETE' })
+        : await apiFetch(`${API_URL}/teams/${team.id}/members`, {
+            method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ agent_id: agentId })
+          })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      load()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  if (loading) return <div className="flex justify-center py-10"><div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+
+  return (
+    <div className="p-4 space-y-4">
+      <div className="flex items-center justify-between">
+        <h2 className="font-semibold text-fg">{t('settings.tabs.teams')}</h2>
+        <button onClick={() => setShowAdd(v => !v)}
+          className="flex items-center gap-1.5 px-3 py-2 bg-brand rounded-xl text-xs text-white font-medium">
+          <Plus size={14} /> {t('settings.teams.addTeam')}
+        </button>
+      </div>
+      <p className="text-xs text-fg-subtle -mt-2">{t('settings.teams.desc')}</p>
+
+      {showAdd && (
+        <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+          <InputField label={t('settings.teams.nameLabel')} value={newName} onChange={setNewName} placeholder={t('settings.teams.namePlaceholder')} />
+          <div className="flex gap-2">
+            <button onClick={createTeam} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
+            <button onClick={() => { setShowAdd(false); setNewName('') }} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
+          </div>
+        </div>
+      )}
+
+      {teams.length === 0 && !showAdd && (
+        <p className="text-xs text-fg-subtle text-center py-6">{t('settings.teams.empty')}</p>
+      )}
+
+      <div className="space-y-2.5">
+        {teams.map(team => {
+          const memberIds = new Set(team.members.map(m => m.id))
+          const expanded = expandedId === team.id
+          return (
+            <div key={team.id} className="bg-surface-2 rounded-2xl border border-surface-3 overflow-hidden">
+              <button onClick={() => setExpandedId(expanded ? null : team.id)}
+                className="w-full flex items-center gap-3 p-4 text-start hover:bg-surface-3/40 transition-colors">
+                <div className="w-9 h-9 rounded-full bg-brand/15 flex items-center justify-center flex-shrink-0">
+                  <Users2 size={16} className="text-brand" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-fg truncate">{team.name}</p>
+                  <p className="text-xs text-fg-subtle">{t('settings.teams.memberCount', { count: team.members.length })}</p>
+                </div>
+                {expanded ? <ChevronUp size={16} className="text-fg-subtle" /> : <ChevronDown size={16} className="text-fg-subtle" />}
+              </button>
+
+              {expanded && (
+                <div className="px-4 pb-4 space-y-3 border-t border-surface-3 pt-3">
+                  <div>
+                    <label className="block text-xs text-fg-muted mb-1">{t('settings.teams.editNameLabel')}</label>
+                    <input defaultValue={team.name}
+                      onBlur={e => { const v = e.target.value.trim(); if (v && v !== team.name) updateTeam(team.id, { name: v }) }}
+                      className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-fg-muted mb-1">{t('settings.roundRobin.modeLabel')}</label>
+                    <div className="flex gap-2">
+                      {DISTRIBUTION_MODES.map(m => (
+                        <button key={m.key} onClick={() => updateTeam(team.id, { distribution_mode: m.key })}
+                          className={`flex-1 px-2 py-2 rounded-lg text-xs font-medium transition-colors ${team.distribution_mode === m.key ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>
+                          {t(m.labelKey)}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs text-fg-muted mb-1.5">{t('settings.teams.membersLabel')}</label>
+                    <div className="divide-y divide-surface-3">
+                      {allAgents.map(ag => {
+                        const isMember = memberIds.has(ag.id)
+                        return (
+                          <label key={ag.id} className="flex items-center gap-2.5 py-2 cursor-pointer">
+                            <input type="checkbox" checked={isMember} onChange={() => toggleMember(team, ag.id, isMember)}
+                              className="accent-brand w-4 h-4 flex-shrink-0" />
+                            <AgentAvatar agent={ag} size={22} />
+                            <span className="text-sm text-fg flex-1 truncate">{ag.name}</span>
+                            {ag.access_scope === 'comments' && (
+                              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle flex-shrink-0">{t('settings.agents.accessScope.comments')}</span>
+                            )}
+                          </label>
+                        )
+                      })}
+                      {allAgents.length === 0 && <p className="text-xs text-fg-subtle py-2">{t('settings.teams.noAgentsYet')}</p>}
+                    </div>
+                  </div>
+
+                  <button onClick={() => deleteTeam(team)}
+                    className="w-full flex items-center justify-center gap-1.5 py-2 rounded-xl text-xs text-danger hover:bg-danger/10 transition-colors">
+                    <Trash2 size={13} /> {t('settings.teams.deleteTeam')}
+                  </button>
+                </div>
+              )}
+            </div>
+          )
+        })}
+      </div>
+    </div>
+  )
+}
+
 function RoundRobinTab() {
   const { t } = useTranslation()
   const toast = useToast()
@@ -3308,15 +3506,26 @@ function RoundRobinTab() {
   const [followupMinutes, setFollowupMinutes] = useState(60)
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
+  // فريق التوزيع لكل نوع — فاضي (null) يعني السلوك العام القديم (كل الموظفين المؤهلين)
+  const [teams, setTeams] = useState([])
+  const [messagesTeamId, setMessagesTeamId] = useState('')
+  const [commentsTeamId, setCommentsTeamId] = useState('')
+  const [savingTeams, setSavingTeams] = useState(false)
 
   useEffect(() => { load() }, [])
   const load = async () => {
-    const { data } = await supabase.from('app_settings').select('distribution_mode, followup_reassign_enabled, followup_reassign_minutes').eq('id', true).maybeSingle()
+    const [{ data }, res] = await Promise.all([
+      supabase.from('app_settings').select('distribution_mode, followup_reassign_enabled, followup_reassign_minutes, messages_distribution_team_id, comments_distribution_team_id').eq('id', true).maybeSingle(),
+      apiFetch(`${API_URL}/teams`)
+    ])
     if (data) {
       setMode(data.distribution_mode)
       setFollowupEnabled(data.followup_reassign_enabled)
       setFollowupMinutes(data.followup_reassign_minutes || 60)
+      setMessagesTeamId(data.messages_distribution_team_id || '')
+      setCommentsTeamId(data.comments_distribution_team_id || '')
     }
+    try { const teamsData = await res.json(); setTeams(teamsData.teams || []) } catch { /* الفرق مش لازمة عشان باقي الشاشة تشتغل */ }
   }
 
   const save = async () => {
@@ -3330,6 +3539,14 @@ function RoundRobinTab() {
     if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  const saveTeamAssignment = async (field, value) => {
+    setSavingTeams(true)
+    const { error } = await supabase.from('app_settings').update({ [field]: value || null }).eq('id', true)
+    setSavingTeams(false)
+    if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
+    toast.success(t('settings.roundRobin.teamAssignmentSaved'))
   }
 
   return (
@@ -3362,6 +3579,32 @@ function RoundRobinTab() {
           className={`w-full py-2.5 rounded-xl text-sm font-semibold transition-colors ${saved ? 'bg-success text-white' : 'bg-brand hover:bg-brand-dark text-white'}`}>
           {saved ? t('settings.common.savedCheck') : t('settings.common.saveSettings')}
         </button>
+      </div>
+
+      <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+        <h3 className="text-sm font-semibold text-fg">{t('settings.roundRobin.teamAssignmentTitle')}</h3>
+        <p className="text-xs text-fg-subtle -mt-1.5 leading-relaxed">{t('settings.roundRobin.teamAssignmentDesc')}</p>
+
+        <div>
+          <label className="block text-xs text-fg-muted mb-1">{t('settings.roundRobin.messagesTeamLabel')}</label>
+          <select value={messagesTeamId} disabled={savingTeams}
+            onChange={e => { setMessagesTeamId(e.target.value); saveTeamAssignment('messages_distribution_team_id', e.target.value) }}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+            <option value="">{t('settings.roundRobin.allAgentsOption')}</option>
+            {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-xs text-fg-muted mb-1">{t('settings.roundRobin.commentsTeamLabel')}</label>
+          <select value={commentsTeamId} disabled={savingTeams}
+            onChange={e => { setCommentsTeamId(e.target.value); saveTeamAssignment('comments_distribution_team_id', e.target.value) }}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+            <option value="">{t('settings.roundRobin.noAutoAssignOption')}</option>
+            {teams.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+          </select>
+          <p className="text-[10px] text-fg-subtle mt-1">{t('settings.roundRobin.commentsTeamHint')}</p>
+        </div>
       </div>
 
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">

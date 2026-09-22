@@ -147,6 +147,7 @@
     "accessDenied": "You are not authorized to access this page",
     "tabs": {
       "agents": "Staff",
+      "teams": "Teams",
       "channels": "Channels",
       "lifecycle": "Lifecycle",
       "tags": "Tags",
@@ -520,7 +521,30 @@
       "followupToggleLabel": "Maximum wait time for a reply after follow-up",
       "followupToggleSublabel": "When a customer sends a new message in a \"Follow-up\" conversation, it stays with the same agent as usual. If enabled, and the agent doesn't reply within this time, the conversation moves to another online agent â€” or is unassigned if no one is online.",
       "minutesLabel": "Duration in minutes",
-      "minutesHint": "For example, 60 = one hour. This setting only affects follow-up conversations that were reopened, not regular open conversations."
+      "minutesHint": "For example, 60 = one hour. This setting only affects follow-up conversations that were reopened, not regular open conversations.",
+      "teamAssignmentTitle": "Distribution teams",
+      "teamAssignmentDesc": "If you pick a team for a type, its automatic distribution is limited to that team's members — anyone not a member gets none of that type, even if online. Leave it blank to keep distributing across all agents as before.",
+      "messagesTeamLabel": "Conversations distribution team",
+      "commentsTeamLabel": "Comments distribution team",
+      "allAgentsOption": "All agents (no team)",
+      "noAutoAssignOption": "No automatic assignment",
+      "commentsTeamHint": "Comments have no automatic distribution at all unless you set a team here",
+      "teamAssignmentSaved": "Saved"
+    },
+    "teams": {
+      "desc": "Teams control how conversations and comments get distributed — only agents in the team set for distribution (in the \"Distribution\" tab) receive them automatically. An agent can belong to more than one team at once.",
+      "addTeam": "New team",
+      "nameLabel": "Team name",
+      "namePlaceholder": "e.g. Call center",
+      "created": "Team created",
+      "deleted": "Team deleted",
+      "deleteConfirm": "Delete team \"{{name}}\"? If it's set for distribution in the Distribution tab, that goes back to the general behavior.",
+      "empty": "No teams yet. Create the first one and set its members.",
+      "memberCount": "{{count}} members",
+      "editNameLabel": "Name",
+      "membersLabel": "Members",
+      "noAgentsYet": "No agents yet",
+      "deleteTeam": "Delete team"
     },
     "ai": {
       "models": {
