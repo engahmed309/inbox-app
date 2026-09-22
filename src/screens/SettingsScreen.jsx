@@ -3832,6 +3832,7 @@ function AiAgentTab() {
 // كل مرة تدخل التاب لازم تكتب كلمة السر تاني
 function DangerZoneGate({ onUnlock }) {
   const { t } = useTranslation()
+  const [forgotMode, setForgotMode] = useState(false)
   const [password, setPassword] = useState('')
   const [checking, setChecking] = useState(false)
   const [error, setError] = useState('')
@@ -3856,23 +3857,55 @@ function DangerZoneGate({ onUnlock }) {
     }
   }
 
+  // نسيت كلمة سر منطقة الخطر — بديل ببـاسورد حساب تسجيل الدخول بتاعك (مش كلمة سر منطقة الخطر
+  // نفسها). بينفتح التاب على أساس "أول مرة" عشان تحدد كلمة سر جديدة لمنطقة الخطر فورًا
+  const verifyWithAccountPassword = async () => {
+    if (!password || checking) return
+    setChecking(true); setError('')
+    try {
+      const res = await apiFetch(`${API_URL}/settings/danger-password/verify-account`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('settings.danger.gate.error'))
+      if (!data.valid) { setError(t('settings.danger.gate.wrongAccountPassword')); return }
+      onUnlock('', true, true)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  const submit = forgotMode ? verifyWithAccountPassword : verify
+
   return (
     <div className="p-4 flex items-start justify-center pt-10">
       <div className="w-full max-w-sm bg-danger/10 border border-danger/30 rounded-2xl p-5 space-y-3">
         <div className="flex items-center gap-2">
           <Lock size={18} className="text-danger flex-shrink-0" />
-          <p className="text-sm font-semibold text-danger">{t('settings.danger.gate.title')}</p>
+          <p className="text-sm font-semibold text-danger">
+            {forgotMode ? t('settings.danger.gate.forgotTitle') : t('settings.danger.gate.title')}
+          </p>
         </div>
-        <p className="text-xs text-fg-muted leading-relaxed">{t('settings.danger.gate.desc')}</p>
+        <p className="text-xs text-fg-muted leading-relaxed">
+          {forgotMode ? t('settings.danger.gate.forgotDesc') : t('settings.danger.gate.desc')}
+        </p>
         <input type="password" autoFocus value={password}
           onChange={e => { setPassword(e.target.value); setError('') }}
-          onKeyDown={e => { if (e.key === 'Enter') verify() }}
-          placeholder={t('settings.danger.gate.placeholder')}
+          onKeyDown={e => { if (e.key === 'Enter') submit() }}
+          placeholder={forgotMode ? t('settings.danger.gate.accountPasswordPlaceholder') : t('settings.danger.gate.placeholder')}
           className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
         {error && <p className="text-xs text-danger">{error}</p>}
-        <button onClick={verify} disabled={!password || checking}
+        <button onClick={submit} disabled={!password || checking}
           className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
-          {checking ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('settings.danger.gate.unlock')}
+          {checking ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+            : forgotMode ? t('settings.danger.gate.unlockWithAccount') : t('settings.danger.gate.unlock')}
+        </button>
+        <button onClick={() => { setForgotMode(v => !v); setPassword(''); setError('') }}
+          className="w-full text-xs text-fg-subtle hover:text-fg text-center">
+          {forgotMode ? t('settings.danger.gate.backToPassword') : t('settings.danger.gate.forgotLink')}
         </button>
       </div>
     </div>
@@ -4007,10 +4040,14 @@ function DangerZoneTab() {
   const [unlocked, setUnlocked] = useState(false)
   const [password, setPassword] = useState('')
   const [isFirstTime, setIsFirstTime] = useState(false)
+  // دخل بباسورد حسابه لأنه نسي كلمة سر منطقة الخطر — القديمة اتنسيت وباسورد حسابه مش صالح
+  // كـ"كلمة سر منطقة الخطر" فعليًا، فلازم يحدد واحدة جديدة الأول قبل ما نوريله أي زرار حذف
+  const [mustSetNewPassword, setMustSetNewPassword] = useState(false)
 
-  const handleUnlock = (pw, firstTime) => {
+  const handleUnlock = (pw, firstTime, viaAccountRecovery) => {
     setPassword(pw)
     setIsFirstTime(firstTime)
+    setMustSetNewPassword(!!viaAccountRecovery)
     setUnlocked(true)
   }
 
@@ -4021,11 +4058,16 @@ function DangerZoneTab() {
       <h2 className="font-semibold text-fg">{t('settings.tabs.danger')}</h2>
 
       <DangerPasswordSetting isFirstTime={isFirstTime}
-        onChanged={(newPw) => { setPassword(newPw); setIsFirstTime(false) }} />
+        onChanged={(newPw) => { setPassword(newPw); setIsFirstTime(false); setMustSetNewPassword(false) }} />
 
-      <WipeAllDataZone password={password} />
-
-      <CommentsWipeZone password={password} />
+      {mustSetNewPassword ? (
+        <p className="text-xs text-fg-subtle text-center py-4">{t('settings.danger.gate.setBeforeContinue')}</p>
+      ) : (
+        <>
+          <WipeAllDataZone password={password} />
+          <CommentsWipeZone password={password} />
+        </>
+      )}
     </div>
   )
 }

@@ -617,7 +617,15 @@
         "noPasswordHint": "No Danger Zone password is set yet — set one now to enable the extra protection from next time.",
         "newPasswordPlaceholder": "New password (at least 4 characters)",
         "setSaved": "Password saved",
-        "setFailed": "Failed to save the password"
+        "setFailed": "Failed to save the password",
+        "forgotLink": "Forgot the password?",
+        "backToPassword": "Back to the Danger Zone password",
+        "forgotTitle": "Sign in with your account password",
+        "forgotDesc": "Forgot the Danger Zone password? Enter your personal account password (the same one you log in with) instead, and we'll ask you to set a new Danger Zone password right away.",
+        "accountPasswordPlaceholder": "Your account password",
+        "unlockWithAccount": "Unlock with account password",
+        "wrongAccountPassword": "Wrong account password",
+        "setBeforeContinue": "Set a new Danger Zone password above to continue"
       }
     },
     "comments": {
