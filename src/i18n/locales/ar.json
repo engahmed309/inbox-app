@@ -1040,7 +1040,12 @@
       "fillVariables": "املأ المتغيرات",
       "valuePlaceholder": "القيمة رقم {{n}}",
       "preview": "معاينة",
-      "send": "إرسال"
+      "send": "إرسال",
+      "headerFileLabel": "ملف الهيدر ({{format}})",
+      "headerFormat": { "IMAGE": "صورة", "VIDEO": "فيديو", "DOCUMENT": "ملف" },
+      "headerFilePlaceholder": "اختر ملف",
+      "headerFileRequired": "لازم تختار الملف اللي هيتبعت مع القالب ده",
+      "uploadingFile": "جاري رفع الملف..."
     },
     "formatDate": {
       "today": "اليوم",

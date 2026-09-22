@@ -1040,7 +1040,12 @@
       "fillVariables": "Fill in the variables",
       "valuePlaceholder": "Value #{{n}}",
       "preview": "Preview",
-      "send": "Send"
+      "send": "Send",
+      "headerFileLabel": "Header file ({{format}})",
+      "headerFormat": { "IMAGE": "image", "VIDEO": "video", "DOCUMENT": "document" },
+      "headerFilePlaceholder": "Choose a file",
+      "headerFileRequired": "You need to pick the file to send with this template",
+      "uploadingFile": "Uploading file..."
     },
     "formatDate": {
       "today": "Today",

@@ -1775,6 +1775,11 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   const [selected, setSelected] = useState(null)
   const [params, setParams] = useState([])
   const [sending, setSending] = useState(false)
+  // القالب اللي هيدره صورة/فيديو/ملف محتاج ملف فعلي يتبعت معاه في كل رسالة (العيّنة وقت إنشاء
+  // القالب كانت للمراجعة بس عند ميتا) — الملف بيترفع هنا زي أي مرفق عادي، ورابطه العام بيتبعت
+  // كـheader_media_url مع الطلب
+  const [headerFile, setHeaderFile] = useState(null)
+  const [headerUploading, setHeaderUploading] = useState(false)
 
   // القوالب بتتعمل على مستوى كل رقم لوحده، فالموظف لازم يقدر يختار الرقم اللي هيبعت منه —
   // مش بس رقم المحادثة الحالي. بنجيب كل أرقام الواتساب النشطة مش اللي كلّمت العميل بس
@@ -1805,7 +1810,11 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   }, [activeChannelId])
 
   const bodyOf = (tpl) => tpl?.components?.find(c => c.type === 'BODY')?.text || ''
+  const headerOf = (tpl) => tpl?.components?.find(c => c.type === 'HEADER')
   const varCount = selected ? (bodyOf(selected).match(/\{\{\d+\}\}/g) || []).length : 0
+  const headerFormat = selected ? headerOf(selected)?.format : null
+  const needsHeaderFile = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)
+  const headerAccept = headerFormat === 'IMAGE' ? 'image/*' : headerFormat === 'VIDEO' ? 'video/*' : '.pdf,.doc,.docx,.xls,.xlsx'
   // معاينة حية بنفس منطق السيرفر — الموظف يشوف الرسالة النهائية قبل ما يبعتها
   const preview = selected ? bodyOf(selected).replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] || `{{${n}}}`) : ''
 
@@ -1814,14 +1823,30 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
       toast.error(t('chat.toast.fillVariablesFirst'))
       return
     }
+    if (needsHeaderFile && !headerFile) {
+      toast.error(t('chat.template.headerFileRequired'))
+      return
+    }
     setSending(true)
     try {
+      let headerMediaUrl = null
+      if (needsHeaderFile && headerFile) {
+        setHeaderUploading(true)
+        const safeName = headerFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+        const path = `media/${conversationId}/${Date.now()}_${safeName}`
+        const { error: upErr } = await supabase.storage.from('inbox-media').upload(path, headerFile)
+        setHeaderUploading(false)
+        if (upErr) throw upErr
+        const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
+        headerMediaUrl = urlData.publicUrl
+      }
       const res = await apiFetch(`${API_URL}/reply-template`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           conversation_id: conversationId, template_name: selected.name,
           language: selected.language, parameters: params.slice(0, varCount),
-          agent_id: agentId, channel_id: activeChannelId
+          agent_id: agentId, channel_id: activeChannelId,
+          header_media_url: headerMediaUrl || undefined
         })
       })
       const data = await res.json()
@@ -1841,7 +1866,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[420px] max-h-[80vh] overflow-y-auto">
         <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
           <p className="text-sm font-semibold text-fg">{selected ? selected.name : t('chat.template.chooseTitle')}</p>
-          <button onClick={selected ? () => { setSelected(null); setParams([]) } : onClose}
+          <button onClick={selected ? () => { setSelected(null); setParams([]); setHeaderFile(null) } : onClose}
             className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
             <X size={16} />
           </button>
@@ -1875,7 +1900,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
             </p>
           ) : !selected ? (
             templates.map(tpl => (
-              <button key={tpl.id || tpl.name} onClick={() => { setSelected(tpl); setParams([]) }}
+              <button key={tpl.id || tpl.name} onClick={() => { setSelected(tpl); setParams([]); setHeaderFile(null) }}
                 className="w-full text-start bg-surface-3/50 hover:bg-surface-3 rounded-xl px-3 py-2.5 transition-colors">
                 <p className="text-xs font-medium text-fg">{tpl.name}</p>
                 <p className="text-[11px] text-fg-muted mt-1 leading-relaxed line-clamp-2">{bodyOf(tpl)}</p>
@@ -1883,6 +1908,18 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
             ))
           ) : (
             <>
+              {needsHeaderFile && (
+                <div>
+                  <p className="text-xs font-semibold text-fg mb-1.5">{t('chat.template.headerFileLabel', { format: t(`chat.template.headerFormat.${headerFormat}`) })}</p>
+                  <label className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg cursor-pointer hover:bg-surface-3/70">
+                    <Paperclip size={15} className="text-fg-muted flex-shrink-0" />
+                    <span className="flex-1 truncate">{headerFile ? headerFile.name : t('chat.template.headerFilePlaceholder')}</span>
+                    <input type="file" accept={headerAccept} className="hidden"
+                      onChange={e => setHeaderFile(e.target.files?.[0] || null)} />
+                  </label>
+                  {!headerFile && <p className="text-[11px] text-danger mt-1">{t('chat.template.headerFileRequired')}</p>}
+                </div>
+              )}
               {varCount > 0 && (
                 <div className="space-y-2">
                   <p className="text-xs font-semibold text-fg">{t('chat.template.fillVariables')}</p>
@@ -1902,7 +1939,12 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
               </div>
               <button onClick={send} disabled={sending}
                 className="w-full py-2.5 rounded-xl text-sm font-semibold bg-brand text-white disabled:opacity-40 flex items-center justify-center gap-2">
-                {sending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Send size={15} /> {t('chat.template.send')}</>}
+                {sending ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    {headerUploading && <span>{t('chat.template.uploadingFile')}</span>}
+                  </>
+                ) : <><Send size={15} /> {t('chat.template.send')}</>}
               </button>
             </>
           )}
