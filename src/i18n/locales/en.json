@@ -690,7 +690,8 @@
       "volume": "Channel Volume",
       "tags": "Tags",
       "export": "Export Data",
-      "ratings": "Ratings"
+      "ratings": "Ratings",
+      "templates": "Templates"
     },
     "ai": {
       "suggestedQuestions": {
@@ -823,6 +824,17 @@
       "escalated": "Escalated to admin:",
       "longestWait": "Longest wait:",
       "delaysHint": "A delay is a customer message that passed the alert threshold (set in Delay alerts settings) with no reply"
+    },
+    "templates": {
+      "title": "Sent Templates",
+      "description": "How many WhatsApp templates each agent sent per day. Open any row to see who received the template, track each message's status, and jump into the conversation.",
+      "empty": "No templates sent in this period",
+      "totalSent": "Total sent:",
+      "totalFailed": "Failed:",
+      "failedCount": "{{count}} failed",
+      "unknownAgent": "Unknown agent",
+      "unknownContact": "Customer",
+      "loadError": "Failed to load conversations"
     },
     "volume": {
       "title": "Channel Message Volume",

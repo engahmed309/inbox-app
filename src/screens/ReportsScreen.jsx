@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate as localeFormatDate, formatTime as localeFormatTime } from '../lib/locale'
-import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star } from 'lucide-react'
+import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star, FileText, Ban, CheckCheck, Check } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -22,6 +22,7 @@ const SECTIONS = [
   { key: 'attendance', labelKey: 'reports.sections.attendance', icon: Users2 },
   { key: 'performance', labelKey: 'reports.sections.performance', icon: Zap },
   { key: 'ratings', labelKey: 'reports.sections.ratings', icon: Star },
+  { key: 'templates', labelKey: 'reports.sections.templates', icon: FileText },
   { key: 'volume', labelKey: 'reports.sections.volume', icon: Radio },
   { key: 'tags', labelKey: 'reports.sections.tags', icon: Tag },
   { key: 'export', labelKey: 'reports.sections.export', icon: Download },
@@ -85,6 +86,7 @@ export default function ReportsScreen() {
         {section === 'attendance' && <AttendanceTab />}
         {section === 'performance' && <PerformanceTab />}
         {section === 'ratings' && <RatingsReportTab />}
+        {section === 'templates' && <TemplatesReportTab />}
         {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
         {section === 'export' && <ExportTab />}
@@ -1523,6 +1525,190 @@ function AgentAvatar({ agent, size = 22 }) {
   return (
     <div style={{ width: size, height: size }} className="rounded-full bg-surface-3 flex items-center justify-center text-fg-muted font-semibold flex-shrink-0" >
       <span style={{ fontSize: size * 0.45 }}>{agent?.name?.[0]?.toUpperCase() || '?'}</span>
+    </div>
+  )
+}
+
+// ─── تقرير القوالب المُرسلة ──────────────────────────────────
+// كام قالب واتساب بعت كل موظف في كل يوم، مع إمكانية الدخول على قايمة المحادثات نفسها اللي
+// اتبعتلها القالب ومتابعة حالة كل رسالة (وصلت/اتقرت/فشلت). الملخص مجمّع من الباك إند
+// (/reports/templates/summary)، وتفاصيل المحادثات بتتجاب بنداء منفصل (/reports/templates/messages)
+// بس لما الأدمن يفتح يوم+موظف معيّن — مش كل الرسايل مرة واحدة
+function TemplatesReportTab() {
+  const { t } = useTranslation()
+  const navigate = useNavigate()
+  const [range, setRange] = useState('week')
+  const [customFrom, setCustomFrom] = useState('')
+  const [customTo, setCustomTo] = useState('')
+  const [rows, setRows] = useState([])
+  const [agentsMap, setAgentsMap] = useState({})
+  const [loading, setLoading] = useState(true)
+  const [detail, setDetail] = useState(null) // { agentId, agentName, day } — يوم+موظف مفتوح حاليًا
+
+  useEffect(() => {
+    supabase.from('agents').select('id, name, avatar_url').then(({ data }) => {
+      setAgentsMap(Object.fromEntries((data || []).map(a => [a.id, a])))
+    })
+  }, [])
+
+  useEffect(() => {
+    if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
+    load()
+  }, [range, customFrom, customTo])
+
+  const load = async () => {
+    setLoading(true)
+    const { from, to } = computeDateBounds(range, customFrom, customTo)
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
+    try {
+      const res = await apiFetch(`${API_URL}/reports/templates/summary?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setRows(data.rows || [])
+    } catch {
+      setRows([])
+    }
+    setLoading(false)
+  }
+
+  // تجميع الصفوف (يوم × موظف × قالب) إلى: لكل يوم → لكل موظف → إجمالي + تفصيل كل قالب
+  const grouped = useMemo(() => {
+    const byDay = {}
+    for (const r of rows) {
+      const dayBucket = byDay[r.day] || (byDay[r.day] = {})
+      const key = r.agent_id || 'none'
+      const e = dayBucket[key] || (dayBucket[key] = { agent_id: r.agent_id, sent: 0, delivered: 0, read: 0, failed: 0, templates: [] })
+      e.sent += r.sent; e.delivered += r.delivered; e.read += r.read; e.failed += r.failed
+      e.templates.push({ name: r.template_name, sent: r.sent })
+    }
+    return Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([day, agents]) => ({ day, agents: Object.values(agents).sort((a, b) => b.sent - a.sent) }))
+  }, [rows])
+
+  const totalSent = useMemo(() => rows.reduce((s, r) => s + r.sent, 0), [rows])
+  const totalFailed = useMemo(() => rows.reduce((s, r) => s + r.failed, 0), [rows])
+
+  return (
+    <div className="p-4 space-y-4">
+      <h2 className="font-semibold text-fg">{t('reports.templates.title')}</h2>
+      <p className="text-xs text-fg-subtle -mt-2">{t('reports.templates.description')}</p>
+
+      <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
+
+      {range === 'custom' && !(customFrom && customTo) ? (
+        <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
+      ) : loading ? (
+        <div className="flex items-center justify-center h-32">
+          <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : !rows.length ? (
+        <p className="text-center text-fg-subtle text-sm py-10">{t('reports.templates.empty')}</p>
+      ) : (
+        <>
+          <div className="flex items-center gap-4 text-xs bg-surface-2 border border-surface-3 rounded-xl px-4 py-3">
+            <span className="text-fg-muted">{t('reports.templates.totalSent')} <b className="text-fg">{totalSent}</b></span>
+            {totalFailed > 0 && <span className="text-fg-muted">{t('reports.templates.totalFailed')} <b className="text-danger">{totalFailed}</b></span>}
+          </div>
+
+          <div className="space-y-4">
+            {grouped.map(({ day, agents }) => (
+              <div key={day}>
+                <h3 className="text-xs font-semibold text-fg-muted mb-2">{formatShort(new Date(day))}</h3>
+                <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+                  {agents.map(a => (
+                    <button key={a.agent_id || 'none'}
+                      onClick={() => setDetail({ agentId: a.agent_id, day, agentName: agentsMap[a.agent_id]?.name || t('reports.templates.unknownAgent') })}
+                      className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-3 text-start transition-colors">
+                      <AgentAvatar agent={agentsMap[a.agent_id]} size={26} />
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-fg truncate">{agentsMap[a.agent_id]?.name || t('reports.templates.unknownAgent')}</div>
+                        <div className="text-[11px] text-fg-subtle truncate">
+                          {a.templates.map(tp => `${tp.name} (${tp.sent})`).join('، ')}
+                        </div>
+                      </div>
+                      <div className="text-end flex-shrink-0">
+                        <div className="text-sm font-semibold text-fg">{a.sent}</div>
+                        {a.failed > 0 && <div className="text-[10px] text-danger">{t('reports.templates.failedCount', { count: a.failed })}</div>}
+                      </div>
+                      <ChevronDown size={14} className="text-fg-subtle -rotate-90 flex-shrink-0" />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </>
+      )}
+
+      {detail && (
+        <TemplateMessagesModal detail={detail} onClose={() => setDetail(null)}
+          onOpenConversation={id => navigate(`/chat/${id}`)} />
+      )}
+    </div>
+  )
+}
+
+// قايمة المحادثات اللي اتبعتلها قالب من موظف معيّن في يوم معيّن — كل صف بيوري حالة الرسالة فعليًا
+// (✓ اتبعتت، ✓✓ وصلت/اتقرت، أو سبب الفشل) عشان تتابع نجاح الإرسال، والضغط عليه بيفتح المحادثة نفسها
+function TemplateMessagesModal({ detail, onClose, onOpenConversation }) {
+  const { t } = useTranslation()
+  const [rows, setRows] = useState(null)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    let cancelled = false
+    setRows(null); setError('')
+    const params = new URLSearchParams({ agent_id: detail.agentId || '', day: detail.day })
+    apiFetch(`${API_URL}/reports/templates/messages?${params}`)
+      .then(r => r.json())
+      .then(d => {
+        if (cancelled) return
+        if (d.error) throw new Error(d.error)
+        setRows(d.rows || [])
+      })
+      .catch(err => { if (!cancelled) setError(err.message || t('reports.templates.loadError')) })
+    return () => { cancelled = true }
+  }, [detail, t])
+
+  const statusIcon = (m) => {
+    if (m.status === 'failed') return <Ban size={13} className="text-danger" />
+    if (m.status === 'read') return <CheckCheck size={13} className="text-brand" />
+    if (m.status === 'delivered') return <CheckCheck size={13} className="text-fg-subtle" />
+    return <Check size={13} className="text-fg-subtle" />
+  }
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[80vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3 flex-shrink-0">
+          <div>
+            <h3 className="font-semibold text-fg text-sm">{detail.agentName}</h3>
+            <p className="text-xs text-fg-subtle">{formatShort(new Date(detail.day))}</p>
+          </div>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto divide-y divide-surface-3">
+          {error ? (
+            <p className="text-center text-danger text-sm py-8 px-4">{error}</p>
+          ) : rows === null ? (
+            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+          ) : !rows.length ? (
+            <p className="text-center text-fg-subtle text-sm py-8">{t('reports.templates.empty')}</p>
+          ) : rows.map(m => (
+            <button key={m.id} onClick={() => onOpenConversation(m.conversation_id)}
+              className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-2 text-start transition-colors">
+              <div className="flex-1 min-w-0">
+                <div className="text-sm text-fg truncate">{m.contact_name || t('reports.templates.unknownContact')}</div>
+                <div className="text-[11px] text-fg-subtle truncate">{m.template_name} · {formatClock(new Date(m.created_at))}</div>
+                {m.status === 'failed' && m.status_reason && <div className="text-[10px] text-danger truncate">{m.status_reason}</div>}
+              </div>
+              <span className="flex-shrink-0">{statusIcon(m)}</span>
+            </button>
+          ))}
+        </div>
+      </div>
     </div>
   )
 }
