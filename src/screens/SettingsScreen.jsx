@@ -2406,12 +2406,16 @@ function PackagesTab() {
   const [editForm, setEditForm] = useState({ name: '', default_duration_days: '' })
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
+  // قوالب واتساب — لاختيار رقم القالب اللي هيتبعت تلقائي لما باقة العميل تخلص
+  const [waChannels, setWaChannels] = useState([])
+  const [channelTemplates, setChannelTemplates] = useState(null) // null = لسه محملتش، [] = محملة وفاضية
+  const [templatesLoading, setTemplatesLoading] = useState(false)
 
   const load = useCallback(async () => {
     try {
       const [{ data: pkgs }, { data: st }] = await Promise.all([
         supabase.from('contact_packages').select('*').order('sort_order'),
-        supabase.from('app_settings').select('package_reminder_enabled, package_reminder_note, package_reminder_offset_days').eq('id', true).maybeSingle()
+        supabase.from('app_settings').select('package_reminder_enabled, package_reminder_note, package_reminder_offset_days, package_reminder_template_enabled, package_reminder_channel_id, package_reminder_template_name, package_reminder_template_language').eq('id', true).maybeSingle()
       ])
       setPackages(pkgs || [])
       if (st) setSettings(st)
@@ -2419,6 +2423,22 @@ function PackagesTab() {
   }, [toast])
 
   useEffect(() => { load() }, [load])
+
+  useEffect(() => {
+    apiFetch(`${API_URL}/channels`).then(r => r.json())
+      .then(d => setWaChannels((d.channels || []).filter(c => c.platform === 'whatsapp' && c.status === 'active')))
+      .catch(() => { /* لو فشل الجلب، الاختيار هيفضل فاضي والموظف يقدر يحاول تاني بفتح الشاشة تاني */ })
+  }, [])
+
+  // قوالب الرقم المختار — بنجيبها بس أول ما نحتاجها فعليًا (الرقم اتحدد بالفعل)، مش كل الأرقام مقدمًا
+  useEffect(() => {
+    if (!settings?.package_reminder_channel_id) { setChannelTemplates(null); return }
+    setTemplatesLoading(true)
+    apiFetch(`${API_URL}/channels/${settings.package_reminder_channel_id}/templates`).then(r => r.json())
+      .then(d => setChannelTemplates((d.templates || []).filter(tp => tp.status === 'APPROVED')))
+      .catch(() => setChannelTemplates([]))
+      .finally(() => setTemplatesLoading(false))
+  }, [settings?.package_reminder_channel_id])
 
   const add = async () => {
     if (!form.name.trim()) return
@@ -2542,6 +2562,65 @@ function PackagesTab() {
                     className="w-full bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
                   <p className="text-[10px] text-fg-subtle mt-1">{t('settings.packages.noteHint')}</p>
                 </div>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      {settings && (
+        <div className="pt-4 border-t border-surface-3 space-y-3">
+          <h3 className="font-semibold text-fg text-sm">{t('settings.packages.autoTemplateTitle')}</h3>
+          <p className="text-xs text-fg-subtle -mt-2">{t('settings.packages.autoTemplateDesc')}</p>
+          <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-3">
+            <Toggle label={t('settings.packages.autoTemplateEnable')} sublabel={t('settings.packages.autoTemplateEnableHint')}
+              value={!!settings.package_reminder_template_enabled} onChange={v => saveSetting({ package_reminder_template_enabled: v })} />
+            {settings.package_reminder_template_enabled && (
+              <>
+                <div>
+                  <label className="block text-xs text-fg-muted mb-1">{t('settings.packages.channelLabel')}</label>
+                  <select value={settings.package_reminder_channel_id || ''}
+                    onChange={e => saveSetting({
+                      package_reminder_channel_id: e.target.value || null,
+                      package_reminder_template_name: null, package_reminder_template_language: null
+                    })}
+                    className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+                    <option value="">{t('settings.packages.channelPlaceholder')}</option>
+                    {waChannels.map(c => <option key={c.id} value={c.id}>{c.custom_name || c.display_name}</option>)}
+                  </select>
+                </div>
+
+                {settings.package_reminder_channel_id && (
+                  <div>
+                    <label className="block text-xs text-fg-muted mb-1">{t('settings.packages.templateLabel')}</label>
+                    {templatesLoading ? (
+                      <div className="flex justify-center py-3"><div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+                    ) : !channelTemplates?.length ? (
+                      <p className="text-xs text-fg-subtle py-2">{t('settings.packages.noTemplates')}</p>
+                    ) : (
+                      <>
+                        <select value={settings.package_reminder_template_name || ''}
+                          onChange={e => {
+                            const tpl = channelTemplates.find(tp => tp.name === e.target.value)
+                            saveSetting({ package_reminder_template_name: tpl?.name || null, package_reminder_template_language: tpl?.language || null })
+                          }}
+                          className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+                          <option value="">{t('settings.packages.templatePlaceholder')}</option>
+                          {channelTemplates.map(tp => <option key={`${tp.name}_${tp.language}`} value={tp.name}>{tp.name}</option>)}
+                        </select>
+                        {(() => {
+                          const tpl = channelTemplates.find(tp => tp.name === settings.package_reminder_template_name)
+                          if (!tpl) return null
+                          const varCount = (tpl.components?.find(c => c.type === 'BODY')?.text.match(/\{\{\d+\}\}/g) || []).length
+                          const hasMediaHeader = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(tpl.components?.find(c => c.type === 'HEADER')?.format)
+                          if (hasMediaHeader) return <p className="text-[10px] text-danger mt-1">{t('settings.packages.templateMediaHeaderWarning')}</p>
+                          if (varCount > 1) return <p className="text-[10px] text-danger mt-1">{t('settings.packages.templateTooManyVarsWarning')}</p>
+                          return <p className="text-[10px] text-fg-subtle mt-1">{t('settings.packages.templateOkHint')}</p>
+                        })()}
+                      </>
+                    )}
+                  </div>
+                )}
               </>
             )}
           </div>

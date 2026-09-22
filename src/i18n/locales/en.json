@@ -674,7 +674,19 @@
       "offsetHint": "0 = sent on the expiry day itself",
       "noteLabel": "Internal note text",
       "notePlaceholder": "{package} package for {name} has ended — send them a renewal message 🔄",
-      "noteHint": "Use {name} for the customer's name and {package} for the package name — both get substituted automatically"
+      "noteHint": "Use {name} for the customer's name and {package} for the package name — both get substituted automatically",
+      "autoTemplateTitle": "Automatic renewal template",
+      "autoTemplateDesc": "In addition to the internal note above, the system can send an approved WhatsApp template straight to the customer when their package ends and the reminder is due.",
+      "autoTemplateEnable": "Enable automatic sending",
+      "autoTemplateEnableHint": "Sent on the customer's WhatsApp conversation specifically, at the same time as the internal note above",
+      "channelLabel": "Sending number",
+      "channelPlaceholder": "Choose a WhatsApp number",
+      "templateLabel": "Template",
+      "templatePlaceholder": "Choose a template",
+      "noTemplates": "No approved templates on this number yet",
+      "templateMediaHeaderWarning": "⚠️ This template's header is an image/video/document — the system can't send it automatically (no file is set). Pick a text-only template instead",
+      "templateTooManyVarsWarning": "⚠️ This template has more than one variable — the system only fills the first with the agent/team name; the rest stay empty and sending will fail",
+      "templateOkHint": "The template's one variable is filled automatically with the conversation's assigned agent name, or \"Dr. Mohamed Saeed's team\" if none is assigned"
     }
   },
   "reports": {
