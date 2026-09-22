@@ -1712,6 +1712,7 @@
     "markHandled": "Mark handled",
     "ignore": "Ignore",
     "privateReplySent": "Private reply sent",
+    "openConversation": "Open conversation",
     "privateReplyTitle": "Private reply to {{name}}",
     "privateReplyPlaceholder": "Write your private messageâ€¦",
     "privateReplyHint": "Sent as a private message. Meta allows one private reply per comment, within 7 days of it.",

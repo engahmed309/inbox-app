@@ -1712,6 +1712,7 @@
     "markHandled": "تمت المعالجة",
     "ignore": "تجاهل",
     "privateReplySent": "تم إرسال رد خاص",
+    "openConversation": "فتح المحادثة",
     "privateReplyTitle": "رد خاص على {{name}}",
     "privateReplyPlaceholder": "اكتب رسالتك الخاصة…",
     "privateReplyHint": "يُرسل كرسالة خاصة. ميتا تسمح برد خاص واحد فقط لكل تعليق، وخلال ٧ أيام منه.",

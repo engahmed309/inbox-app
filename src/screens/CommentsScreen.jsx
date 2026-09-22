@@ -258,7 +258,13 @@ export default function CommentsScreen() {
             )}
 
             {c.private_replied_at && (
-              <p className="text-[11px] text-success mt-1.5">✓ {t('comments.privateReplySent')}</p>
+              <div className="flex items-center gap-2 mt-1.5">
+                <p className="text-[11px] text-success">✓ {t('comments.privateReplySent')}</p>
+                {c.private_reply_conversation_id && (
+                  <button onClick={() => navigate(`/chat/${c.private_reply_conversation_id}`)}
+                    className="text-[11px] text-brand hover:underline">{t('comments.openConversation')}</button>
+                )}
+              </div>
             )}
 
             <div className="flex flex-wrap items-center gap-2 mt-2">
@@ -452,7 +458,9 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
       const now = new Date().toISOString()
       onSent(isPublic
         ? { public_reply_at: now, public_reply_text: text.trim() }
-        : { private_replied_at: now })
+        // الرد الخاص فعليًا بيبقى رسالة في محادثة عادية اتعينت للموظف اللي بعتها — الباك إند
+        // بيرجع معرّفها فورًا (من غير ما نستنى الويب هوك) عشان "فتح المحادثة" يظهر على طول
+        : { private_replied_at: now, private_reply_conversation_id: data.conversation_id || null })
     } catch (err) { toast.error(err.message) } finally { setSending(false) }
   }
 
