@@ -824,7 +824,6 @@ function ConnectedChannelsList() {
   return (
     <div className="space-y-3 pt-1">
       <CommentsIngestionToggle />
-      <CommentsWipeZone />
       {['facebook', 'instagram', 'whatsapp', 'tiktok', 'whatsapp_qr', 'telegram', 'youtube'].map(platform => {
         const meta = PLATFORM_META[platform]
         const metaLabel = t(meta.labelKey)
@@ -3897,6 +3896,8 @@ function DangerZoneTab() {
           )}
         </button>
       </div>
+
+      <CommentsWipeZone />
     </div>
   )
 }
