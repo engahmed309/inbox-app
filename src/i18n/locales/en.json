@@ -1045,7 +1045,8 @@
       "headerFormat": { "IMAGE": "image", "VIDEO": "video", "DOCUMENT": "document" },
       "headerFilePlaceholder": "Choose a file",
       "headerFileRequired": "You need to pick the file to send with this template",
-      "uploadingFile": "Uploading file..."
+      "uploadingFile": "Uploading file...",
+      "noLibraryFiles": "No {{format}} files in the library yet — upload one from your device, or add it to the library from Quick Replies in Settings"
     },
     "formatDate": {
       "today": "Today",

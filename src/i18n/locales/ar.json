@@ -1045,7 +1045,8 @@
       "headerFormat": { "IMAGE": "صورة", "VIDEO": "فيديو", "DOCUMENT": "ملف" },
       "headerFilePlaceholder": "اختر ملف",
       "headerFileRequired": "لازم تختار الملف اللي هيتبعت مع القالب ده",
-      "uploadingFile": "جاري رفع الملف..."
+      "uploadingFile": "جاري رفع الملف...",
+      "noLibraryFiles": "لا توجد ملفات {{format}} في المكتبة — ارفع واحد من الجهاز، أو ضيفه للمكتبة من الردود السريعة في الإعدادات"
     },
     "formatDate": {
       "today": "اليوم",

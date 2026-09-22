@@ -1776,10 +1776,13 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   const [params, setParams] = useState([])
   const [sending, setSending] = useState(false)
   // القالب اللي هيدره صورة/فيديو/ملف محتاج ملف فعلي يتبعت معاه في كل رسالة (العيّنة وقت إنشاء
-  // القالب كانت للمراجعة بس عند ميتا) — الملف بيترفع هنا زي أي مرفق عادي، ورابطه العام بيتبعت
-  // كـheader_media_url مع الطلب
+  // القالب كانت للمراجعة بس عند ميتا) — الملف إما من الجهاز (بيترفع هنا زي أي مرفق عادي) أو من
+  // مكتبة ملفات الردود السريعة الموجودة بالفعل (رابط جاهز، من غير رفع تاني)
+  // headerFile: { source: 'device', file: File } | { source: 'library', url, name }
   const [headerFile, setHeaderFile] = useState(null)
   const [headerUploading, setHeaderUploading] = useState(false)
+  const [showHeaderLibrary, setShowHeaderLibrary] = useState(false)
+  const [libraryItems, setLibraryItems] = useState(null) // null = لسه محملتش
 
   // القوالب بتتعمل على مستوى كل رقم لوحده، فالموظف لازم يقدر يختار الرقم اللي هيبعت منه —
   // مش بس رقم المحادثة الحالي. بنجيب كل أرقام الواتساب النشطة مش اللي كلّمت العميل بس
@@ -1815,8 +1818,20 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   const headerFormat = selected ? headerOf(selected)?.format : null
   const needsHeaderFile = ['IMAGE', 'VIDEO', 'DOCUMENT'].includes(headerFormat)
   const headerAccept = headerFormat === 'IMAGE' ? 'image/*' : headerFormat === 'VIDEO' ? 'video/*' : '.pdf,.doc,.docx,.xls,.xlsx'
+  // نوع الميديا في مكتبة الردود السريعة مختلف تسميته عن شكل الهيدر عند ميتا
+  const LIBRARY_TYPE_FOR_HEADER = { IMAGE: 'image', VIDEO: 'video', DOCUMENT: 'file' }
+  const filteredLibraryItems = (libraryItems || []).filter(i => i.file_type === LIBRARY_TYPE_FOR_HEADER[headerFormat])
   // معاينة حية بنفس منطق السيرفر — الموظف يشوف الرسالة النهائية قبل ما يبعتها
   const preview = selected ? bodyOf(selected).replace(/\{\{(\d+)\}\}/g, (_, n) => params[Number(n) - 1] || `{{${n}}}`) : ''
+
+  const openHeaderLibrary = async () => {
+    setShowHeaderLibrary(true)
+    if (libraryItems === null) {
+      const { data } = await supabase.from('quick_replies').select('id, name, file_url, file_type')
+        .not('file_url', 'is', null).order('name')
+      setLibraryItems(data || [])
+    }
+  }
 
   const send = async () => {
     if (varCount > 0 && params.filter(p => p?.trim()).length < varCount) {
@@ -1830,11 +1845,13 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
     setSending(true)
     try {
       let headerMediaUrl = null
-      if (needsHeaderFile && headerFile) {
+      if (needsHeaderFile && headerFile?.source === 'library') {
+        headerMediaUrl = headerFile.url
+      } else if (needsHeaderFile && headerFile?.source === 'device') {
         setHeaderUploading(true)
-        const safeName = headerFile.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
+        const safeName = headerFile.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
         const path = `media/${conversationId}/${Date.now()}_${safeName}`
-        const { error: upErr } = await supabase.storage.from('inbox-media').upload(path, headerFile)
+        const { error: upErr } = await supabase.storage.from('inbox-media').upload(path, headerFile.file)
         setHeaderUploading(false)
         if (upErr) throw upErr
         const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
@@ -1861,6 +1878,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
   }
 
   return (
+    <>
     <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={onClose}>
       <div onClick={e => e.stopPropagation()}
         className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[420px] max-h-[80vh] overflow-y-auto">
@@ -1911,12 +1929,25 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
               {needsHeaderFile && (
                 <div>
                   <p className="text-xs font-semibold text-fg mb-1.5">{t('chat.template.headerFileLabel', { format: t(`chat.template.headerFormat.${headerFormat}`) })}</p>
-                  <label className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg cursor-pointer hover:bg-surface-3/70">
-                    <Paperclip size={15} className="text-fg-muted flex-shrink-0" />
-                    <span className="flex-1 truncate">{headerFile ? headerFile.name : t('chat.template.headerFilePlaceholder')}</span>
-                    <input type="file" accept={headerAccept} className="hidden"
-                      onChange={e => setHeaderFile(e.target.files?.[0] || null)} />
-                  </label>
+                  {headerFile ? (
+                    <div className="flex items-center gap-2 bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg">
+                      {headerFile.source === 'library' ? <FolderOpen size={15} className="text-fg-muted flex-shrink-0" /> : <Paperclip size={15} className="text-fg-muted flex-shrink-0" />}
+                      <span className="flex-1 truncate">{headerFile.source === 'library' ? headerFile.name : headerFile.file.name}</span>
+                      <button onClick={() => setHeaderFile(null)} className="text-fg-subtle hover:text-danger flex-shrink-0"><X size={14} /></button>
+                    </div>
+                  ) : (
+                    <div className="flex gap-2">
+                      <button onClick={openHeaderLibrary}
+                        className="flex-1 flex items-center justify-center gap-1.5 bg-surface-3 hover:bg-surface-3/70 rounded-xl px-3 py-2.5 text-xs text-fg">
+                        <FolderOpen size={14} className="text-fg-muted" /> {t('chat.composer.fromLibrary')}
+                      </button>
+                      <label className="flex-1 flex items-center justify-center gap-1.5 bg-surface-3 hover:bg-surface-3/70 rounded-xl px-3 py-2.5 text-xs text-fg cursor-pointer">
+                        <Paperclip size={14} className="text-fg-muted" /> {t('chat.composer.fromDevice')}
+                        <input type="file" accept={headerAccept} className="hidden"
+                          onChange={e => { const f = e.target.files?.[0]; if (f) setHeaderFile({ source: 'device', file: f }) }} />
+                      </label>
+                    </div>
+                  )}
                   {!headerFile && <p className="text-[11px] text-danger mt-1">{t('chat.template.headerFileRequired')}</p>}
                 </div>
               )}
@@ -1951,6 +1982,35 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         </div>
       </div>
     </div>
+
+    {showHeaderLibrary && (
+      <div className="fixed inset-0 z-[60] flex items-end lg:items-center justify-center bg-black/60" onClick={() => setShowHeaderLibrary(false)}>
+        <div onClick={e => e.stopPropagation()}
+          className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[380px] max-h-[70vh] overflow-y-auto">
+          <div className="flex items-center justify-between px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2">
+            <p className="text-sm font-semibold text-fg">{t('chat.library.title')}</p>
+            <button onClick={() => setShowHeaderLibrary(false)}
+              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
+              <X size={16} />
+            </button>
+          </div>
+          <div className="p-3 space-y-1.5">
+            {libraryItems === null ? (
+              <div className="flex justify-center py-6"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+            ) : filteredLibraryItems.length === 0 ? (
+              <p className="text-xs text-fg-subtle text-center py-6">{t('chat.template.noLibraryFiles', { format: t(`chat.template.headerFormat.${headerFormat}`) })}</p>
+            ) : filteredLibraryItems.map(item => (
+              <button key={item.id} onClick={() => { setHeaderFile({ source: 'library', url: item.file_url, name: item.name }); setShowHeaderLibrary(false) }}
+                className="w-full text-start flex items-center gap-2 bg-surface-3/50 hover:bg-surface-3 rounded-xl px-3 py-2.5 transition-colors">
+                <FolderOpen size={14} className="text-fg-muted flex-shrink-0" />
+                <span className="text-xs text-fg truncate">{item.name}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+      </div>
+    )}
+    </>
   )
 }
 
