@@ -15,7 +15,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock
+  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock
 } from 'lucide-react'
 
 const TABS = [
@@ -517,7 +517,7 @@ function CommentsIngestionToggle() {
 // تفضية سجل التعليقات عندنا — بيمسح سجلاتنا المحلية بس (زي منطقة الخطر في الإعدادات)، من غير
 // ما يلمس التعليقات الحقيقية على فيسبوك/انستجرام/يوتيوب خالص. مختلف تمامًا عن حذف تعليق واحد
 // من داخل شاشة التعليقات (ده بيمسح فعليًا من المنصة نفسها)
-function CommentsWipeZone() {
+function CommentsWipeZone({ password }) {
   const { t } = useTranslation()
   const toast = useToast()
   const WIPE_PHRASE = t('settings.comments.wipeConfirmPhrase')
@@ -528,7 +528,10 @@ function CommentsWipeZone() {
     if (confirmText !== WIPE_PHRASE) return
     setWiping(true)
     try {
-      const res = await apiFetch(`${API_URL}/comments`, { method: 'DELETE' })
+      const res = await apiFetch(`${API_URL}/comments`, {
+        method: 'DELETE', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.comments.wipeFailed'))
       toast.success(t('settings.comments.wiped', { count: data.deleted ?? 0 }))
@@ -3823,7 +3826,118 @@ function AiAgentTab() {
 }
 
 // ─── Danger Zone ────────────────────────────────────────────
-function DangerZoneTab() {
+// التاب كله وراه كلمة سر منفصلة (مختلفة عن باسورد الحساب) — طبقة أمان زيادة فوق شرط الأدمن
+// العادي، عشان تقلل خطر الحذف بالغلط أو من جلسة أدمن مفتوحة من غير علمه. التحقق بيتم في الباك
+// إند (checkDangerPassword)، فمش قفل شكلي بس في الواجهة. "unlocked" مش متخزنة بين الجلسات —
+// كل مرة تدخل التاب لازم تكتب كلمة السر تاني
+function DangerZoneGate({ onUnlock }) {
+  const { t } = useTranslation()
+  const [password, setPassword] = useState('')
+  const [checking, setChecking] = useState(false)
+  const [error, setError] = useState('')
+
+  const verify = async () => {
+    if (!password || checking) return
+    setChecking(true); setError('')
+    try {
+      const res = await apiFetch(`${API_URL}/settings/danger-password/verify`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('settings.danger.gate.error'))
+      if (data.noPasswordSet) { onUnlock(password, true); return }
+      if (!data.valid) { setError(t('settings.danger.gate.wrongPassword')); return }
+      onUnlock(password, false)
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setChecking(false)
+    }
+  }
+
+  return (
+    <div className="p-4 flex items-start justify-center pt-10">
+      <div className="w-full max-w-sm bg-danger/10 border border-danger/30 rounded-2xl p-5 space-y-3">
+        <div className="flex items-center gap-2">
+          <Lock size={18} className="text-danger flex-shrink-0" />
+          <p className="text-sm font-semibold text-danger">{t('settings.danger.gate.title')}</p>
+        </div>
+        <p className="text-xs text-fg-muted leading-relaxed">{t('settings.danger.gate.desc')}</p>
+        <input type="password" autoFocus value={password}
+          onChange={e => { setPassword(e.target.value); setError('') }}
+          onKeyDown={e => { if (e.key === 'Enter') verify() }}
+          placeholder={t('settings.danger.gate.placeholder')}
+          className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
+        {error && <p className="text-xs text-danger">{error}</p>}
+        <button onClick={verify} disabled={!password || checking}
+          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 flex items-center justify-center gap-2">
+          {checking ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('settings.danger.gate.unlock')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// تغيير/تعيين كلمة سر منطقة الخطر — من غير حاجة للباسورد القديم (الأدمن أصلاً فتح التاب بيها
+// لو كانت موجودة، ومفيش داعي طبقة تأكيد تانية فوق كده)
+function DangerPasswordSetting({ isFirstTime, onChanged }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [value, setValue] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const save = async () => {
+    if (value.length < 4 || saving) return
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/settings/danger-password`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: value })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('settings.danger.gate.setFailed'))
+      toast.success(t('settings.danger.gate.setSaved'))
+      onChanged(value)
+      setValue('')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div className="bg-surface-2 rounded-2xl border border-surface-3 p-4 space-y-2">
+      <div className="flex items-center gap-2">
+        <KeyRound size={15} className="text-fg-muted" />
+        <p className="text-sm font-semibold text-fg">
+          {isFirstTime ? t('settings.danger.gate.setTitle') : t('settings.danger.gate.changeTitle')}
+        </p>
+      </div>
+      {isFirstTime && <p className="text-xs text-fg-subtle leading-relaxed">{t('settings.danger.gate.noPasswordHint')}</p>}
+      <div className="flex gap-2">
+        <input type="password" value={value} onChange={e => setValue(e.target.value)}
+          onKeyDown={e => { if (e.key === 'Enter') save() }}
+          placeholder={t('settings.danger.gate.newPasswordPlaceholder')}
+          className="flex-1 bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+        <button onClick={save} disabled={value.length < 4 || saving}
+          className="px-4 py-2 rounded-xl text-sm font-medium bg-brand text-white disabled:opacity-40 flex-shrink-0">
+          {saving ? '...' : t('settings.common.save')}
+        </button>
+      </div>
+    </div>
+  )
+}
+
+// اسم الجدول التقني (زي الباك إند بيرجّعه في failedStep) ← مفتاح الترجمة المعروض للموظف
+const WIPE_TABLE_LABEL_KEYS = {
+  messages: 'messages', conversation_reads: 'conversationReads', conversation_assignment_log: 'assignmentLog',
+  conversation_activity_log: 'activityLog', conversations: 'conversations', contact_tags: 'contactTags',
+  contact_custom_fields: 'customFields', contacts: 'contacts'
+}
+
+function WipeAllDataZone({ password }) {
   const { t } = useTranslation()
   const WIPE_CONFIRM_PHRASE = t('settings.danger.wipeConfirmPhrase')
   const toast = useToast()
@@ -3835,23 +3949,15 @@ function DangerZoneTab() {
     if (confirmText !== WIPE_CONFIRM_PHRASE) return
     setWiping(true)
     try {
-      // بالترتيب الصح عشان مانصطدمش بقيود الـ foreign key. كل خطوة لازم تتأكد من نجاحها فعليًا —
-      // لو خطوة فشلت (RLS، شبكة، أي سبب) واستمرينا من غير ما نلاحظ، كنا ممكن نقول "تم المسح ✓"
-      // ونصف البيانات لسه موجود جزئيًا، أو العكس. لو أي خطوة فشلت، بنوقف فورًا ونقول بالظبط
-      // وصلنا فين، بدل رسالة نجاح عامة مش دقيقة
-      const steps = [
-        { table: 'messages', label: t('settings.danger.tables.messages'), run: () => supabase.from('messages').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'conversation_reads', label: t('settings.danger.tables.conversationReads'), run: () => supabase.from('conversation_reads').delete().neq('conversation_id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'conversation_assignment_log', label: t('settings.danger.tables.assignmentLog'), run: () => supabase.from('conversation_assignment_log').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'conversation_activity_log', label: t('settings.danger.tables.activityLog'), run: () => supabase.from('conversation_activity_log').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'conversations', label: t('settings.danger.tables.conversations'), run: () => supabase.from('conversations').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'contact_tags', label: t('settings.danger.tables.contactTags'), run: () => supabase.from('contact_tags').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'contact_custom_fields', label: t('settings.danger.tables.customFields'), run: () => supabase.from('contact_custom_fields').delete().neq('contact_id', '00000000-0000-0000-0000-000000000000') },
-        { table: 'contacts', label: t('settings.danger.tables.contacts'), run: () => supabase.from('contacts').delete().neq('id', '00000000-0000-0000-0000-000000000000') },
-      ]
-      for (const step of steps) {
-        const { error } = await step.run()
-        if (error) throw new Error(t('settings.danger.wipePartialError', { step: step.label, message: error.message }))
+      const res = await apiFetch(`${API_URL}/settings/wipe-all-data`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password })
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        throw new Error(data.failedStep
+          ? t('settings.danger.wipePartialError', { step: t(`settings.danger.tables.${WIPE_TABLE_LABEL_KEYS[data.failedStep] || data.failedStep}`), message: data.error })
+          : (data.error || t('settings.danger.wipeFailed')))
       }
       setDone(true)
       setConfirmText('')
@@ -3864,40 +3970,62 @@ function DangerZoneTab() {
   }
 
   return (
+    <div className="bg-danger/10 border border-danger/30 rounded-2xl p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={18} className="text-danger flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-danger">{t('settings.danger.wipeTitle')}</p>
+          <p className="text-xs text-fg-muted mt-1 leading-relaxed">
+            {t('settings.danger.wipeDescription')}
+          </p>
+        </div>
+      </div>
+
+      <div>
+        <label className="block text-xs text-fg-muted mb-1">
+          {t('settings.danger.typeToEnablePrefix')} "<b>{WIPE_CONFIRM_PHRASE}</b>" {t('settings.danger.typeToEnableSuffix')}
+        </label>
+        <input value={confirmText} onChange={e => { setConfirmText(e.target.value); setDone(false) }}
+          placeholder={WIPE_CONFIRM_PHRASE}
+          className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
+      </div>
+
+      <button onClick={wipeAllData} disabled={confirmText !== WIPE_CONFIRM_PHRASE || wiping}
+        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+        {wiping ? (
+          <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+        ) : done ? t('settings.danger.wipedButton') : (
+          <><Trash2 size={15} /> {t('settings.danger.wipeButton')}</>
+        )}
+      </button>
+    </div>
+  )
+}
+
+function DangerZoneTab() {
+  const { t } = useTranslation()
+  const [unlocked, setUnlocked] = useState(false)
+  const [password, setPassword] = useState('')
+  const [isFirstTime, setIsFirstTime] = useState(false)
+
+  const handleUnlock = (pw, firstTime) => {
+    setPassword(pw)
+    setIsFirstTime(firstTime)
+    setUnlocked(true)
+  }
+
+  if (!unlocked) return <DangerZoneGate onUnlock={handleUnlock} />
+
+  return (
     <div className="p-4 space-y-4">
       <h2 className="font-semibold text-fg">{t('settings.tabs.danger')}</h2>
 
-      <div className="bg-danger/10 border border-danger/30 rounded-2xl p-4 space-y-3">
-        <div className="flex items-start gap-2">
-          <AlertTriangle size={18} className="text-danger flex-shrink-0 mt-0.5" />
-          <div>
-            <p className="text-sm font-semibold text-danger">{t('settings.danger.wipeTitle')}</p>
-            <p className="text-xs text-fg-muted mt-1 leading-relaxed">
-              {t('settings.danger.wipeDescription')}
-            </p>
-          </div>
-        </div>
+      <DangerPasswordSetting isFirstTime={isFirstTime}
+        onChanged={(newPw) => { setPassword(newPw); setIsFirstTime(false) }} />
 
-        <div>
-          <label className="block text-xs text-fg-muted mb-1">
-            {t('settings.danger.typeToEnablePrefix')} "<b>{WIPE_CONFIRM_PHRASE}</b>" {t('settings.danger.typeToEnableSuffix')}
-          </label>
-          <input value={confirmText} onChange={e => { setConfirmText(e.target.value); setDone(false) }}
-            placeholder={WIPE_CONFIRM_PHRASE}
-            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
-        </div>
+      <WipeAllDataZone password={password} />
 
-        <button onClick={wipeAllData} disabled={confirmText !== WIPE_CONFIRM_PHRASE || wiping}
-          className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
-          {wiping ? (
-            <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-          ) : done ? t('settings.danger.wipedButton') : (
-            <><Trash2 size={15} /> {t('settings.danger.wipeButton')}</>
-          )}
-        </button>
-      </div>
-
-      <CommentsWipeZone />
+      <CommentsWipeZone password={password} />
     </div>
   )
 }

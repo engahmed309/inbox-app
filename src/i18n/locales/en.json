@@ -603,7 +603,22 @@
       "typeToEnablePrefix": "Type",
       "typeToEnableSuffix": "to enable the button",
       "wipedButton": "âœ“ Data wiped",
-      "wipeButton": "Permanently wipe all conversation and customer data"
+      "wipeButton": "Permanently wipe all conversation and customer data",
+      "wipeFailed": "Wipe failed",
+      "gate": {
+        "title": "Danger Zone is locked",
+        "desc": "Actions here permanently delete data with no way back — you need to enter this zone's password every time you open it.",
+        "placeholder": "Password",
+        "unlock": "Unlock",
+        "error": "Failed to verify the password",
+        "wrongPassword": "Wrong password",
+        "setTitle": "Set a Danger Zone password",
+        "changeTitle": "Change the Danger Zone password",
+        "noPasswordHint": "No Danger Zone password is set yet — set one now to enable the extra protection from next time.",
+        "newPasswordPlaceholder": "New password (at least 4 characters)",
+        "setSaved": "Password saved",
+        "setFailed": "Failed to save the password"
+      }
     },
     "comments": {
       "toggleLabel": "Receive comments",
