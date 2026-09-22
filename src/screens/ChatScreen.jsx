@@ -1844,9 +1844,14 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
     }
     setSending(true)
     try {
-      let headerMediaUrl = null
+      let headerMediaUrl = null, headerMediaFilename = null
       if (needsHeaderFile && headerFile?.source === 'library') {
         headerMediaUrl = headerFile.url
+        // اسم عنصر المكتبة (زي "قواعد المتابعة والإرشادات") من غير امتداد — بنستنتج الامتداد من
+        // رابط الملف نفسه ونضيفه، عشان العميل يشوف اسم واضح بدل "Untitled" مش امتداد الرابط الخام
+        const ext = headerFile.url.split('?')[0].split('.').pop()?.toLowerCase()
+        const hasExt = ext && ext.length <= 5 && headerFile.name.toLowerCase().endsWith(`.${ext}`)
+        headerMediaFilename = hasExt ? headerFile.name : `${headerFile.name}${ext ? `.${ext}` : ''}`
       } else if (needsHeaderFile && headerFile?.source === 'device') {
         setHeaderUploading(true)
         const safeName = headerFile.file.name.replace(/[^a-zA-Z0-9.\-_]/g, '_')
@@ -1856,6 +1861,7 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
         if (upErr) throw upErr
         const { data: urlData } = supabase.storage.from('inbox-media').getPublicUrl(path)
         headerMediaUrl = urlData.publicUrl
+        headerMediaFilename = headerFile.file.name
       }
       const res = await apiFetch(`${API_URL}/reply-template`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
@@ -1863,7 +1869,8 @@ function SendTemplateModal({ conversationId, channelId, agentId, onClose, onSent
           conversation_id: conversationId, template_name: selected.name,
           language: selected.language, parameters: params.slice(0, varCount),
           agent_id: agentId, channel_id: activeChannelId,
-          header_media_url: headerMediaUrl || undefined
+          header_media_url: headerMediaUrl || undefined,
+          header_media_filename: headerMediaFilename || undefined
         })
       })
       const data = await res.json()
