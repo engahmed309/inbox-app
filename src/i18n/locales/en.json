@@ -610,7 +610,13 @@
       "onHint": "Facebook and Instagram comments reach the app and are saved.",
       "offHint": "Comments are not being saved. Anything arriving while this is off will not appear later.",
       "paused": "Comment intake paused",
-      "resumed": "Comment intake resumed"
+      "resumed": "Comment intake resumed",
+      "wipeTitle": "Wipe all comments",
+      "wipeDescription": "Permanently deletes every comment we've stored (Facebook, Instagram, YouTube) to free up the data. It doesn't touch the real comments on those platforms — they stay exactly as they are, just won't show up here anymore. This can't be undone.",
+      "wipeConfirmPhrase": "delete all comments",
+      "wipeButton": "Permanently wipe all comments",
+      "wiped": "{{count}} comments deleted",
+      "wipeFailed": "Failed to wipe comments"
     },
     "responseAlerts": {
       "desc": "When a customer messages and nobody replies, the assigned agent is nudged first, then the admin. Only working hours count toward the delay.",

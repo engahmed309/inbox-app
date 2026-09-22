@@ -514,6 +514,57 @@ function CommentsIngestionToggle() {
   )
 }
 
+// تفضية سجل التعليقات عندنا — بيمسح سجلاتنا المحلية بس (زي منطقة الخطر في الإعدادات)، من غير
+// ما يلمس التعليقات الحقيقية على فيسبوك/انستجرام/يوتيوب خالص. مختلف تمامًا عن حذف تعليق واحد
+// من داخل شاشة التعليقات (ده بيمسح فعليًا من المنصة نفسها)
+function CommentsWipeZone() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const WIPE_PHRASE = t('settings.comments.wipeConfirmPhrase')
+  const [confirmText, setConfirmText] = useState('')
+  const [wiping, setWiping] = useState(false)
+
+  const wipeAll = async () => {
+    if (confirmText !== WIPE_PHRASE) return
+    setWiping(true)
+    try {
+      const res = await apiFetch(`${API_URL}/comments`, { method: 'DELETE' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('settings.comments.wipeFailed'))
+      toast.success(t('settings.comments.wiped', { count: data.deleted ?? 0 }))
+      setConfirmText('')
+    } catch (err) {
+      toast.error(err.message)
+    } finally {
+      setWiping(false)
+    }
+  }
+
+  return (
+    <div className="bg-danger/10 border border-danger/30 rounded-2xl p-4 space-y-3">
+      <div className="flex items-start gap-2">
+        <AlertTriangle size={16} className="text-danger flex-shrink-0 mt-0.5" />
+        <div>
+          <p className="text-sm font-semibold text-danger">{t('settings.comments.wipeTitle')}</p>
+          <p className="text-xs text-fg-muted mt-1 leading-relaxed">{t('settings.comments.wipeDescription')}</p>
+        </div>
+      </div>
+      <div>
+        <label className="block text-xs text-fg-muted mb-1">
+          {t('settings.danger.typeToEnablePrefix')} "<b>{WIPE_PHRASE}</b>" {t('settings.danger.typeToEnableSuffix')}
+        </label>
+        <input value={confirmText} onChange={e => setConfirmText(e.target.value)}
+          placeholder={WIPE_PHRASE}
+          className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-danger" />
+      </div>
+      <button onClick={wipeAll} disabled={confirmText !== WIPE_PHRASE || wiping}
+        className="w-full py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:bg-danger/90 transition-colors disabled:opacity-40 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+        {wiping ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : <><Trash2 size={15} /> {t('settings.comments.wipeButton')}</>}
+      </button>
+    </div>
+  )
+}
+
 // نطاق وصول الموظف — الأدمن بيشوف كل حاجة بغض النظر عن ده
 function AccessScopeField({ value, onChange }) {
   const { t } = useTranslation()
@@ -904,6 +955,8 @@ function ConnectedChannelsList() {
           onChanged={() => { load(); setSettingsChannel(null) }}
         />
       )}
+
+      <CommentsWipeZone />
     </div>
   )
 }
