@@ -7,6 +7,8 @@ import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../lib/locale'
 import { Bell, Check, X, UserPlus, Tag, Clock } from 'lucide-react'
 
+const NOTIFICATIONS_PAGE_SIZE = 30
+
 // جرس الإشعارات — ثابت فوق كل الشاشات بعد تسجيل الدخول. أول استخدام له طلبات نقل المحادثات
 // بين الموظفين، وممكن نضيفله أنواع تانية بعدين بنفس الشكل
 export default function NotificationBell() {
@@ -19,30 +21,53 @@ export default function NotificationBell() {
   const [filter, setFilter] = useState('all') // 'all' | 'unread' | 'read'
   const [open, setOpen] = useState(false)
   const [busyId, setBusyId] = useState(null)
+  const [hasMore, setHasMore] = useState(false)
+  const [loadingMore, setLoadingMore] = useState(false)
   const wrapRef = useRef(null)
   // الـrealtime callback بيتعمل مرة واحدة لكل موظف، فبيقرا الفلتر الحالي من ref مش من الـstate
   const filterRef = useRef(filter)
   filterRef.current = filter
+  // عدد الإشعارات المحمّلة فعليًا — بنستخدمه كنقطة بداية لزرار "تحميل المزيد" (مش state عشان
+  // متتغيرش قبل ما setItems يخلص ويسبب تحميل مضاعف/ناقص)
+  const loadedCountRef = useRef(0)
 
-  // الفلتر بيتطبّق في الكويري نفسه (مش على أول ٣٠ إشعار محمّلين بس) — وعداد غير المقروءة على
-  // الجرس كويري منفصل، عشان يفضل صح حتى لو الفلتر المختار "المقروءة"
-  const load = async () => {
-    if (!agent?.id) return
+  const buildQuery = (offset, limit) => {
     let q = supabase
       .from('notifications')
       .select('*, from_agent:from_agent_id(name), conversations(id, contacts(name))')
       .eq('agent_id', agent.id)
       .order('created_at', { ascending: false })
-      .limit(30)
+      .range(offset, offset + limit - 1)
     if (filterRef.current === 'unread') q = q.eq('is_read', false)
     else if (filterRef.current === 'read') q = q.eq('is_read', true)
+    return q
+  }
+
+  // الفلتر بيتطبّق في الكويري نفسه (مش على أول ٣٠ إشعار محمّلين بس) — وعداد غير المقروءة على
+  // الجرس كويري منفصل، عشان يفضل صح حتى لو الفلتر المختار "المقروءة". دايمًا بيرجّع لأول صفحة
+  // (أول تحميل، تغيير الفلتر، أو أي حدث لحظي جديد)
+  const load = async () => {
+    if (!agent?.id) return
     const [{ data, error }, { count }] = await Promise.all([
-      q,
+      buildQuery(0, NOTIFICATIONS_PAGE_SIZE),
       supabase.from('notifications').select('id', { count: 'exact', head: true }).eq('agent_id', agent.id).eq('is_read', false)
     ])
     if (error) { console.error('فشل تحميل الإشعارات:', error.message); return }
     setItems(data || [])
     setUnreadCount(count || 0)
+    loadedCountRef.current = (data || []).length
+    setHasMore((data || []).length === NOTIFICATIONS_PAGE_SIZE)
+  }
+
+  const loadMore = async () => {
+    if (!agent?.id || loadingMore) return
+    setLoadingMore(true)
+    const { data, error } = await buildQuery(loadedCountRef.current, NOTIFICATIONS_PAGE_SIZE)
+    setLoadingMore(false)
+    if (error) { console.error('فشل تحميل المزيد من الإشعارات:', error.message); return }
+    setItems(prev => [...prev, ...(data || [])])
+    loadedCountRef.current += (data || []).length
+    setHasMore((data || []).length === NOTIFICATIONS_PAGE_SIZE)
   }
 
   useEffect(() => {
@@ -220,6 +245,14 @@ export default function NotificationBell() {
               </div>
             </div>
           ))}
+          {hasMore && (
+            <div className="px-4 py-3 text-center">
+              <button onClick={loadMore} disabled={loadingMore}
+                className="text-xs font-medium text-brand hover:underline disabled:opacity-50">
+                {loadingMore ? t('notificationBell.loading') : t('notificationBell.loadMore')}
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

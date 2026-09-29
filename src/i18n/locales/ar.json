@@ -1449,6 +1449,8 @@
     "filterRead": "المقروءة",
     "markAllRead": "تحديد الكل كمقروء",
     "markAllReadFailed": "فشل تحديد الإشعارات كمقروءة",
+    "loadMore": "تحميل المزيد",
+    "loading": "جارٍ التحميل...",
     "respondFailed": "فشل الرد على الطلب",
     "transferAccepted": "تم تحويل المحادثة إليه",
     "requestRejected": "تم رفض الطلب",
