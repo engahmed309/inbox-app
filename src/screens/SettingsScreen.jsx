@@ -1063,7 +1063,7 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             <p className="text-[11px] text-fg-subtle mt-1">{t('settings.channels.shortNameHint')}</p>
           </div>
 
-          {channel.platform === 'whatsapp' && (
+          {(channel.platform === 'whatsapp' || channel.platform === 'whatsapp_qr') && (
             <ChannelTeamRestriction channel={channel} onChanged={onChanged} />
           )}
 
