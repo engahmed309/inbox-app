@@ -438,15 +438,17 @@ export default function ChatScreen() {
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
-    // شبكة الضمان جوه محادثة مفتوحة: كانت بتحدّث كل ٦ ثواين دايمًا حتى لو الـ Realtime شغال
-    // تمام، يعني بيانات وبطارية بتتاكل من غير داعي على أي شبكة الاتصال الدائم فيها بطيء أو
-    // متقطع. دلوقتي: كل ٦ ثواني بس لو الـ Realtime فعلاً معطّل (.subscribe فوق بيحدّث
-    // realtimeHealthyRef)، وكل ٤٥ ثانية كشبكة أمان بعيدة حتى لو شكله شغال (تحسبًا لحدث فاتنا بصمت)
-    let ticks = 0
+    // شبكة الضمان جوه محادثة مفتوحة: كانت بتعتمد على realtimeHealthyRef عشان تقرر تستقصي كل ٦
+    // ثواني (لو معطّل) أو كل ٤٥ ثانية بس (لو شكله شغال) — لكن ظهر إن سيرفر الـ Realtime بتاع
+    // Supabase بيقفل اتصال الـ "tenant" ويعيد إنشاء replication slot جديد من الصفر كل شوية (وقت
+    // معاودة الاتصال، شبكة متقطعة، إلخ)، وأي رسالة توصل بالظبط في اللحظة دي بتضيع من غير ما حالة
+    // .subscribe() تتغيّر لـ CLOSED/ERROR من الأصل — يعني realtimeHealthyRef بيفضل true غلط، والاستقصاء
+    // السريع مبيشتغلش، ويفضل الموظف مستني لحد ٤٥ ثانية (أو أكتر) وهو مش شايف رد العميل. دلوقتي:
+    // استقصاء كل ٤ ثواني ثابت جوه أي محادثة مفتوحة (من غير أي شرط)، عشان أقصى تأخير ممكن يبقى ٤
+    // ثواني حتى لو الـ Realtime فشل بصمت بالكامل
     const pollInterval = setInterval(() => {
-      ticks++
-      if (!realtimeHealthyRef.current || ticks % 8 === 0) fetchMessages(false)
-    }, 6000)
+      fetchMessages(false)
+    }, 4000)
 
     return () => {
       cancelled = true
