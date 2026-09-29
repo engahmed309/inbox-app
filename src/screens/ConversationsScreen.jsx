@@ -487,8 +487,13 @@ export default function ConversationsScreen() {
     setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
 
     if (agent?.id) {
-      const { data: myTeams } = await supabase.from('team_members').select('team_id').eq('agent_id', agent.id)
-      setMyTeamIds(new Set((myTeams || []).map(m => m.team_id)))
+      // team_members جدول RLS مقفول بالكامل (إدارة الفرق بالباك إند بس) — استعلام مباشر منه هنا
+      // كان بيرجع فاضي دايمًا، فمضطرين endpoint مخصص بدل ما نستعلم الجدول زي باقي البيانات فوق
+      try {
+        const res = await apiFetch(`${API_URL}/my-team-ids`)
+        const data = await res.json()
+        setMyTeamIds(new Set(data.team_ids || []))
+      } catch { setMyTeamIds(new Set()) }
     }
 
     try {
