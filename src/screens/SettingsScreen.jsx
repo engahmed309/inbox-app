@@ -1063,6 +1063,10 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             <p className="text-[11px] text-fg-subtle mt-1">{t('settings.channels.shortNameHint')}</p>
           </div>
 
+          {channel.platform === 'whatsapp' && (
+            <ChannelTeamRestriction channel={channel} onChanged={onChanged} />
+          )}
+
           {channel.platform === 'whatsapp' && channel.status === 'active' && (
             <ChannelTemplates channel={channel} />
           )}
@@ -1097,6 +1101,57 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
           </div>
         </div>
       </div>
+    </div>
+  )
+}
+
+// تقييد رقم واتساب بفريق معيّن — محادثات الرقم ده بتتوزّع بس على أعضاء الفريق (round robin/أقل
+// محادثات حسب إعداد الفريق نفسه)، ومتظهرش في الانبوكس لأي موظف تاني غير أعضاء الفريق والأدمن.
+// مفيد لرقم مخصص لفريق داخلي (زي فريق الجودة) عاوزين رسايله متتلخبطش مع باقي الرسايل العامة
+function ChannelTeamRestriction({ channel, onChanged }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [teams, setTeams] = useState(null)
+  const [selected, setSelected] = useState(channel.restricted_team_id || '')
+  const [saving, setSaving] = useState(false)
+
+  useEffect(() => {
+    apiFetch(`${API_URL}/teams`).then(r => r.json()).then(data => setTeams(data.teams || [])).catch(() => setTeams([]))
+  }, [])
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/channels/${channel.id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ restricted_team_id: selected || null })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('settings.channels.saveFailed'))
+      toast.success(t('settings.channels.teamRestrictionSaved'))
+      onChanged()
+    } catch (err) {
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-fg mb-1.5">{t('settings.channels.teamRestrictionLabel')}</label>
+      <div className="flex items-center gap-2">
+        <select value={selected} onChange={e => setSelected(e.target.value)} disabled={teams === null}
+          className="flex-1 min-w-0 bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+          <option value="">{t('settings.channels.teamRestrictionNone')}</option>
+          {teams?.map(tm => <option key={tm.id} value={tm.id}>{tm.name}</option>)}
+        </select>
+        <button onClick={save} disabled={saving || teams === null}
+          className="px-3 py-2 rounded-xl text-xs font-semibold bg-brand text-white disabled:opacity-50 flex-shrink-0">
+          {saving ? t('settings.common.ellipsis') : t('settings.common.save')}
+        </button>
+      </div>
+      <p className="text-[11px] text-fg-subtle mt-1">{t('settings.channels.teamRestrictionHint')}</p>
     </div>
   )
 }

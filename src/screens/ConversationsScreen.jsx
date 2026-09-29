@@ -425,14 +425,29 @@ export default function ConversationsScreen() {
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
 
+  // الفرق التاني اللي الموظف الحالي عضو فيها — لازمة نعرفها عشان نعرف هل نستثني قنوات مقيّدة
+  // بفريق (channels.restricted_team_id) من الانبوكس ولا لأ. الأدمن يشوف كل حاجة دايمًا
+  const [myTeamIds, setMyTeamIds] = useState(new Set())
+  // القنوات المقيّدة بفريق الموظف مش عضو فيه — لازم تتخفي تمامًا من الانبوكس (مش بس من التاب
+  // بتاعها)، عشان رسايلها متتلخبطش مع باقي الرسايل العامة زي ما طلب الدكتور
+  const hiddenChannelIds = useMemo(() => {
+    if (agent?.role === 'admin') return new Set()
+    return new Set((allChannels || []).filter(ch => ch.restricted_team_id && !myTeamIds.has(ch.restricted_team_id)).map(ch => ch.id))
+  }, [allChannels, myTeamIds, agent])
+  const excludeHiddenChannels = useCallback((q) => {
+    if (hiddenChannelIds.size === 0) return q
+    return q.or(`channel_id.is.null,channel_id.not.in.(${[...hiddenChannelIds].join(',')})`)
+  }, [hiddenChannelIds])
+
   // لو منصة معينة (فيسبوك/انستجرام/واتساب) ليها قناة واحدة بس متربطة (أو مفيش)، سيب التاب العادي
   // بتاعها زي ما هو. لو أكتر من قناة لنفس المنصة، بدّل التاب الواحد بتاب منفصل لكل قناة عشان
   // محادثات كل واحدة تفضل منفصلة عن التانية
   const channelTabs = useMemo(() => {
     const tabs = []
+    const visibleChannels = allChannels.filter(ch => !hiddenChannelIds.has(ch.id))
     for (const c of CHANNELS) {
       if (c.key === 'all') { tabs.push({ ...c, label: t(c.labelKey) }); continue }
-      const chsForPlatform = allChannels.filter(ch => ch.platform === c.key)
+      const chsForPlatform = visibleChannels.filter(ch => ch.platform === c.key)
       if (chsForPlatform.length > 1) {
         chsForPlatform.forEach(ch => tabs.push({
           key: `${c.key}:${ch.id}`, label: getChannelLabel(ch), icon: PLATFORM_ICONS[c.key]
@@ -442,7 +457,7 @@ export default function ConversationsScreen() {
       }
     }
     return tabs
-  }, [allChannels, t])
+  }, [allChannels, hiddenChannelIds, t])
 
   // بيانات "بتتغير نادر" (الموظفين/التاجات/مراحل الـ lifecycle) — بنجيبها لوحدها وبمعدل أبطأ بكتير
   // من قائمة المحادثات، عشان منكررش نفس الاستعلامات دي كل ٥ ثواني من غير داعي
@@ -471,6 +486,11 @@ export default function ConversationsScreen() {
     const { data: tagRows } = await supabase.from('tags').select('id, name, color').order('name')
     setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
 
+    if (agent?.id) {
+      const { data: myTeams } = await supabase.from('team_members').select('team_id').eq('agent_id', agent.id)
+      setMyTeamIds(new Set((myTeams || []).map(m => m.team_id)))
+    }
+
     try {
       const res = await apiFetch(`${API_URL}/ads/campaigns`)
       const data = await res.json()
@@ -484,7 +504,7 @@ export default function ConversationsScreen() {
       const data = await res.json()
       if (res.ok) { setSegments(data.segments || []); screenCache.segments = data.segments || [] }
     } catch { /* مش أدمن أو فشل الجلب — القسم هيفضل مش ظاهر أصلاً */ }
-  }, [])
+  }, [agent?.id])
 
   const fetchConversations = useCallback(async () => {
     // رقم النداء ده — لو نداء تاني اتبعت بعدنا (فلتر اتغيّر تاني بسرعة) قبل ما ده يخلص، أي setState
@@ -557,6 +577,7 @@ export default function ConversationsScreen() {
         q = q.eq('platform', cf.platform)
         if (cf.channelId) q = q.eq('channel_id', cf.channelId)
       }
+      q = excludeHiddenChannels(q)
       if (!canSeeAll) {
         q = q.eq('assigned_agent_id', agent?.id)
       } else if (agentFilter === 'unassigned') {
@@ -618,7 +639,7 @@ export default function ConversationsScreen() {
           q = q.eq('platform', cf.platform)
           if (cf.channelId) q = q.eq('channel_id', cf.channelId)
         }
-        return q
+        return excludeHiddenChannels(q)
       }) : Promise.resolve([]),
       // بس المحادثات المفتوحة (بنفس نطاق الفلترة الحالي) — لازمة لعدّاد "مفتوحة" غير المقروءة
       // ولتحديد أي محادثة في القائمة نفسها غير مقروءة ليّا (isUnreadForMe تحت)
@@ -729,7 +750,7 @@ export default function ConversationsScreen() {
       console.error('fetchConversations error:', err)
       if (stillCurrent()) { toast.error(t('conversations.list.loadError')); setLoading(false) }
     }
-  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
+  }, [status, channel, agent, viewMode, agentFilter, canSeeAll, unrepliedOnly, selectedLifecycle, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId, excludeHiddenChannels])
 
   // البحث بيدور في قاعدة البيانات كلها مباشرة (مش بس المحادثات المحمّلة/الظاهرة حاليًا)، وبيحترم نفس
   // فلاتر القناة/الموظف/الحالة الحالية. searchType بيحدد نبحث فين: اسم العميل، محتوى رسالة حقيقية،
@@ -789,6 +810,7 @@ export default function ConversationsScreen() {
         query = query.eq('platform', cf.platform)
         if (cf.channelId) query = query.eq('channel_id', cf.channelId)
       }
+      query = excludeHiddenChannels(query)
       // البحث مش زي القائمة العادية — بيدور في كل المحادثات حتى المتعينة لموظفين تانيين، عشان لو
       // موظف دوّر على شات مع زميله يلاقيه في النتايج (بس معلّم باسم الموظف صاحبه)، ويقدر يطلب نقله له
       if (agentFilter === 'unassigned') query = query.is('assigned_agent_id', null)
@@ -835,7 +857,7 @@ export default function ConversationsScreen() {
       toast.error(t('conversations.search.error'))
       setLoading(false)
     }
-  }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll, selectedLifecycle, selectedTagIds, selectedAdIds, dateFrom, dateTo, unrepliedOnly])
+  }, [search, searchType, status, channel, agent, viewMode, agentFilter, canSeeAll, selectedLifecycle, selectedTagIds, selectedAdIds, dateFrom, dateTo, unrepliedOnly, excludeHiddenChannels])
 
   // محادثات الموظف الحالي المثبتة — pinnedIds بيتحسب من جدول conversation_pins مفلتر على
   // agent_id بتاعه بس (كل موظف بيشوف تثبيتاته هو، مش تثبيتات زمايله)، وpinnedConvs بيجيب
@@ -852,11 +874,12 @@ export default function ConversationsScreen() {
       .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
       .in('id', ids)
     if (!canSeeAll) q = q.eq('assigned_agent_id', agent.id)
+    q = excludeHiddenChannels(q)
     if (status !== 'all') q = q.eq('status', status)
     const { data, error } = await q
     if (error) { console.error('فشل تحميل بيانات المحادثات المثبتة:', error.message); return }
     setPinnedConvs((data || []).map(c => ({ ...c, myUnread: false })))
-  }, [agent?.id, canSeeAll, status])
+  }, [agent?.id, canSeeAll, status, excludeHiddenChannels])
 
   useEffect(() => { loadPinned() }, [loadPinned])
 
