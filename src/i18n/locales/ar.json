@@ -1447,6 +1447,8 @@
     "filterAll": "الكل",
     "filterUnread": "غير المقروءة",
     "filterRead": "المقروءة",
+    "markAllRead": "تحديد الكل كمقروء",
+    "markAllReadFailed": "فشل تحديد الإشعارات كمقروءة",
     "respondFailed": "فشل الرد على الطلب",
     "transferAccepted": "تم تحويل المحادثة إليه",
     "requestRejected": "تم رفض الطلب",

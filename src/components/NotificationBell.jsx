@@ -80,6 +80,14 @@ export default function NotificationBell() {
     setUnreadCount(c => Math.max(0, c - 1))
   }
 
+  const markAllRead = async () => {
+    if (!agent?.id || unreadCount === 0) return
+    const { error } = await supabase.from('notifications').update({ is_read: true }).eq('agent_id', agent.id).eq('is_read', false)
+    if (error) { console.error('فشل تحديد كل الإشعارات كمقروءة:', error.message); toast.error(t('notificationBell.markAllReadFailed')); return }
+    setItems(prev => prev.map(x => ({ ...x, is_read: true })))
+    setUnreadCount(0)
+  }
+
   const openNotification = (n) => {
     markRead(n)
     if (!['transfer_request', 'admin_request'].includes(n.type) && n.conversation_id) {
@@ -142,7 +150,14 @@ export default function NotificationBell() {
 
       {open && (
         <div className="absolute top-full end-0 mt-2 w-80 max-h-[70vh] overflow-y-auto bg-surface-2 border border-surface-3 rounded-2xl shadow-2xl z-50">
-          <div className="px-4 py-3 border-b border-surface-3 font-semibold text-sm text-fg">{t('notificationBell.title')}</div>
+          <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3">
+            <span className="font-semibold text-sm text-fg">{t('notificationBell.title')}</span>
+            {unreadCount > 0 && (
+              <button onClick={markAllRead} className="flex items-center gap-1 text-xs font-medium text-brand hover:underline">
+                <Check size={12} /> {t('notificationBell.markAllRead')}
+              </button>
+            )}
+          </div>
           <div className="flex gap-1.5 px-3 py-2 border-b border-surface-3">
             {['all', 'unread', 'read'].map(f => (
               <button key={f} onClick={() => setFilter(f)}
