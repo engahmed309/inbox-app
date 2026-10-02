@@ -160,31 +160,46 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const onPackageSelect = (packageId) => {
     if (!packageId) { clearPackage(); return }
     const pkg = packages.find(p => p.id === packageId)
-    setPackageModal({ packageId, expiresAt: pkg?.default_duration_days ? todayPlusDays(pkg.default_duration_days) : '' })
+    setPackageModal({ packageId, expiresAt: pkg?.default_duration_days ? todayPlusDays(pkg.default_duration_days) : '', isEdit: false })
   }
 
   const openEditPackageDate = () => {
-    setPackageModal({ packageId: form.package_id, expiresAt: form.package_expires_at ? form.package_expires_at.slice(0, 10) : '' })
+    setPackageModal({ packageId: form.package_id, expiresAt: form.package_expires_at ? form.package_expires_at.slice(0, 10) : '', isEdit: true })
+  }
+
+  // تحديد/إزالة الباقة بيعدّي على الباك إند (مش تعديل مباشر لجدول contacts) عشان بيبني/يمسح معاه
+  // جدول تذكيرات المواعيد الإضافية للباقات اللي فيها أكتر من مكالمة
+  const savePackageOnServer = async (body) => {
+    const res = await apiFetch(`${API_URL}/contacts/${contact.id}/package`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body)
+    })
+    const data = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(data.error || 'save failed')
+    return data
   }
 
   const clearPackage = async () => {
-    const { data: updated, error } = await supabase.from('contacts')
-      .update({ package_id: null, package_expires_at: null, package_reminder_sent_at: null })
-      .eq('id', contact.id).select().single()
-    if (error) { toast.error(t('contactSidebar.package.saveError')); return }
+    let data
+    try { data = await savePackageOnServer({ package_id: null }) } catch { toast.error(t('contactSidebar.package.saveError')); return }
     setForm(f => ({ ...f, package_id: '', package_expires_at: null }))
-    onUpdate(updated)
+    onUpdate(data.contact)
     logActivity(conv?.id, agent?.id, t('contactSidebar.package.activityCleared'))
   }
 
   const confirmPackage = async () => {
     setSavingPackage(true)
     const expiresAtIso = packageModal.expiresAt ? new Date(`${packageModal.expiresAt}T00:00:00`).toISOString() : null
-    const { data: updated, error } = await supabase.from('contacts')
-      .update({ package_id: packageModal.packageId, package_expires_at: expiresAtIso, package_reminder_sent_at: null })
-      .eq('id', contact.id).select().single()
+    let data
+    try {
+      // isEdit = تعديل معاد الانتهاء بس لنفس الباقة الحالية، فمنبدأش دورة تذكيرات جديدة
+      data = await savePackageOnServer({ package_id: packageModal.packageId, expires_at: expiresAtIso, keep_schedule: !!packageModal.isEdit })
+    } catch {
+      setSavingPackage(false)
+      toast.error(t('contactSidebar.package.saveError'))
+      return
+    }
     setSavingPackage(false)
-    if (error) { toast.error(t('contactSidebar.package.saveError')); return }
+    const updated = data.contact
     setForm(f => ({ ...f, package_id: packageModal.packageId, package_expires_at: expiresAtIso }))
     onUpdate(updated)
     const pkgName = packages.find(p => p.id === packageModal.packageId)?.name || ''
@@ -195,9 +210,13 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     // الخط اللي فات في الأكتيفيتي مختصر — هنا بنشرح بوضوح في الشات نفسه إيه اللي حصل وإيه اللي
     // هيحصل بعدين، عشان أي موظف يفتح المحادثة يفهم الموضوع من غير ما يرجع لملف العميل
     if (conv?.id) {
-      const noteText = expiresAtIso
+      let noteText = expiresAtIso
         ? t('contactSidebar.package.noteWithDate', { package: pkgName, date: formatDate(expiresAtIso) })
         : t('contactSidebar.package.noteWithoutDate', { package: pkgName })
+      if (data.followups?.length) {
+        const lines = data.followups.map(f => t('contactSidebar.package.noteFollowupLine', { n: f.sequence, date: formatDate(f.due_at) }))
+        noteText += `\n${t('contactSidebar.package.noteFollowupsIntro')}\n${lines.join('\n')}`
+      }
       apiFetch(`${API_URL}/notes`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

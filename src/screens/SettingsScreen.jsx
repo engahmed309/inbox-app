@@ -2509,14 +2509,59 @@ function LifecycleTab() {
 // تذكير التجديد التلقائي: لما باقة عميل تستحق، السيرفر بيفتح محادثته تاني ويحط ملاحظة داخلية
 // (checkPackageReminders في index.js) — هنا بنتحكم فيه: نوعه شغال ولا لأ، نص الملاحظة، وقبل
 // الانتهاء بكام يوم يتبعت
+// مواعيد المكالمات الإضافية للباقة (بعد أول مكالمة): بتتخزن كأيام من بداية الباقة، والعرض/الإدخال
+// بوحدة يوم/أسبوع/شهر (الشهر = ٣٠ يوم). صف فاضي في القايمة = لسه مكتوبش رقمه
+const FOLLOWUP_UNIT_DAYS = { days: 1, weeks: 7, months: 30 }
+const offsetsToRows = (offsets) => (offsets || []).map(d => {
+  const unit = d % 30 === 0 ? 'months' : d % 7 === 0 ? 'weeks' : 'days'
+  return { amount: String(d / FOLLOWUP_UNIT_DAYS[unit]), unit }
+})
+const rowsToOffsets = (rows) => [...new Set(
+  rows.map(r => Math.round(Number(r.amount) * FOLLOWUP_UNIT_DAYS[r.unit])).filter(d => Number.isFinite(d) && d > 0)
+)].sort((a, b) => a - b)
+
+function FollowupsEditor({ rows, onChange }) {
+  const { t } = useTranslation()
+  const enabled = rows.length > 0
+  const update = (i, patch) => onChange(rows.map((r, idx) => idx === i ? { ...r, ...patch } : r))
+  return (
+    <div className="space-y-2">
+      <Toggle label={t('settings.packages.followupsToggle')} sublabel={t('settings.packages.followupsToggleHint')}
+        value={enabled} onChange={v => onChange(v ? [{ amount: '', unit: 'months' }] : [])} />
+      {enabled && (
+        <div className="space-y-2 pt-1">
+          {rows.map((r, i) => (
+            <div key={i} className="flex items-center gap-2">
+              <span className="text-xs text-fg-muted flex-shrink-0 w-24">{t('settings.packages.followupCallLabel', { n: i + 2 })}</span>
+              <span className="text-xs text-fg-subtle flex-shrink-0">{t('settings.packages.followupAfter')}</span>
+              <input type="number" min="1" value={r.amount} onChange={e => update(i, { amount: e.target.value })}
+                className="w-16 flex-shrink-0 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+              <select value={r.unit} onChange={e => update(i, { unit: e.target.value })}
+                className="bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
+                <option value="days">{t('settings.packages.unit.days')}</option>
+                <option value="weeks">{t('settings.packages.unit.weeks')}</option>
+                <option value="months">{t('settings.packages.unit.months')}</option>
+              </select>
+              <button type="button" onClick={() => onChange(rows.filter((_, idx) => idx !== i))} className="text-fg-muted hover:text-danger"><X size={15} /></button>
+            </div>
+          ))}
+          <button type="button" onClick={() => onChange([...rows, { amount: '', unit: 'months' }])}
+            className="flex items-center gap-1 text-xs text-brand font-medium"><Plus size={13} /> {t('settings.packages.followupAdd')}</button>
+          <p className="text-[10px] text-fg-subtle">{t('settings.packages.followupsHint')}</p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function PackagesTab() {
   const { t } = useTranslation()
   const toast = useToast()
   const [packages, setPackages] = useState([])
   const [showAdd, setShowAdd] = useState(false)
-  const [form, setForm] = useState({ name: '', default_duration_days: '' })
+  const [form, setForm] = useState({ name: '', default_duration_days: '', followups: [] })
   const [editingId, setEditingId] = useState(null)
-  const [editForm, setEditForm] = useState({ name: '', default_duration_days: '' })
+  const [editForm, setEditForm] = useState({ name: '', default_duration_days: '', followups: [] })
   const [settings, setSettings] = useState(null)
   const [loading, setLoading] = useState(true)
   // قوالب واتساب — لاختيار رقم القالب اللي هيتبعت تلقائي لما باقة العميل تخلص
@@ -2558,10 +2603,11 @@ function PackagesTab() {
     const { error } = await supabase.from('contact_packages').insert({
       name: form.name.trim(),
       default_duration_days: form.default_duration_days ? Number(form.default_duration_days) : null,
+      followup_offsets_days: rowsToOffsets(form.followups),
       sort_order: packages.length
     })
     if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
-    setForm({ name: '', default_duration_days: '' })
+    setForm({ name: '', default_duration_days: '', followups: [] })
     setShowAdd(false)
     load()
   }
@@ -2573,12 +2619,13 @@ function PackagesTab() {
     load()
   }
 
-  const startEdit = (p) => { setEditingId(p.id); setEditForm({ name: p.name, default_duration_days: p.default_duration_days ?? '' }) }
+  const startEdit = (p) => { setEditingId(p.id); setEditForm({ name: p.name, default_duration_days: p.default_duration_days ?? '', followups: offsetsToRows(p.followup_offsets_days) }) }
   const saveEdit = async () => {
     if (!editForm.name.trim()) return
     const { error } = await supabase.from('contact_packages').update({
       name: editForm.name.trim(),
-      default_duration_days: editForm.default_duration_days ? Number(editForm.default_duration_days) : null
+      default_duration_days: editForm.default_duration_days ? Number(editForm.default_duration_days) : null,
+      followup_offsets_days: rowsToOffsets(editForm.followups)
     }).eq('id', editingId)
     if (error) { toast.error(t('settings.common.errorWithMessage', { message: error.message })); return }
     setEditingId(null)
@@ -2614,6 +2661,7 @@ function PackagesTab() {
               <InputField label={t('settings.packages.nameLabel')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
               <InputField label={t('settings.packages.durationLabel')} type="number" value={form.default_duration_days}
                 onChange={v => setForm({ ...form, default_duration_days: v })} placeholder={t('settings.packages.durationPlaceholder')} />
+              <FollowupsEditor rows={form.followups} onChange={followups => setForm({ ...form, followups })} />
               <div className="flex gap-2">
                 <button onClick={add} className="flex-1 py-2.5 bg-brand rounded-xl text-sm text-white font-medium">{t('settings.common.add')}</button>
                 <button onClick={() => setShowAdd(false)} className="px-4 py-2.5 bg-surface-3 rounded-xl text-sm text-fg-muted">{t('settings.common.cancel')}</button>
@@ -2624,19 +2672,27 @@ function PackagesTab() {
           {packages.map(p => (
             <div key={p.id} className="bg-surface-2 rounded-2xl p-4 flex items-center gap-3 border border-surface-3">
               {editingId === p.id ? (
-                <>
-                  <input autoFocus value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
-                    className="flex-1 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-                  <input type="number" value={editForm.default_duration_days}
-                    onChange={e => setEditForm({ ...editForm, default_duration_days: e.target.value })}
-                    placeholder={t('settings.packages.durationPlaceholder')}
-                    className="w-24 flex-shrink-0 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
-                  <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
-                  <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
-                </>
+                <div className="w-full space-y-3">
+                  <div className="flex items-center gap-3">
+                    <input autoFocus value={editForm.name} onChange={e => setEditForm({ ...editForm, name: e.target.value })}
+                      className="flex-1 min-w-0 bg-surface-3 rounded-lg px-2.5 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                    <input type="number" value={editForm.default_duration_days}
+                      onChange={e => setEditForm({ ...editForm, default_duration_days: e.target.value })}
+                      placeholder={t('settings.packages.durationPlaceholder')}
+                      className="w-24 flex-shrink-0 bg-surface-3 rounded-lg px-2 py-1.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand" />
+                    <button onClick={saveEdit} className="text-success hover:brightness-110"><Check size={16} /></button>
+                    <button onClick={() => setEditingId(null)} className="text-fg-muted hover:text-fg"><X size={16} /></button>
+                  </div>
+                  <FollowupsEditor rows={editForm.followups} onChange={followups => setEditForm({ ...editForm, followups })} />
+                </div>
               ) : (
                 <>
                   <span className="flex-1 text-sm text-fg">{p.name}</span>
+                  {p.followup_offsets_days?.length > 0 && (
+                    <span className="text-[10px] font-medium text-brand bg-brand/10 px-2 py-0.5 rounded-full">
+                      {t('settings.packages.followupsBadge', { count: p.followup_offsets_days.length })}
+                    </span>
+                  )}
                   <span className="text-xs text-fg-subtle">
                     {p.default_duration_days ? t('settings.packages.daysCount', { count: p.default_duration_days }) : t('settings.packages.noDuration')}
                   </span>
