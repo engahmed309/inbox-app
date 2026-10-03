@@ -254,6 +254,21 @@
       "resetPasswordPrompt": "New password for {{name}} (at least 6 characters):",
       "passwordChanged": "Password changed successfully",
       "neverLoggedIn": "Hasn't logged in yet",
+      "suspend": {
+        "badge": "Suspended",
+        "suspendTitle": "Suspend account",
+        "unsuspendTitle": "Reactivate account",
+        "modalTitle": "Suspend {{name}}'s account",
+        "modalDesc": "They won't be able to sign in or receive new conversations, calls or notifications until you reactivate the account. Their data and past conversations stay untouched.",
+        "redistribute": "Take their open conversations ({{count}}) and redistribute them to the rest of the team",
+        "redistributeHint": "Conversations in \"follow-up\" stay with them",
+        "confirm": "Suspend",
+        "suspended": "Account suspended",
+        "suspendedAndMoved": "Account suspended and {{count}} conversation(s) moved to the team",
+        "unsuspendConfirm": "Reactivate {{name}}'s account?",
+        "unsuspended": "Account reactivated, they can sign in now",
+        "failed": "Couldn't change the account status"
+      },
       "limitPrefix": "Limit:",
       "resetPasswordTitle": "Set a password for temporary sign-in",
       "accessScope": {
@@ -1505,7 +1520,8 @@
     "instagramConnectSuccess": "Instagram account connected successfully"
   },
   "auth": {
-    "notInvited": "This account is not invited to use the system. Please contact the admin to add you."
+    "notInvited": "This account is not invited to use the system. Please contact the admin to add you.",
+    "suspended": "This account has been suspended. Please contact the admin."
   },
   "countrySelect": {
     "placeholder": "Select country",

@@ -15,7 +15,7 @@ import {
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2
+  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2, PauseCircle, PlayCircle
 } from 'lucide-react'
 
 const TABS = [
@@ -110,6 +110,9 @@ function AgentsTab() {
   const [reassignMode, setReassignMode] = useState('specific') // 'specific' | 'all' | 'online'
   const [reassignToId, setReassignToId] = useState('')
   const [reassigning, setReassigning] = useState(false)
+  const [suspendTarget, setSuspendTarget] = useState(null) // الموظف اللي هنجمّده (مودال التأكيد)
+  const [redistribute, setRedistribute] = useState(true)
+  const [suspending, setSuspending] = useState(false)
   const [aiAgentRow, setAiAgentRow] = useState(null)
   const [aiCounts, setAiCounts] = useState({ open: 0, follow_up: 0, closed: 0 })
   const [aiEnabled, setAiEnabled] = useState(false)
@@ -193,6 +196,28 @@ function AgentsTab() {
       toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
       setLoading(false)
+    }
+  }
+
+  // تجميد/تفعيل الحساب بيعدّي على السيرفر (مش تعديل مباشر): هو اللي بيحظر دخول الأوث ويمسح
+  // اشتراكات الإشعارات ويعيد توزيع المحادثات
+  const setSuspended = async (ag, suspend, redistributeOpen = false) => {
+    setSuspending(true)
+    try {
+      const res = await apiFetch(`${API_URL}/admin/agent/${ag.id}/${suspend ? 'suspend' : 'unsuspend'}`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ redistribute: redistributeOpen })
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(data.error || t('settings.agents.suspend.failed'))
+      toast.success(!suspend ? t('settings.agents.suspend.unsuspended')
+        : data.unassigned ? t('settings.agents.suspend.suspendedAndMoved', { count: data.unassigned }) : t('settings.agents.suspend.suspended'))
+      setSuspendTarget(null)
+      loadAgents(); loadCounts()
+    } catch (err) {
+      toast.error(t('settings.common.errorWithMessage', { message: err.message }))
+    } finally {
+      setSuspending(false)
     }
   }
 
@@ -422,8 +447,44 @@ function AgentsTab() {
         <AgentCard key={ag.id} agent={ag} counts={counts[ag.id]}
           onEdit={() => setEditId(ag.id)} onDelete={() => confirmDeleteAgent(ag)}
           onUpdate={updates => updateAgent(ag.id, updates)}
+          onToggleSuspend={() => {
+            if (ag.is_suspended) { if (confirm(t('settings.agents.suspend.unsuspendConfirm', { name: ag.name }))) setSuspended(ag, false) }
+            else { setRedistribute(true); setSuspendTarget(ag) }
+          }}
           editing={editId === ag.id} />
       ))}
+
+      {suspendTarget && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
+          onClick={() => !suspending && setSuspendTarget(null)}>
+          <div className="w-full max-w-sm bg-surface-2 rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center gap-2 px-4 py-3.5 border-b border-surface-3">
+              <PauseCircle size={16} className="text-follow" />
+              <span className="font-semibold text-fg text-sm">{t('settings.agents.suspend.modalTitle', { name: suspendTarget.name })}</span>
+            </div>
+            <div className="p-4 space-y-3">
+              <p className="text-sm text-fg-muted">{t('settings.agents.suspend.modalDesc')}</p>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" className="mt-0.5" checked={redistribute} onChange={e => setRedistribute(e.target.checked)} />
+                <span className="text-sm text-fg">
+                  {t('settings.agents.suspend.redistribute', { count: counts[suspendTarget.id]?.open || 0 })}
+                  <span className="block text-[11px] text-fg-subtle">{t('settings.agents.suspend.redistributeHint')}</span>
+                </span>
+              </label>
+            </div>
+            <div className="flex items-center gap-2 p-4 border-t border-surface-3">
+              <button onClick={() => setSuspendTarget(null)} disabled={suspending}
+                className="flex-1 py-2.5 rounded-xl text-sm font-medium bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-50">
+                {t('settings.common.cancel')}
+              </button>
+              <button onClick={() => setSuspended(suspendTarget, true, redistribute)} disabled={suspending}
+                className="flex-1 py-2.5 rounded-xl text-sm font-semibold bg-danger text-white hover:brightness-110 disabled:opacity-50 flex items-center justify-center gap-2">
+                {suspending ? <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> : t('settings.agents.suspend.confirm')}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {deleteTarget && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60"
@@ -608,7 +669,7 @@ function MaxConversationsField({ value, onChange }) {
   )
 }
 
-function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
+function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onToggleSuspend, editing }) {
   const { t } = useTranslation()
   const [form, setForm] = useState({ name: agent.name, max_conversations: agent.max_conversations, role: agent.role, can_see_all_conversations: agent.can_see_all_conversations, access_scope: agent.access_scope || 'messages', can_view_calls: agent.can_view_calls !== false })
   const c = counts || { open: 0, follow_up: 0, closed: 0 }
@@ -632,7 +693,7 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
   }
 
   return (
-    <div className="bg-surface-2 rounded-2xl p-4 border border-surface-3">
+    <div className={`bg-surface-2 rounded-2xl p-4 border border-surface-3 ${agent.is_suspended ? 'opacity-60' : ''}`}>
       {editing ? (
         <div className="space-y-3">
           <InputField label={t('settings.common.name')} value={form.name} onChange={v => setForm({ ...form, name: v })} />
@@ -665,6 +726,9 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
             <div className="flex-1">
               <div className="flex items-center gap-1.5">
                 <p className="font-semibold text-sm text-fg">{agent.name}</p>
+                {agent.is_suspended && (
+                  <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-danger/15 text-danger">{t('settings.agents.suspend.badge')}</span>
+                )}
                 {!agent.last_seen_at && (
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">{t('settings.agents.neverLoggedIn')}</span>
                 )}
@@ -676,6 +740,12 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, editing }) {
               <button onClick={resetPassword} title={t('settings.agents.resetPasswordTitle')} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <KeyRound size={14} />
               </button>
+              {agent.role === 'agent' && (
+                <button onClick={onToggleSuspend} title={agent.is_suspended ? t('settings.agents.suspend.unsuspendTitle') : t('settings.agents.suspend.suspendTitle')}
+                  className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-3 ${agent.is_suspended ? 'text-success hover:text-success' : 'text-fg-muted hover:text-follow'}`}>
+                  {agent.is_suspended ? <PlayCircle size={14} /> : <PauseCircle size={14} />}
+                </button>
+              )}
               <button onClick={onEdit} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <Edit2 size={14} />
               </button>

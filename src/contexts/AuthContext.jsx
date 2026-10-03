@@ -8,7 +8,16 @@ export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [agent, setAgent] = useState(null)
   const [loading, setLoading] = useState(true)
-  const [authError, setAuthError] = useState('')
+  const [authError, setAuthError] = useState(() => {
+    // apiFetch علّمت إن الحساب اتجمّد وطلّعتنا برّه — نوري السبب في شاشة الدخول
+    try {
+      if (sessionStorage.getItem('inbox_suspended')) {
+        sessionStorage.removeItem('inbox_suspended')
+        return i18n.t('auth.suspended')
+      }
+    } catch { /* مش مشكلة */ }
+    return ''
+  })
 
   // بنفرّق بين "مفيش صف للموظف ده فعلاً" (يعني مش مدعو) و"الاستعلام نفسه فشل" (شبكة/سيرفر) —
   // قبل كده الاتنين كانوا بيرجعوا null، فالموظف الشرعي كان ممكن يتقاله "غير مدعو" غلط لمجرد
@@ -52,6 +61,13 @@ export function AuthProvider({ children }) {
       setUser(null)
       setAgent(null)
       setAuthError(i18n.t('auth.notInvited'))
+      return
+    }
+    if (ag.is_suspended) {
+      setUser(null)
+      setAgent(null)
+      setAuthError(i18n.t('auth.suspended'))
+      await supabase.auth.signOut().catch(() => {})
       return
     }
 

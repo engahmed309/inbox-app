@@ -14,7 +14,17 @@ export async function apiFetch(url, options = {}) {
   const { data: { session } } = await supabase.auth.getSession()
   const headers = { ...(options.headers || {}) }
   if (session?.access_token) headers.Authorization = `Bearer ${session.access_token}`
-  return fetch(url, { ...options, headers })
+  const res = await fetch(url, { ...options, headers })
+  // الأدمن جمّد الحساب وإحنا لسه فاتحين: نخرّج الموظف فورًا بدل ما تفضل شاشاته تفشل بصمت
+  if (res.status === 403) {
+    const body = await res.clone().json().catch(() => null)
+    if (body?.code === 'account_suspended') {
+      try { sessionStorage.setItem('inbox_suspended', '1') } catch { /* مش مشكلة */ }
+      await supabase.auth.signOut().catch(() => {})
+      window.location.replace('/')
+    }
+  }
+  return res
 }
 
 // معرفات عامة بتاعة تطبيق ميتا (مش سرية) — لازمة لتشغيل SDK بتاع فيسبوك وربط القنوات من جوه التطبيق
