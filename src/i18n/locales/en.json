@@ -1336,7 +1336,10 @@
       "noActiveChannel": "No active WhatsApp number linked",
       "quickLinkTag": "(Quick link)",
       "officialTemplateHint": "If you choose official WhatsApp, the first message must be a template approved by Meta.",
-      "submitButton": "Start conversation"
+      "submitButton": "Start conversation",
+      "transferRequested": "This customer already has a conversation with {{agent}}. A transfer request was sent to them — you'll get it once they accept.",
+      "transferPending": "A transfer request for this customer was already sent to {{agent}} and is waiting for their reply.",
+      "colleagueFallback": "a colleague"
     },
     "install": {
       "iosTitle": "Install the app on iPhone",

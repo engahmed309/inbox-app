@@ -1851,6 +1851,13 @@ function NewConversationModal({ agentId, channels, onClose, onStarted }) {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('conversations.newConversation.startError'))
+      // الرقم ده ليه محادثة مع زميل: مفيش دخول للمحادثة، السيرفر بعتله طلب نقل بدل كده
+      if (data.requires_transfer) {
+        const agentName = data.assigned_agent_name || t('conversations.newConversation.colleagueFallback')
+        toast.info(t(data.request_already_pending ? 'conversations.newConversation.transferPending' : 'conversations.newConversation.transferRequested', { agent: agentName }), 6000)
+        onClose()
+        return
+      }
       onStarted(data.conversation_id)
     } catch (err) {
       toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
