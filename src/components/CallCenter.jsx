@@ -226,9 +226,15 @@ export default function CallCenter() {
         }
       }
 
-      await pc.setRemoteDescription({ type: 'offer', sdp: offerData.sdp })
-      const localAnswer = await pc.createAnswer()
-      await pc.setLocalDescription(localAnswer)
+      // واتساب: ميتا بتبعت offer ونرد بـanswer. ماسنجر بالعكس: مفيش offer جاهز، فمتصفحنا هو اللي
+      // بيبني الـoffer ويبعته مع القبول، وميتا بترد بالـanswer اللي بنطبّقه بعد كده
+      const isOfferer = offerData.platform === 'facebook' || !offerData.sdp
+      if (isOfferer) {
+        await pc.setLocalDescription(await pc.createOffer())
+      } else {
+        await pc.setRemoteDescription({ type: 'offer', sdp: offerData.sdp })
+        await pc.setLocalDescription(await pc.createAnswer())
+      }
       await waitForIceGathering(pc)
 
       const res = await apiFetch(`${API_URL}/calls/${incoming.call_id}/accept`, {
@@ -237,6 +243,10 @@ export default function CallCenter() {
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
+      if (isOfferer) {
+        if (!data.sdp_answer) throw new Error(t('calls.answerFailed'))
+        await pc.setRemoteDescription({ type: 'answer', sdp: data.sdp_answer })
+      }
 
       setActive({ ...incoming, conversation_id: data.conversation_id || incoming.conversation_id })
       setIncoming(null)
