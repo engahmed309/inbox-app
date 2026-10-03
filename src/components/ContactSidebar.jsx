@@ -4,6 +4,7 @@ import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
+import { copyText } from '../lib/clipboard'
 import { formatDate } from '../lib/locale'
 import CountrySelect from './CountrySelect'
 import RequestAdminModal from './RequestAdminModal'
@@ -35,12 +36,11 @@ function PhoneDisplay({ phone, countryCode }) {
   )
 
   const copy = async () => {
-    try {
-      await navigator.clipboard.writeText(`+${split.dial || ''}${split.local}`.replace(/\s/g, ''))
+    if (await copyText(`+${split.dial || ''}${split.local}`.replace(/\s/g, ''))) {
       setCopied(true)
       toast.success(t('contactSidebar.phone.copied'))
       setTimeout(() => setCopied(false), 1500)
-    } catch {
+    } else {
       toast.error(t('chat.toast.copyFailed'))
     }
   }

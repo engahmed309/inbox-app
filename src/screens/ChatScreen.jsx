@@ -12,6 +12,7 @@ import { formatTime as localeFormatTime, formatDate as localeFormatDate, formatD
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
+import { copyText } from '../lib/clipboard'
 import {
   Send, Paperclip, ChevronDown, Search, X,
   User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode, Languages
@@ -613,12 +614,8 @@ export default function ChatScreen() {
   }
 
   const copyMessage = async (msg) => {
-    try {
-      await navigator.clipboard.writeText(msg.content || '')
-      toast.success(t('chat.toast.messageCopied'))
-    } catch {
-      toast.error(t('chat.toast.copyFailed'))
-    }
+    if (await copyText(msg.content || '')) toast.success(t('chat.toast.messageCopied'))
+    else toast.error(t('chat.toast.copyFailed'))
   }
 
   const startReply = (msg) => {
