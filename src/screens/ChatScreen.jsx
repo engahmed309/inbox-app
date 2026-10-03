@@ -14,7 +14,7 @@ import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import {
   Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode, Languages
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -125,6 +125,9 @@ export default function ChatScreen() {
   const [sending, setSending] = useState(false)
   const [replyingTo, setReplyingTo] = useState(null) // الرسالة اللي الموظف بيرد عليها (ريبلاي)، لو فيه
   const [actionSheetMsg, setActionSheetMsg] = useState(null) // الرسالة اللي فتحنا لها قائمة نسخ/رد (اضغط مطول)
+  // ترجمات الرسائل اللي الموظف طلبها: { [message_id]: { target, text } } + الرسالة اللي بتتترجم دلوقتي
+  const [translations, setTranslations] = useState({})
+  const [translatingId, setTranslatingId] = useState(null)
   const [showStatus, setShowStatus] = useState(false)
   const [showSidebar, setShowSidebar] = useState(false)
   const [agents, setAgents] = useState([])
@@ -262,6 +265,13 @@ export default function ChatScreen() {
     firstLoadDoneRef.current = false
     setHasMoreMessages(false)
     setMessages([])
+    setTranslations({})
+    // الترجمات اللي اتطلبت قبل كده للمحادثة دي (من أي موظف) — آخر ترجمة لكل رسالة هي اللي بتظهر
+    apiFetch(`${API_URL}/conversations/${id}/translations`).then(r => r.json()).then(d => {
+      const map = {}
+      for (const tr of d.translations || []) map[tr.message_id] = { target: tr.target, text: tr.translated_text }
+      setTranslations(map)
+    }).catch(() => {})
     // لو الموظف نقل بسرعة بين محادثتين قبل ما تحميل الأولى يخلص، رد الأولى المتأخر كان ممكن يكتب
     // فوق عرض المحادثة الثانية (اسم عميل غلط، رسايل غلط) — cancelled بيمنع أي setState من نداء قديم
     let cancelled = false
@@ -615,6 +625,23 @@ export default function ChatScreen() {
     setReplyingTo(msg)
     setActionSheetMsg(null)
     textareaRef.current?.focus()
+  }
+
+  const translateMessage = async (msg, target) => {
+    setActionSheetMsg(null)
+    setTranslatingId(msg.id)
+    try {
+      const res = await apiFetch(`${API_URL}/messages/${msg.id}/translate`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('chat.translation.error'))
+      setTranslations(prev => ({ ...prev, [msg.id]: { target, text: data.translation } }))
+    } catch (err) {
+      toast.error(err.message || t('chat.translation.error'))
+    } finally {
+      setTranslatingId(null)
+    }
   }
 
   const sendNote = async () => {
@@ -1190,7 +1217,8 @@ export default function ChatScreen() {
                   repliedMsg={item.reply_to_message_id ? messagesById[item.reply_to_message_id] : null}
                   canReply={conv?.platform === 'whatsapp' && !item._temp}
                   onLongPress={() => setActionSheetMsg(item)}
-                  onSwipeReply={() => startReply(item)} />
+                  onSwipeReply={() => startReply(item)}
+                  translation={translations[item.id]} translating={translatingId === item.id} />
               ))}
             </div>
           </div>
@@ -1523,6 +1551,22 @@ export default function ChatScreen() {
                 <Reply size={16} className="text-fg-muted" /> {t('chat.actionSheet.reply')}
               </button>
             )}
+            {actionSheetMsg.content && ['text', undefined, null].includes(actionSheetMsg.content_type) && (
+              <>
+                {['egyptian', 'msa', 'english'].map(target => (
+                  <button key={target} onClick={() => translateMessage(actionSheetMsg, target)}
+                    className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg text-start border-t border-surface-3">
+                    <Languages size={16} className="text-fg-muted" /> {t(`chat.translation.to.${target}`)}
+                  </button>
+                ))}
+                {translations[actionSheetMsg.id] && (
+                  <button onClick={() => { setTranslations(prev => { const n = { ...prev }; delete n[actionSheetMsg.id]; return n }); setActionSheetMsg(null) }}
+                    className="flex items-center gap-3 w-full px-4 py-3.5 hover:bg-surface-3 text-sm text-fg-muted text-start border-t border-surface-3">
+                    <X size={16} /> {t('chat.translation.hide')}
+                  </button>
+                )}
+              </>
+            )}
             <button onClick={() => setActionSheetMsg(null)}
               className="flex items-center justify-center w-full px-4 py-3.5 text-sm text-fg-muted border-t border-surface-3">
               {t('chat.common.cancel')}
@@ -1604,7 +1648,7 @@ function ActivityEvent({ log, agentsMap }) {
 // المسافة اللي لازم تتسحب لحد ما نعتبرها "سحب لتفعيل الرد" فعلي، مش مجرد لمسة عرضية
 const SWIPE_REPLY_THRESHOLD = 56
 
-function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canReply, onLongPress, onSwipeReply }) {
+function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canReply, onLongPress, onSwipeReply, translation, translating }) {
   const { t } = useTranslation()
   const [dragX, setDragX] = useState(0)
   const dragInfo = useRef({ startX: 0, startY: 0, dragging: false, longPressTimer: null, longPressFired: false })
@@ -1732,6 +1776,18 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             </a>
           ) : (
             <LinkifiedText text={msg.content} className="whitespace-pre-wrap break-words" />
+          )}
+          {/* ترجمة طلبها الموظف — للموظفين بس، مش بتتبعت للعميل */}
+          {translating && (
+            <span className="flex items-center gap-1.5 mt-1.5 pt-1.5 border-t border-white/15 text-[11px] opacity-70">
+              <span className="w-3 h-3 border-2 border-current border-t-transparent rounded-full animate-spin" /> {t('chat.translation.loading')}
+            </span>
+          )}
+          {translation && (
+            <div className="mt-1.5 pt-1.5 border-t border-white/20">
+              <span className="flex items-center gap-1 text-[10px] opacity-70 mb-0.5"><Languages size={10} /> {t(`chat.translation.label.${translation.target}`)}</span>
+              <LinkifiedText text={translation.text} className="whitespace-pre-wrap break-words text-[13px]" />
+            </div>
           )}
           {/* القالب بيتخزن كنص عادي، فمن غير العلامة دي مافيش أي فرق ظاهر بينه وبين رسالة مكتوبة */}
           {msg.template_name && (

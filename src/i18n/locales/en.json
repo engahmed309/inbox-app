@@ -1080,6 +1080,13 @@
       "copy": "Copy",
       "reply": "Reply"
     },
+    "translation": {
+      "to": { "egyptian": "Translate to Egyptian Arabic", "msa": "Translate to Modern Standard Arabic", "english": "Translate to English" },
+      "label": { "egyptian": "Egyptian Arabic", "msa": "Modern Standard Arabic", "english": "English" },
+      "hide": "Hide translation",
+      "loading": "Translating...",
+      "error": "Translation failed, please try again"
+    },
     "timeline": {
       "assignedManualPrefix": "Conversation assigned to",
       "assignedManualBy": "by",

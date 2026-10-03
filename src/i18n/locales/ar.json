@@ -1080,6 +1080,13 @@
       "copy": "نسخ",
       "reply": "رد"
     },
+    "translation": {
+      "to": { "egyptian": "ترجمة للمصري", "msa": "ترجمة للفصحى", "english": "Translate to English" },
+      "label": { "egyptian": "بالمصري", "msa": "بالفصحى", "english": "English" },
+      "hide": "إخفاء الترجمة",
+      "loading": "جاري الترجمة...",
+      "error": "تعذّرت الترجمة، حاول تاني"
+    },
     "timeline": {
       "assignedManualPrefix": "تم تعيين المحادثة إلى",
       "assignedManualBy": "بواسطة",
