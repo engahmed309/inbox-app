@@ -1717,6 +1717,8 @@
     "empty": "لا توجد مكالمات",
     "openChat": "فتح المحادثة",
     "answeredBy": "رد عليها {{name}}",
+    "unnamedMessenger": "عميل ماسنجر",
+    "platform": { "whatsapp": "واتساب", "facebook": "ماسنجر" },
     "tabs": {
       "all": "الكل",
       "answered": "تم الرد",

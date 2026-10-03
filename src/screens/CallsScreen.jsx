@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
-import { PhoneIncoming, PhoneMissed, Phone, MessageSquare, Clock } from 'lucide-react'
+import { PhoneIncoming, PhoneMissed, Phone, MessageSquare, Clock, Facebook } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
@@ -115,14 +115,30 @@ export default function CallsScreen() {
 
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-semibold text-fg truncate">
-                  {c.contacts?.name || c.from_number}
+                  {c.contacts?.name || (c.platform === 'facebook' ? t('callsLog.unnamedMessenger') : c.from_number)}
+                </p>
+                {/* جت على أنهي منصة/رقم: واتساب (اسم الرقم + رقمه) أو ماسنجر (اسم الصفحة) */}
+                <p className="flex items-center gap-1 text-[11px] font-medium mt-0.5" dir="auto">
+                  {c.platform === 'facebook' ? (
+                    <>
+                      <Facebook size={11} className="text-blue-400 flex-shrink-0" />
+                      <span className="text-blue-400">{t('callsLog.platform.facebook')}</span>
+                      {c.channels && <span className="text-fg-muted truncate">· {c.channels.custom_name || c.channels.display_name}</span>}
+                    </>
+                  ) : (
+                    <>
+                      <Phone size={11} className="text-green-400 flex-shrink-0" />
+                      <span className="text-green-400">{t('callsLog.platform.whatsapp')}</span>
+                      {c.channels?.custom_name && <span className="text-fg-muted">· {c.channels.custom_name}</span>}
+                      {c.channel_phone && <span className="text-fg-muted" dir="ltr">· {c.channel_phone}</span>}
+                    </>
+                  )}
                 </p>
                 <p className="text-[11px] text-fg-subtle truncate">
                   {missed
                     ? t(`callsLog.status.${c.status}`)
                     : t('callsLog.answeredBy', { name: c.agents?.name || '—' })}
                   {dur && <span className="ms-1.5"><Clock size={9} className="inline align-[-1px]" /> {dur}</span>}
-                  {c.channels && <span className="ms-1.5">· {c.channels.custom_name || c.channels.display_name}</span>}
                 </p>
                 {/* "فاتت" لوحدها مش كفاية — مين كان فاتح البرنامج وقتها وسابها ترن؟ */}
                 {missed && c.notified_agents?.length > 0 && (

@@ -1715,6 +1715,8 @@
     "title": "Call log",
     "noAccess": "Your account has no access to calls",
     "empty": "No calls yet",
+    "unnamedMessenger": "Messenger customer",
+    "platform": { "whatsapp": "WhatsApp", "facebook": "Messenger" },
     "openChat": "Open chat",
     "answeredBy": "Answered by {{name}}",
     "tabs": {
