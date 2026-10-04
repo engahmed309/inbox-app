@@ -26,5 +26,21 @@
 <body class="bg-surface text-fg">
   <div id="root"></div>
   <script type="module" src="/src/main.jsx"></script>
+  <script>
+    // حارس: لو بعد ١٢ ثانية مفيش حاجة اترسمت (ملف التطبيق الرئيسي نفسه فشل يتحمل، فكود React مش
+    // هيشتغل أصلاً عشان يعرض أي رسالة) نعرض زرار يمسح الكاش ويحدّث
+    setTimeout(function () {
+      var root = document.getElementById('root')
+      if (!root || root.childElementCount) return
+      root.innerHTML = '<div style="min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:#16161A;color:#e5e7eb;text-align:center;font-family:sans-serif"><div><p style="font-size:16px;margin-bottom:8px">البرنامج مش بيفتح</p><p style="font-size:12px;color:#9ca3af;margin-bottom:16px">اضغط الزرار لتحديثه، من غير ما يخرّجك من حسابك</p><button id="fix" style="padding:10px 20px;border-radius:10px;border:0;background:#6366f1;color:#fff;font-size:14px">تحديث البرنامج</button></div></div>'
+      document.getElementById('fix').onclick = function () {
+        var done = function () { location.reload() }
+        Promise.all([
+          navigator.serviceWorker ? navigator.serviceWorker.getRegistrations().then(function (r) { return Promise.all(r.map(function (x) { return x.unregister() })) }) : 0,
+          window.caches ? caches.keys().then(function (k) { return Promise.all(k.map(function (n) { return caches.delete(n) })) }) : 0
+        ]).then(done, done)
+      }
+    }, 12000)
+  </script>
 </body>
 </html>

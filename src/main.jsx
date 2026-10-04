@@ -3,6 +3,8 @@ import ReactDOM from 'react-dom/client'
 import { BrowserRouter } from 'react-router-dom'
 import { registerSW } from 'virtual:pwa-register'
 import App from './App'
+import ErrorBoundary from './components/ErrorBoundary'
+import { recoverApp } from './lib/recover'
 import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { LanguageProvider } from './contexts/LanguageContext'
@@ -33,8 +35,12 @@ registerSW({
   }
 })
 
+// فشل تحميل chunk (شاشة lazy) بعد تحديث جديد — Vite بيطلق الحدث ده، وبنعالجه بمسح الكاش وريلود
+window.addEventListener('vite:preloadError', (e) => { e.preventDefault(); recoverApp() })
+
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
+    <ErrorBoundary>
     <BrowserRouter>
       <LanguageProvider>
         <ThemeProvider>
@@ -46,5 +52,6 @@ ReactDOM.createRoot(document.getElementById('root')).render(
         </ThemeProvider>
       </LanguageProvider>
     </BrowserRouter>
+    </ErrorBoundary>
   </React.StrictMode>
 )
