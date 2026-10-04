@@ -1186,6 +1186,12 @@
     },
     "channelLabel": {
       "whatsappFallback": "WhatsApp"
+    },
+    "foreign": {
+      "title": "This chat is handled by {{name}}",
+      "body": "You can't view or reply to it. If you need it, request a transfer and your colleague will be notified.",
+      "requestTransfer": "Request transfer",
+      "back": "Back"
     }
   },
   "conversations": {

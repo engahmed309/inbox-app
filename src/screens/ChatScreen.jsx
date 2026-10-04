@@ -156,6 +156,8 @@ export default function ChatScreen() {
   // ليها صلاحية قصيرة (بتتجدد باستمرار طول ما هو بيكتب)، فلو حد قفل التاب فجأة من غير ما يبعت
   // إشارة "خلصت" هتختفي لوحدها من غير ما تفضل عالقة
   const [typingUsers, setTypingUsers] = useState({})
+  // المحادثة معيّنة لموظف تاني والموظف الحالي مالوش صلاحية رؤية كل المحادثات — مفيش جلب رسايل ولا عرض
+  const foreignRef = useRef(false)
   const typingChannelRef = useRef(null)
   const myTypingRef = useRef({ lastSentAt: 0, offTimeout: null })
 
@@ -215,6 +217,7 @@ export default function ChatScreen() {
   // بنجيب بس آخر MESSAGES_PAGE_SIZE رسالة (مش كل تاريخ المحادثة) وبندمجهم مع اللي محمّل قبل كده
   // (زي رسايل أقدم اتحملت بزرار "تحميل رسائل أقدم")، عشان محادثة طويلة العمر متتقلش كل ٤ ثواني كاملة
   const fetchMessages = useCallback(async (scroll = true) => {
+    if (foreignRef.current) return
     const { data } = await supabase
       .from('messages')
       .select('*')
@@ -285,8 +288,12 @@ export default function ChatScreen() {
         .single()
       if (cancelled) return
       if (convData) {
+        // محادثة موظف تاني: منحمّلش رسايلها ولا نسجّل قراءة — الشاشة هتعرض رسالة "معيّنة لـ..." بس
+        const seeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
+        foreignRef.current = !seeAll && !!convData.assigned_agent_id && convData.assigned_agent_id !== agent?.id
         setConv(convData)
         setContact(convData.contacts)
+        if (foreignRef.current) return
       }
 
       // Agent name
@@ -457,8 +464,16 @@ export default function ChatScreen() {
     // السريع مبيشتغلش، ويفضل الموظف مستني لحد ٤٥ ثانية (أو أكتر) وهو مش شايف رد العميل. دلوقتي:
     // استقصاء كل ٤ ثواني ثابت جوه أي محادثة مفتوحة (من غير أي شرط)، عشان أقصى تأخير ممكن يبقى ٤
     // ثواني حتى لو الـ Realtime فشل بصمت بالكامل
+    // وبنفس الدورة بنتأكد مين المسؤول عن المحادثة دلوقتي: لو اتنقلت لموظف تاني وإحنا فاتحينها
+    // (حصل: أريج ردت بعد ما اتعيّنت لرنا) الشاشة تتقفل بدل ما تفضل تقبل رد
+    const refreshAssignment = async () => {
+      const { data: c } = await supabase.from('conversations').select('assigned_agent_id').eq('id', id).maybeSingle()
+      if (cancelled || !c) return
+      setConv(prev => (prev && prev.assigned_agent_id !== c.assigned_agent_id ? { ...prev, assigned_agent_id: c.assigned_agent_id } : prev))
+    }
     const pollInterval = setInterval(() => {
       fetchMessages(false)
+      refreshAssignment()
     }, 4000)
 
     return () => {
@@ -1028,6 +1043,61 @@ export default function ChatScreen() {
     groups[date].push(item)
     return groups
   }, {}), [timeline])
+
+  // الموظف العادي مايشوفش ولا يرد على محادثة معيّنة لموظف تاني (الأدمن ومن عنده "رؤية كل المحادثات" بس)
+  const canSeeAll = agent?.role === 'admin' || !!agent?.can_see_all_conversations
+  const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id
+  foreignRef.current = isForeign
+  const [ownerName, setOwnerName] = useState('')
+  const [requestingTransfer, setRequestingTransfer] = useState(false)
+  useEffect(() => {
+    const aid = conv?.assigned_agent_id
+    if (!aid) { setOwnerName(''); return }
+    let live = true
+    supabase.from('agents').select('name, avatar_url').eq('id', aid).single().then(({ data }) => {
+      if (!live || !data) return
+      setOwnerName(data.name)
+      setConv(prev => (prev && prev.assigned_agent_id === aid ? { ...prev, agentName: data.name, agentAvatarUrl: data.avatar_url } : prev))
+    })
+    return () => { live = false }
+  }, [conv?.assigned_agent_id])
+
+  const requestTransferForThisChat = async () => {
+    setRequestingTransfer(true)
+    try {
+      const res = await apiFetch(`${API_URL}/notifications/transfer-request`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ conversation_id: id, from_agent_id: agent?.id })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('conversations.transfer.requestError'))
+      toast.success(t('conversations.transfer.requestSent'))
+    } catch (err) {
+      toast.error(t('chat.toast.genericErrorPrefix', { message: err.message }))
+    }
+    setRequestingTransfer(false)
+  }
+
+  if (isForeign) {
+    return (
+      <div className="h-full flex flex-col bg-surface overflow-hidden">
+        <div className="flex-shrink-0 flex items-center gap-3 px-4 pt-4 pb-3 bg-surface-2 border-b border-surface-3">
+          <button onClick={() => navigate(-1)} className="text-fg-muted hover:text-fg"><BackArrow /></button>
+          <p className="font-semibold text-sm text-fg truncate">{displayName(contact)}</p>
+        </div>
+        <div className="flex-1 flex flex-col items-center justify-center px-8 text-center gap-4">
+          <div className="w-14 h-14 rounded-full bg-surface-3 flex items-center justify-center"><User size={26} className="text-fg-muted" /></div>
+          <p className="text-fg font-medium">{t('chat.foreign.title', { name: ownerName || '…' })}</p>
+          <p className="text-sm text-fg-subtle max-w-xs">{t('chat.foreign.body')}</p>
+          <button onClick={requestTransferForThisChat} disabled={requestingTransfer}
+            className="px-5 py-2.5 rounded-xl bg-brand text-white text-sm font-medium disabled:opacity-50">
+            {t('chat.foreign.requestTransfer')}
+          </button>
+          <button onClick={() => navigate(-1)} className="text-sm text-fg-muted">{t('chat.foreign.back')}</button>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="h-full flex flex-col bg-surface overflow-hidden">
