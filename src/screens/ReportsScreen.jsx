@@ -1541,8 +1541,12 @@ function TemplatesReportTab() {
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [rows, setRows] = useState([])
+  const [currency, setCurrency] = useState('USD')
   const [agentsMap, setAgentsMap] = useState({})
   const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+  const [showPricing, setShowPricing] = useState(false)
+  const [reloadKey, setReloadKey] = useState(0)
   const [detail, setDetail] = useState(null) // { agentId, agentName, day } — يوم+موظف مفتوح حاليًا
 
   useEffect(() => {
@@ -1551,85 +1555,159 @@ function TemplatesReportTab() {
     })
   }, [])
 
+  // الـ cancelled flag بيمنع نتيجة طلب قديم (مثلاً "الكل" البطيء) إنها تكتب فوق نتيجة فلتر اختاره
+  // المستخدم بعدها. وأي فشل (timeout مثلاً) بيظهر كخطأ مع زرار إعادة محاولة — مش "لا توجد قوالب"
   useEffect(() => {
     if (range === 'custom' && !(customFrom && customTo)) { setLoading(false); return }
-    load()
-  }, [range, customFrom, customTo])
+    let cancelled = false
+    ;(async () => {
+      setLoading(true); setError('')
+      const { from, to } = computeDateBounds(range, customFrom, customTo)
+      const params = new URLSearchParams()
+      // بنقرّب "من" لأقرب ساعة لتحت عشان نفس الفترة تتطابق مع الكاش اللي في السيرفر
+      if (from) params.set('from', new Date(Math.floor(new Date(from).getTime() / 3600000) * 3600000).toISOString())
+      if (to) params.set('to', to)
+      try {
+        const res = await apiFetch(`${API_URL}/reports/templates/summary?${params}`)
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error || 'error')
+        if (cancelled) return
+        setRows(data.rows || [])
+        setCurrency(data.currency || 'USD')
+      } catch (err) {
+        if (cancelled) return
+        setRows([])
+        setError(err.message || t('reports.templates.loadError'))
+      }
+      if (!cancelled) setLoading(false)
+    })()
+    return () => { cancelled = true }
+  }, [range, customFrom, customTo, reloadKey])
 
-  const load = async () => {
-    setLoading(true)
-    const { from, to } = computeDateBounds(range, customFrom, customTo)
-    const params = new URLSearchParams()
-    if (from) params.set('from', from)
-    if (to) params.set('to', to)
-    try {
-      const res = await apiFetch(`${API_URL}/reports/templates/summary?${params}`)
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setRows(data.rows || [])
-    } catch {
-      setRows([])
-    }
-    setLoading(false)
-  }
+  const money = (n) => `${(n || 0).toLocaleString(i18n.language, { maximumFractionDigits: 2, minimumFractionDigits: n > 0 && n < 1 ? 2 : 0 })} ${currency}`
+  const dayLabel = (day) => formatShort(new Date(`${String(day).slice(0, 10)}T12:00:00`))
 
-  // تجميع الصفوف (يوم × موظف × قالب) إلى: لكل يوم → لكل موظف → إجمالي + تفصيل كل قالب
+  // تجميع الصفوف (يوم × موظف × قالب × دولة) إلى: لكل يوم → لكل موظف → إجمالي + تفصيل كل قالب
   const grouped = useMemo(() => {
     const byDay = {}
     for (const r of rows) {
       const dayBucket = byDay[r.day] || (byDay[r.day] = {})
       const key = r.agent_id || 'none'
-      const e = dayBucket[key] || (dayBucket[key] = { agent_id: r.agent_id, sent: 0, delivered: 0, read: 0, failed: 0, templates: [] })
-      e.sent += r.sent; e.delivered += r.delivered; e.read += r.read; e.failed += r.failed
-      e.templates.push({ name: r.template_name, sent: r.sent })
+      const e = dayBucket[key] || (dayBucket[key] = { agent_id: r.agent_id, sent: 0, delivered: 0, read: 0, failed: 0, cost: 0, templates: {} })
+      e.sent += r.sent; e.delivered += r.delivered; e.read += r.read; e.failed += r.failed; e.cost += r.cost
+      e.templates[r.template_name] = (e.templates[r.template_name] || 0) + r.sent
     }
     return Object.entries(byDay).sort((a, b) => b[0].localeCompare(a[0]))
-      .map(([day, agents]) => ({ day, agents: Object.values(agents).sort((a, b) => b.sent - a.sent) }))
+      .map(([day, agents]) => ({
+        day,
+        agents: Object.values(agents)
+          .map(a => ({ ...a, templates: Object.entries(a.templates).map(([name, sent]) => ({ name, sent })) }))
+          .sort((a, b) => b.sent - a.sent),
+      }))
+  }, [rows])
+
+  // إجمالي كل موظف على الفترة كلها (الرسايل والتكلفة التقديرية)
+  const byAgent = useMemo(() => {
+    const m = {}
+    for (const r of rows) {
+      const key = r.agent_id || 'none'
+      const e = m[key] || (m[key] = { agent_id: r.agent_id, sent: 0, failed: 0, cost: 0 })
+      e.sent += r.sent; e.failed += r.failed; e.cost += r.cost
+    }
+    return Object.values(m).sort((a, b) => b.cost - a.cost)
   }, [rows])
 
   const totalSent = useMemo(() => rows.reduce((s, r) => s + r.sent, 0), [rows])
   const totalFailed = useMemo(() => rows.reduce((s, r) => s + r.failed, 0), [rows])
+  const totalCost = useMemo(() => rows.reduce((s, r) => s + r.cost, 0), [rows])
+  const agentName = (id) => agentsMap[id]?.name || t('reports.templates.unknownAgent')
 
   return (
     <div className="p-4 space-y-4">
-      <h2 className="font-semibold text-fg">{t('reports.templates.title')}</h2>
-      <p className="text-xs text-fg-subtle -mt-2">{t('reports.templates.description')}</p>
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <h2 className="font-semibold text-fg">{t('reports.templates.title')}</h2>
+          <p className="text-xs text-fg-subtle mt-1">{t('reports.templates.description')}</p>
+        </div>
+        <button onClick={() => setShowPricing(true)}
+          className="text-xs px-3 py-1.5 rounded-lg bg-surface-2 border border-surface-3 text-fg-muted hover:text-fg flex-shrink-0">
+          {t('reports.templates.pricing.edit')}
+        </button>
+      </div>
 
       <DateRangeFilter range={range} setRange={setRange} customFrom={customFrom} setCustomFrom={setCustomFrom} customTo={customTo} setCustomTo={setCustomTo} />
 
       {range === 'custom' && !(customFrom && customTo) ? (
         <p className="text-center text-fg-subtle text-sm py-8">{t('reports.filters.selectDatesPrompt')}</p>
       ) : loading ? (
-        <div className="flex items-center justify-center h-32">
+        <div className="flex flex-col items-center justify-center h-32 gap-2">
           <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
+          {range === 'all' && <p className="text-[11px] text-fg-subtle">{t('reports.templates.slowHint')}</p>}
+        </div>
+      ) : error ? (
+        <div className="text-center py-10 space-y-3">
+          <p className="text-danger text-sm">{t('reports.templates.loadSummaryError')}</p>
+          <p className="text-[11px] text-fg-subtle" dir="ltr">{error}</p>
+          <button onClick={() => setReloadKey(k => k + 1)} className="px-4 py-2 rounded-lg bg-brand text-white text-sm">{t('reports.templates.retry')}</button>
         </div>
       ) : !rows.length ? (
         <p className="text-center text-fg-subtle text-sm py-10">{t('reports.templates.empty')}</p>
       ) : (
         <>
-          <div className="flex items-center gap-4 text-xs bg-surface-2 border border-surface-3 rounded-xl px-4 py-3">
-            <span className="text-fg-muted">{t('reports.templates.totalSent')} <b className="text-fg">{totalSent}</b></span>
-            {totalFailed > 0 && <span className="text-fg-muted">{t('reports.templates.totalFailed')} <b className="text-danger">{totalFailed}</b></span>}
+          <div className="grid grid-cols-3 gap-2 text-center">
+            <div className="bg-surface-2 border border-surface-3 rounded-xl py-3">
+              <div className="text-[11px] text-fg-muted">{t('reports.templates.totalSentLabel')}</div>
+              <div className="text-lg font-semibold text-fg">{totalSent}</div>
+            </div>
+            <div className="bg-surface-2 border border-surface-3 rounded-xl py-3">
+              <div className="text-[11px] text-fg-muted">{t('reports.templates.totalFailed')}</div>
+              <div className={`text-lg font-semibold ${totalFailed > 0 ? 'text-danger' : 'text-fg'}`}>{totalFailed}</div>
+            </div>
+            <div className="bg-surface-2 border border-surface-3 rounded-xl py-3">
+              <div className="text-[11px] text-fg-muted">{t('reports.templates.estCost')}</div>
+              <div className="text-lg font-semibold text-brand" dir="ltr">{money(totalCost)}</div>
+            </div>
+          </div>
+          <p className="text-[11px] text-fg-subtle -mt-2">{t('reports.templates.estCostNote')}</p>
+
+          <div>
+            <h3 className="text-xs font-semibold text-fg-muted mb-2">{t('reports.templates.byAgent')}</h3>
+            <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
+              {byAgent.map(a => (
+                <div key={a.agent_id || 'none'} className="flex items-center gap-3 px-4 py-3">
+                  <AgentAvatar agent={agentsMap[a.agent_id]} size={26} />
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-fg truncate">{agentName(a.agent_id)}</div>
+                    <div className="text-[11px] text-fg-subtle">
+                      {t('reports.templates.sentShort', { count: a.sent })}
+                      {a.failed > 0 && <span className="text-danger"> · {t('reports.templates.failedCount', { count: a.failed })}</span>}
+                    </div>
+                  </div>
+                  <div className="text-sm font-semibold text-fg flex-shrink-0" dir="ltr">{money(a.cost)}</div>
+                </div>
+              ))}
+            </div>
           </div>
 
           <div className="space-y-4">
             {grouped.map(({ day, agents }) => (
               <div key={day}>
-                <h3 className="text-xs font-semibold text-fg-muted mb-2">{formatShort(new Date(day))}</h3>
+                <h3 className="text-xs font-semibold text-fg-muted mb-2">{dayLabel(day)}</h3>
                 <div className="bg-surface-2 rounded-2xl border border-surface-3 divide-y divide-surface-3 overflow-hidden">
                   {agents.map(a => (
                     <button key={a.agent_id || 'none'}
-                      onClick={() => setDetail({ agentId: a.agent_id, day, agentName: agentsMap[a.agent_id]?.name || t('reports.templates.unknownAgent') })}
+                      onClick={() => setDetail({ agentId: a.agent_id, day, agentName: agentName(a.agent_id) })}
                       className="w-full flex items-center gap-3 px-4 py-3 hover:bg-surface-3 text-start transition-colors">
                       <AgentAvatar agent={agentsMap[a.agent_id]} size={26} />
                       <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-fg truncate">{agentsMap[a.agent_id]?.name || t('reports.templates.unknownAgent')}</div>
+                        <div className="text-sm font-medium text-fg truncate">{agentName(a.agent_id)}</div>
                         <div className="text-[11px] text-fg-subtle truncate">
                           {a.templates.map(tp => `${tp.name} (${tp.sent})`).join('، ')}
                         </div>
                       </div>
                       <div className="text-end flex-shrink-0">
                         <div className="text-sm font-semibold text-fg">{a.sent}</div>
+                        <div className="text-[10px] text-fg-subtle" dir="ltr">{money(a.cost)}</div>
                         {a.failed > 0 && <div className="text-[10px] text-danger">{t('reports.templates.failedCount', { count: a.failed })}</div>}
                       </div>
                       <ChevronDown size={14} className="text-fg-subtle -rotate-90 flex-shrink-0" />
@@ -1643,16 +1721,136 @@ function TemplatesReportTab() {
       )}
 
       {detail && (
-        <TemplateMessagesModal detail={detail} onClose={() => setDetail(null)}
+        <TemplateMessagesModal detail={detail} dayLabel={dayLabel} onClose={() => setDetail(null)}
           onOpenConversation={id => navigate(`/chat/${id}`)} />
       )}
+      {showPricing && (
+        <TemplatePricingModal onClose={() => setShowPricing(false)}
+          onSaved={() => { setShowPricing(false); setReloadKey(k => k + 1) }} />
+      )}
+    </div>
+  )
+}
+
+// تعديل أسعار التقدير: سعر الرسالة التسويقية/الخدمية لكل دولة (+ "باقي الدول")، وفئة كل قالب لو
+// ميتا ما رجّعتهاش (قالب اتمسح مثلاً). الأرقام دي تقديرية — الفاتورة الحقيقية دايمًا من ميتا
+function TemplatePricingModal({ onClose, onSaved }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [data, setData] = useState(null)
+  const [rates, setRates] = useState({})
+  const [cats, setCats] = useState({})
+  const [currency, setCurrency] = useState('USD')
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    apiFetch(`${API_URL}/settings/template-pricing`).then(r => r.json()).then(d => {
+      if (d.error) throw new Error(d.error)
+      setData(d); setRates(d.pricing.rates); setCats(d.pricing.categories); setCurrency(d.pricing.currency)
+    }).catch(err => setError(err.message))
+  }, [])
+
+  const setRate = (cc, kind, v) => setRates(r => ({ ...r, [cc]: { ...r[cc], [kind]: v } }))
+  const addCountry = () => {
+    const cc = (window.prompt(t('reports.templates.pricing.addCountryPrompt')) || '').trim().toUpperCase()
+    if (!/^[A-Z]{2}$/.test(cc) || rates[cc]) return
+    setRates(r => ({ ...r, [cc]: { ...r.default } }))
+  }
+  const removeCountry = (cc) => setRates(r => { const n = { ...r }; delete n[cc]; return n })
+
+  const save = async () => {
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/settings/template-pricing`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ currency, rates, categories: cats }),
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      toast.success(t('reports.templates.pricing.saved'))
+      onSaved()
+    } catch (err) {
+      toast.error(err.message)
+    }
+    setSaving(false)
+  }
+
+  const templateNames = data ? [...new Set([...Object.keys(data.meta_categories || {}), ...Object.keys(cats)])].sort() : []
+  const countries = Object.keys(rates).filter(k => k !== 'default').sort()
+  const inputCls = 'w-20 bg-surface-2 border border-surface-3 rounded-lg px-2 py-1 text-sm text-fg text-center'
+
+  return (
+    <div className="fixed inset-0 bg-black/50 z-50 flex items-end sm:items-center justify-center" onClick={onClose}>
+      <div className="bg-surface w-full sm:max-w-lg sm:rounded-2xl rounded-t-2xl max-h-[85vh] flex flex-col" onClick={e => e.stopPropagation()}>
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3 flex-shrink-0">
+          <h3 className="font-semibold text-fg text-sm">{t('reports.templates.pricing.title')}</h3>
+          <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
+        </div>
+        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+          {error ? <p className="text-danger text-sm text-center">{error}</p> : !data ? (
+            <div className="flex justify-center py-8"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+          ) : (
+            <>
+              <p className="text-[11px] text-fg-subtle">{t('reports.templates.pricing.note')}</p>
+              <label className="flex items-center gap-2 text-sm text-fg">
+                {t('reports.templates.pricing.currency')}
+                <input value={currency} onChange={e => setCurrency(e.target.value)} maxLength={5} dir="ltr" className={inputCls} />
+              </label>
+              <div>
+                <div className="grid grid-cols-[1fr_5rem_5rem_1.5rem] gap-2 text-[11px] text-fg-muted mb-1 items-center">
+                  <span>{t('reports.templates.pricing.country')}</span>
+                  <span className="text-center">{t('reports.templates.pricing.marketing')}</span>
+                  <span className="text-center">{t('reports.templates.pricing.utility')}</span><span />
+                </div>
+                {['default', ...countries].map(cc => (
+                  <div key={cc} className="grid grid-cols-[1fr_5rem_5rem_1.5rem] gap-2 items-center mb-1.5">
+                    <span className="text-sm text-fg">{cc === 'default' ? t('reports.templates.pricing.otherCountries') : cc}</span>
+                    <input type="number" step="0.0001" min="0" dir="ltr" value={rates[cc]?.MARKETING ?? ''} onChange={e => setRate(cc, 'MARKETING', e.target.value)} className={inputCls} />
+                    <input type="number" step="0.0001" min="0" dir="ltr" value={rates[cc]?.UTILITY ?? ''} onChange={e => setRate(cc, 'UTILITY', e.target.value)} className={inputCls} />
+                    {cc !== 'default' ? <button onClick={() => removeCountry(cc)} className="text-fg-subtle hover:text-danger"><X size={14} /></button> : <span />}
+                  </div>
+                ))}
+                <button onClick={addCountry} className="text-xs text-brand mt-1">{t('reports.templates.pricing.addCountry')}</button>
+              </div>
+              {templateNames.length > 0 && (
+                <div>
+                  <h4 className="text-xs font-semibold text-fg-muted mb-1">{t('reports.templates.pricing.categories')}</h4>
+                  <p className="text-[11px] text-fg-subtle mb-2">{t('reports.templates.pricing.categoriesNote')}</p>
+                  {templateNames.map(name => {
+                    const metaCat = data.meta_categories?.[name]
+                    return (
+                      <div key={name} className="flex items-center gap-2 mb-1.5">
+                        <span className="flex-1 min-w-0 text-xs text-fg truncate" dir="ltr">{name}</span>
+                        <select value={cats[name] || ''} onChange={e => setCats(c => { const n = { ...c }; if (e.target.value) n[name] = e.target.value; else delete n[name]; return n })}
+                          className="bg-surface-2 border border-surface-3 rounded-lg px-2 py-1 text-xs text-fg">
+                          <option value="">{metaCat ? `${t('reports.templates.pricing.auto')} (${metaCat})` : `${t('reports.templates.pricing.auto')} (MARKETING)`}</option>
+                          <option value="MARKETING">MARKETING</option>
+                          <option value="UTILITY">UTILITY</option>
+                        </select>
+                      </div>
+                    )
+                  })}
+                </div>
+              )}
+            </>
+          )}
+        </div>
+        {data && (
+          <div className="p-4 border-t border-surface-3 flex-shrink-0">
+            <button onClick={save} disabled={saving} className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-medium disabled:opacity-50">
+              {saving ? '...' : t('reports.templates.pricing.save')}
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
 
 // قايمة المحادثات اللي اتبعتلها قالب من موظف معيّن في يوم معيّن — كل صف بيوري حالة الرسالة فعليًا
 // (✓ اتبعتت، ✓✓ وصلت/اتقرت، أو سبب الفشل) عشان تتابع نجاح الإرسال، والضغط عليه بيفتح المحادثة نفسها
-function TemplateMessagesModal({ detail, onClose, onOpenConversation }) {
+function TemplateMessagesModal({ detail, dayLabel, onClose, onOpenConversation }) {
   const { t } = useTranslation()
   const [rows, setRows] = useState(null)
   const [error, setError] = useState('')
@@ -1685,7 +1883,7 @@ function TemplateMessagesModal({ detail, onClose, onOpenConversation }) {
         <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3 flex-shrink-0">
           <div>
             <h3 className="font-semibold text-fg text-sm">{detail.agentName}</h3>
-            <p className="text-xs text-fg-subtle">{formatShort(new Date(detail.day))}</p>
+            <p className="text-xs text-fg-subtle">{dayLabel(detail.day)}</p>
           </div>
           <button onClick={onClose} className="text-fg-muted hover:text-fg"><X size={18} /></button>
         </div>

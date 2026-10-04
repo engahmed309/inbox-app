@@ -224,7 +224,11 @@
       "followupAdd": "إضافة موعد تاني",
       "followupsHint": "المدة بتتحسب من بداية الباقة (لحظة اختيارها للعميل). قبل كل موعد النظام بيفتح محادثة العميل ويحط ملاحظة داخلية للموظف المعيّن عشان يحدد للعميل موعد المكالمة.",
       "followupsBadge": "+{{count}} موعد",
-      "unit": { "days": "يوم", "weeks": "أسبوع", "months": "شهر" },
+      "unit": {
+        "days": "يوم",
+        "weeks": "أسبوع",
+        "months": "شهر"
+      },
       "reminderTitle": "تذكير تجديد الباقة ومواعيدها",
       "reminderEnable": "تفعيل التذكير التلقائي",
       "reminderEnableHint": "لما معاد انتهاء باقة عميل (أو معاد مكالمة تانية فيها) يستحق، المحادثة بتترجع open وتتحط عليها ملاحظة داخلية تلقائيًا",
@@ -926,7 +930,32 @@
       "failedCount": "{{count}} فشل",
       "unknownAgent": "موظف غير معروف",
       "unknownContact": "عميل",
-      "loadError": "فشل تحميل المحادثات"
+      "loadError": "فشل تحميل المحادثات",
+      "loadSummaryError": "تعذّر تحميل التقرير (الفترة كبيرة أو السيرفر مشغول)",
+      "retry": "إعادة المحاولة",
+      "slowHint": "الفترة الكاملة بتاخد وقت أطول شوية… استنى",
+      "totalSentLabel": "إجمالي المُرسل",
+      "estCost": "التكلفة التقديرية",
+      "estCostNote": "تقديرية: محسوبة من أسعار ميتا حسب فئة القالب ودولة العميل (الفاشل مش بيتحاسب، والخدمي محسوب كامل). الرقم الحقيقي في فاتورة ميتا.",
+      "byAgent": "إجمالي كل موظف في الفترة",
+      "sentShort": "{{count}} رسالة",
+      "pricing": {
+        "edit": "أسعار التقدير",
+        "title": "أسعار تقدير تكلفة القوالب",
+        "note": "السعر لكل رسالة قالب اتسلّمت. عدّل الأرقام زي ما في قائمة أسعار ميتا اللي في حسابك عشان التقدير يبقى أدق.",
+        "currency": "العملة",
+        "country": "الدولة (كود من حرفين)",
+        "marketing": "تسويقي",
+        "utility": "خدمي",
+        "otherCountries": "باقي الدول",
+        "addCountry": "+ إضافة دولة",
+        "addCountryPrompt": "كود الدولة (حرفين، مثال: KW)",
+        "categories": "فئة القوالب",
+        "categoriesNote": "الفئة بتتجاب من ميتا تلقائي. غيّرها يدويًا بس لو قالب اتمسح أو ميتا غيّرت فئته.",
+        "auto": "تلقائي",
+        "save": "حفظ",
+        "saved": "تم حفظ الأسعار"
+      }
     },
     "volume": {
       "title": "رسائل القنوات",
@@ -1096,8 +1125,16 @@
       "reply": "رد"
     },
     "translation": {
-      "to": { "egyptian": "ترجمة للمصري", "msa": "ترجمة للفصحى", "english": "Translate to English" },
-      "label": { "egyptian": "بالمصري", "msa": "بالفصحى", "english": "English" },
+      "to": {
+        "egyptian": "ترجمة للمصري",
+        "msa": "ترجمة للفصحى",
+        "english": "Translate to English"
+      },
+      "label": {
+        "egyptian": "بالمصري",
+        "msa": "بالفصحى",
+        "english": "English"
+      },
       "hide": "إخفاء الترجمة",
       "loading": "جاري الترجمة...",
       "error": "تعذّرت الترجمة، حاول تاني"
@@ -1129,7 +1166,11 @@
       "preview": "معاينة",
       "send": "إرسال",
       "headerFileLabel": "ملف الهيدر ({{format}})",
-      "headerFormat": { "IMAGE": "صورة", "VIDEO": "فيديو", "DOCUMENT": "ملف" },
+      "headerFormat": {
+        "IMAGE": "صورة",
+        "VIDEO": "فيديو",
+        "DOCUMENT": "ملف"
+      },
       "headerFilePlaceholder": "اختر ملف",
       "headerFileRequired": "لازم تختار الملف اللي هيتبعت مع القالب ده",
       "uploadingFile": "جاري رفع الملف...",
@@ -1741,7 +1782,10 @@
     "openChat": "فتح المحادثة",
     "answeredBy": "رد عليها {{name}}",
     "unnamedMessenger": "عميل ماسنجر",
-    "platform": { "whatsapp": "واتساب", "facebook": "ماسنجر" },
+    "platform": {
+      "whatsapp": "واتساب",
+      "facebook": "ماسنجر"
+    },
     "tabs": {
       "all": "الكل",
       "answered": "تم الرد",

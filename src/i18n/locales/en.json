@@ -746,7 +746,11 @@
       "followupAdd": "Add another call",
       "followupsHint": "Counted from the package start (the moment it's assigned to the customer). Before each one, the system reopens the customer's conversation and adds an internal note for the assigned agent to schedule the call.",
       "followupsBadge": "+{{count}} call(s)",
-      "unit": { "days": "day(s)", "weeks": "week(s)", "months": "month(s)" },
+      "unit": {
+        "days": "day(s)",
+        "weeks": "week(s)",
+        "months": "month(s)"
+      },
       "reminderTitle": "Package renewal and call reminders",
       "reminderEnable": "Enable automatic reminder",
       "reminderEnableHint": "When a customer's package expiry (or a later call in it) is due, their conversation reopens and an internal note is added automatically",
@@ -926,7 +930,32 @@
       "failedCount": "{{count}} failed",
       "unknownAgent": "Unknown agent",
       "unknownContact": "Customer",
-      "loadError": "Failed to load conversations"
+      "loadError": "Failed to load conversations",
+      "loadSummaryError": "Couldn't load the report (range too large or server busy)",
+      "retry": "Retry",
+      "slowHint": "The full range takes a bit longer… please wait",
+      "totalSentLabel": "Total sent",
+      "estCost": "Estimated cost",
+      "estCostNote": "Estimate based on Meta's rates by template category and customer country (failed messages aren't charged; utility is counted in full). Your Meta invoice has the real figure.",
+      "byAgent": "Per-agent total for the period",
+      "sentShort": "{{count}} sent",
+      "pricing": {
+        "edit": "Cost rates",
+        "title": "Template cost estimate rates",
+        "note": "Price per delivered template message. Match these to the rate card in your Meta account for a closer estimate.",
+        "currency": "Currency",
+        "country": "Country (2-letter code)",
+        "marketing": "Marketing",
+        "utility": "Utility",
+        "otherCountries": "All other countries",
+        "addCountry": "+ Add country",
+        "addCountryPrompt": "Country code (2 letters, e.g. KW)",
+        "categories": "Template categories",
+        "categoriesNote": "Categories are pulled from Meta automatically. Override only if a template was deleted or Meta changed its category.",
+        "auto": "Auto",
+        "save": "Save",
+        "saved": "Rates saved"
+      }
     },
     "volume": {
       "title": "Channel Message Volume",
@@ -1096,8 +1125,16 @@
       "reply": "Reply"
     },
     "translation": {
-      "to": { "egyptian": "Translate to Egyptian Arabic", "msa": "Translate to Modern Standard Arabic", "english": "Translate to English" },
-      "label": { "egyptian": "Egyptian Arabic", "msa": "Modern Standard Arabic", "english": "English" },
+      "to": {
+        "egyptian": "Translate to Egyptian Arabic",
+        "msa": "Translate to Modern Standard Arabic",
+        "english": "Translate to English"
+      },
+      "label": {
+        "egyptian": "Egyptian Arabic",
+        "msa": "Modern Standard Arabic",
+        "english": "English"
+      },
       "hide": "Hide translation",
       "loading": "Translating...",
       "error": "Translation failed, please try again"
@@ -1129,7 +1166,11 @@
       "preview": "Preview",
       "send": "Send",
       "headerFileLabel": "Header file ({{format}})",
-      "headerFormat": { "IMAGE": "image", "VIDEO": "video", "DOCUMENT": "document" },
+      "headerFormat": {
+        "IMAGE": "image",
+        "VIDEO": "video",
+        "DOCUMENT": "document"
+      },
       "headerFilePlaceholder": "Choose a file",
       "headerFileRequired": "You need to pick the file to send with this template",
       "uploadingFile": "Uploading file...",
@@ -1739,7 +1780,10 @@
     "noAccess": "Your account has no access to calls",
     "empty": "No calls yet",
     "unnamedMessenger": "Messenger customer",
-    "platform": { "whatsapp": "WhatsApp", "facebook": "Messenger" },
+    "platform": {
+      "whatsapp": "WhatsApp",
+      "facebook": "Messenger"
+    },
     "openChat": "Open chat",
     "answeredBy": "Answered by {{name}}",
     "tabs": {
