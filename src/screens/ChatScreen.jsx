@@ -471,9 +471,11 @@ export default function ChatScreen() {
       if (cancelled || !c) return
       setConv(prev => (prev && prev.assigned_agent_id !== c.assigned_agent_id ? { ...prev, assigned_agent_id: c.assigned_agent_id } : prev))
     }
+    // الرسايل كل ٤ ثواني، والتعيين كل ١٢ ثانية بس (الـRealtime بيوصّل تغيير التعيين لحظيًا في العادة)
+    let pollTick = 0
     const pollInterval = setInterval(() => {
       fetchMessages(false)
-      refreshAssignment()
+      if (++pollTick % 3 === 0) refreshAssignment()
     }, 4000)
 
     return () => {
