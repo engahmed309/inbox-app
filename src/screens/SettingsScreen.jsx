@@ -10,12 +10,13 @@ import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 import { formatNumber } from '../lib/locale'
 import SegmentBuilder from '../components/SegmentBuilder'
 import TemplatePreview from '../components/TemplatePreview'
+import FlowsTab from '../components/FlowsTab'
 import {
   Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
   Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
-  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2, PauseCircle, PlayCircle
+  QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2, PauseCircle, PlayCircle, GitBranch
 } from 'lucide-react'
 
 const TABS = [
@@ -30,6 +31,7 @@ const TABS = [
   { key: 'roundrobin', labelKey: 'settings.tabs.roundRobin', icon: Settings2 },
   { key: 'ai', labelKey: 'settings.tabs.ai', icon: Bot },
   { key: 'segments', labelKey: 'settings.tabs.segments', icon: Filter },
+  { key: 'flows', labelKey: 'settings.tabs.flows', icon: GitBranch },
   { key: 'ratings', labelKey: 'settings.tabs.ratings', icon: Star },
   { key: 'responsealerts', labelKey: 'settings.tabs.responseAlerts', icon: Clock },
   { key: 'health', labelKey: 'settings.tabs.health', icon: Activity },
@@ -85,6 +87,7 @@ export default function SettingsScreen() {
         {tab === 'roundrobin' && <RoundRobinTab />}
         {tab === 'ai' && <AiAgentTab />}
         {tab === 'segments' && <SegmentsTab />}
+        {tab === 'flows' && <FlowsTab />}
         {tab === 'ratings' && <RatingsTab />}
         {tab === 'responsealerts' && <ResponseAlertsTab />}
         {tab === 'health' && <SystemHealthTab />}

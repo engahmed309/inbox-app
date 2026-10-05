@@ -160,7 +160,8 @@
       "segments": "Segments",
       "health": "System health",
       "danger": "Danger Zone",
-      "ratings": "Ratings"
+      "ratings": "Ratings",
+      "flows": "Flows"
     },
     "health": {
       "desc": "Where every channel stands right now, and what needs attention.",
@@ -771,6 +772,93 @@
       "templateMediaHeaderWarning": "⚠️ This template's header is an image/video/document — the system can't send it automatically (no file is set). Pick a text-only template instead",
       "templateTooManyVarsWarning": "⚠️ This template has more than one variable — the system only fills the first with the agent/team name; the rest stay empty and sending will fail",
       "templateOkHint": "The template's one variable is filled automatically with the conversation's assigned agent name, or \"Dr. Mohamed Saeed's team\" if none is assigned"
+    },
+    "flows": {
+      "intro": "Decide what happens when a customer replies to a template (or types a keyword): messages, waits, branching on their reply, lifecycle/tag changes, assigning to a team or agent. All configurable here, no code changes.",
+      "empty": "No flows yet. Tap \"New flow\".",
+      "newFlow": "New flow",
+      "editFlow": "Edit flow",
+      "on": "On",
+      "off": "Off",
+      "deleteConfirm": "Delete flow \"{{name}}\"? Conversations currently in it will stop.",
+      "statsLine": "{{total}} runs (30d) — {{running}} running, {{done}} done",
+      "namePlaceholder": "Flow name (e.g. Morocco offer reply)",
+      "triggerTitle": "What starts the flow?",
+      "trigger": {
+        "template_reply": "Customer replies to a template",
+        "keyword": "Customer types a keyword",
+        "first_message": "New customer's first message"
+      },
+      "anyTemplate": "Any template",
+      "replyCondition": "Condition on the reply:",
+      "windowHours": "Max time between template and reply (hours)",
+      "keywordHint": "Runs when the customer message matches these words (Arabic letter variants are treated the same).",
+      "platformsHint": "Platforms (empty = all):",
+      "match": {
+        "any": "Any reply",
+        "equals": "Equals exactly",
+        "contains": "Contains",
+        "valuesPlaceholder": "Words, comma separated: book, i want to book"
+      },
+      "unit": {
+        "m": "minutes",
+        "h": "hours",
+        "d": "days"
+      },
+      "stepsTitle": "Steps",
+      "addStep": "Add step",
+      "step": {
+        "message": "Send message",
+        "template": "Send template",
+        "wait": "Wait",
+        "wait_reply": "Wait for reply (branching)",
+        "lifecycle": "Change lifecycle stage",
+        "tag": "Tag",
+        "assign": "Assign conversation",
+        "note": "Internal note",
+        "end": "End flow"
+      },
+      "messagePlaceholder": "Message text (use {name} for the customer name)",
+      "mediaPlaceholder": "Image/file URL (optional)",
+      "pickTemplate": "Choose template",
+      "paramsPlaceholder": "Template variable values, comma separated (optional)",
+      "sameChannel": "From the conversation's number",
+      "pickStage": "Choose stage",
+      "pickTag": "Choose tag",
+      "tagAdd": "Add",
+      "tagRemove": "Remove",
+      "assignTeam": "To team",
+      "assignAgent": "To agent",
+      "pickTeam": "Choose team",
+      "pickAgent": "Choose agent",
+      "notePlaceholder": "Note text",
+      "notifyAgent": "Notify the assigned agent (push)",
+      "timeoutAfter": "If the customer does not reply after:",
+      "branchName": "Branch name (e.g. wants to book)",
+      "ifReply": "If the customer replies:",
+      "thenDo": "Then:",
+      "addBranch": "Add branch",
+      "elseTitle": "Any other reply",
+      "elseHint": "When the reply matches no branch. If empty, the flow keeps waiting.",
+      "timeoutTitle": "If no reply",
+      "timeoutHint": "What happens when the wait times out.",
+      "stopOnAgent": "Stop the flow when an agent replies manually",
+      "activate": "Activate flow",
+      "save": "Save",
+      "cancel": "Cancel",
+      "saved": "Flow saved",
+      "saveError": "Could not save",
+      "runs": "Runs",
+      "noRuns": "No runs yet",
+      "timedOut": "timed out",
+      "status": {
+        "running": "running",
+        "waiting_time": "waiting",
+        "waiting_reply": "awaiting reply",
+        "done": "done",
+        "cancelled": "cancelled",
+        "failed": "failed"
+      }
     }
   },
   "reports": {
