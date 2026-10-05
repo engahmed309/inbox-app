@@ -1682,6 +1682,16 @@ export default function ChatScreen() {
   )
 }
 
+// تعليق الصورة/الفيديو (الكلام اللي اتبعت مع الملف في نفس الرسالة، زي رد مسار أو تعليق عميل). الملفات
+// اللي بيرفعها الموظف من الشات بتتخزن باسمها في content (صورة.jpg) فبنخفي ده عشان اسم الملف مايظهرش
+// كأنه تعليق
+const FILENAME_RE = /^\S+\.(jpe?g|png|gif|webp|heic|bmp|mp4|mov|3gp|avi|mkv|webm)$/i
+const PLACEHOLDERS = new Set(['ملف', 'file', 'File'])
+function captionOf(msg) {
+  const c = (msg.content || '').trim()
+  return c && !FILENAME_RE.test(c) && !PLACEHOLDERS.has(c) ? c : ''
+}
+
 function AssignmentEvent({ log }) {
   const { t } = useTranslation()
   const toName = log.assigned_to_agent?.name || t('chat.common.unassigned')
@@ -1827,14 +1837,20 @@ function MessageBubble({ msg, prev, onMediaClick, agentsMap, repliedMsg, canRepl
             </div>
           )}
           {msg.content_type === 'image' && msg.media_url ? (
-            <img src={msg.media_url} alt="" loading="lazy" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
-              className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
+            <>
+              <img src={msg.media_url} alt="" loading="lazy" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
+                className="rounded-lg max-w-full max-h-48 object-cover cursor-pointer" />
+              {captionOf(msg) && <LinkifiedText text={captionOf(msg)} className="whitespace-pre-wrap break-words mt-1.5" />}
+            </>
           ) : msg.content_type === 'sticker' && msg.media_url ? (
             <img src={msg.media_url} alt="" loading="lazy" onClick={() => onMediaClick({ type: 'image', url: msg.media_url })}
               className="max-w-[100px] max-h-[100px] object-contain cursor-pointer" />
           ) : msg.content_type === 'video' && msg.media_url ? (
-            <video src={msg.media_url} controls preload="none" onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
-              className="rounded-lg max-w-full max-h-48 cursor-pointer" />
+            <>
+              <video src={msg.media_url} controls preload="none" onClick={e => { e.preventDefault(); onMediaClick({ type: 'video', url: msg.media_url }) }}
+                className="rounded-lg max-w-full max-h-48 cursor-pointer" />
+              {captionOf(msg) && <LinkifiedText text={captionOf(msg)} className="whitespace-pre-wrap break-words mt-1.5" />}
+            </>
           ) : msg.content_type === 'audio' && msg.media_url ? (
             <audio src={msg.media_url} controls className="max-w-full" style={{ height: 36 }} />
           ) : msg.content_type === 'file' && msg.media_url ? (
