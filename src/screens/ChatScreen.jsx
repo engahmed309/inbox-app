@@ -236,7 +236,14 @@ export default function ChatScreen() {
       // بالرسالة الحقيقية اللي جايالنا دلوقتي، مش تتراكم جنبها
       const withoutTemps = prev.filter(m => !m._temp)
       const existingIds = new Set(withoutTemps.map(m => m.id))
-      const merged = [...withoutTemps, ...latest.filter(m => !existingIds.has(m.id))]
+      // الرسالة الموجودة بتتحدّث بنسختها الأحدث من الداتا بيز (رابط الملف، حالة التسليم...). قبل كده كانت
+      // بتتساب زي ما اتحمّلت أول مرة، فرابط فويس اتصلّح بعدين كان بيفضل القديم المكسور على الشاشة المفتوحة
+      const latestById = new Map(latest.map(m => [m.id, m]))
+      const refreshed = withoutTemps.map(m => {
+        const fresh = latestById.get(m.id)
+        return fresh && (fresh.media_url !== m.media_url || fresh.status !== m.status || fresh.content !== m.content) ? { ...m, ...fresh } : m
+      })
+      const merged = [...refreshed, ...latest.filter(m => !existingIds.has(m.id))]
       merged.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
       // اسكرول لو فيه رسايل جديدة فعلاً (مش كل مرة الـ polling بيجري)
       const hasNewOnes = merged.length > messagesCountRef.current
