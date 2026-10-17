@@ -111,17 +111,15 @@ export default function CommentsScreen() {
   // بيرجّع القائمة لأول صفحة. بنستدعيها عند فتح التبويب وبعد أي إجراء — مش كل ٣٠ ثانية،
   // عشان القائمة ماتتحركش تحت إيد الموظف وهو بيقرا
   const load = useCallback(async () => {
+    // العدّادات بتتحمّل بالتوازي مش في الطريق: القائمة تظهر أول ما توصل حتى لو العدّ أبطأ
+    fetchCounts().then(fresh => { if (fresh) setSeenCount(fresh[status] ?? 0) })
     try {
-      const [listRes, fresh] = await Promise.all([
-        apiFetch(`${API_URL}/comments?${query}&limit=${PAGE_SIZE}`),
-        fetchCounts()
-      ])
+      const listRes = await apiFetch(`${API_URL}/comments?${query}&limit=${PAGE_SIZE}`)
       const listData = await listRes.json()
       if (listRes.ok) {
         setComments(listData.comments || [])
         setHasMore(!!listData.hasMore)
       }
-      if (fresh) setSeenCount(fresh[status] ?? 0)
     } catch { /* هنسيب اللي معروض زي ما هو */ } finally { setLoading(false) }
   }, [query, status, fetchCounts])
 
@@ -146,6 +144,7 @@ export default function CommentsScreen() {
     if (!canSee) return
     setLoading(true)
     setComments([])
+    setHasMore(false)          // وإلا مؤشر "حمّل المزيد" بتاع الفلتر القديم يفضل ظاهر ويطلب صفحة بإزاحة غلط
     load()
   }, [load, canSee])
 
@@ -586,7 +585,7 @@ export default function CommentsScreen() {
           )}
 
           {/* آخر الصفحة: أول ما يبان بنجيب الدفعة اللي بعده */}
-          {hasMore && (
+          {hasMore && !loading && (
             <div ref={sentinelRef} className="flex items-center justify-center py-4">
               <div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" />
             </div>
