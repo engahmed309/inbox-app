@@ -880,6 +880,10 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
   const [sending, setSending] = useState(false)
   const [saved, setSaved] = useState([])
   const [sug, setSug] = useState({ loading: false, items: [], note: null, examples: 0, asked: false })
+  // رسالة خاصة: بعدها بنرد علنًا إننا تواصلنا معاه (سياسة الصفحة: ما بنطلبش منه يراسلنا)
+  const canAck = mode === 'private' && !comment.public_reply_at && !comment.deleted_at
+  const [alsoPublic, setAlsoPublic] = useState(true)
+  const [ack, setAck] = useState(t('comments.ai.defaultAck'))
   useEffect(() => { loadSavedReplies().then(setSaved) }, [])
 
   // اقتراح بالذكاء الاصطناعي: بيتعلم من ردود الدكتور والموظفين السابقة. بيتحط في الصندوق والموظف يعدّل ويبعت
@@ -893,6 +897,7 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
       if (!res.ok) throw new Error(data.error)
       setSug({ loading: false, items: data.suggestions || [], note: data.note, examples: data.examples || 0, asked: true })
       if (data.suggestions?.[0]?.text && !text.trim()) setText(data.suggestions[0].text)
+      if (data.public_ack) setAck(data.public_ack)
       if (!data.suggestions?.length) toast.error(t('comments.ai.noSuggestion'))
     } catch (err) { toast.error(err.message); setSug(s => ({ ...s, loading: false })) }
   }
@@ -904,17 +909,18 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
     try {
       const res = await apiFetch(`${API_URL}/comments/${comment.id}/${isPublic ? 'reply' : 'private-reply'}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: text.trim() })
+        body: JSON.stringify({ message: text.trim(), ...(canAck && alsoPublic && ack.trim() ? { public_message: ack.trim() } : {}) })
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error)
       toast.success(t(isPublic ? 'comments.publicReplyDone' : 'comments.privateReplyDone'))
+      if (data.public && !data.public.ok) toast.error(t('comments.ai.ackFailed', { error: data.public.error || '' }))
       const now = new Date().toISOString()
       onSent(isPublic
         ? { public_reply_at: now, public_reply_text: text.trim() }
         // الرد الخاص فعليًا بيبقى رسالة في محادثة عادية اتعينت للموظف اللي بعتها — الباك إند
         // بيرجع معرّفها فورًا (من غير ما نستنى الويب هوك) عشان "فتح المحادثة" يظهر على طول
-        : { private_replied_at: now, private_reply_conversation_id: data.conversation_id || null })
+        : { private_replied_at: now, private_reply_conversation_id: data.conversation_id || null, ...(data.public?.ok ? { public_reply_at: now, public_reply_text: ack.trim() } : {}) })
     } catch (err) { toast.error(err.message) } finally { setSending(false) }
   }
 
@@ -957,6 +963,18 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
           <textarea value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
             placeholder={t(isPublic ? 'comments.publicReplyPlaceholder' : 'comments.privateReplyPlaceholder')}
             className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+          {canAck && (
+            <div className="bg-surface-3 rounded-xl p-2.5 space-y-1.5">
+              <label className="flex items-center gap-2 text-xs text-fg cursor-pointer">
+                <input type="checkbox" checked={alsoPublic} onChange={e => setAlsoPublic(e.target.checked)} />
+                {t('comments.ai.alsoPublic')}
+              </label>
+              {alsoPublic && (
+                <textarea value={ack} onChange={e => setAck(e.target.value)} rows={2}
+                  className="w-full bg-surface rounded-lg px-2.5 py-2 text-xs text-fg" />
+              )}
+            </div>
+          )}
           <p className="text-[11px] text-fg-subtle">{t(isPublic ? 'comments.publicReplyHint' : 'comments.privateReplyHint')}</p>
           <button onClick={send} disabled={sending || !text.trim()}
             className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">

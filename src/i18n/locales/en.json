@@ -2271,7 +2271,10 @@
       "sugUsed": "Used as is",
       "sugEdited": "Edited",
       "sugIgnored": "Ignored",
-      "sugCost": "Estimated cost: ${{v}}"
+      "sugCost": "Estimated cost: ${{v}}",
+      "defaultAck": "We have contacted you privately 💚 please check your messages",
+      "alsoPublic": "Also reply publicly that we contacted them privately",
+      "ackFailed": "The private message was sent, but the public reply failed: {{error}}"
     },
     "admin": {
       "redistributeTitle": "Move an agent's comments",
