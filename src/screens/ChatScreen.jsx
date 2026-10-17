@@ -216,7 +216,9 @@ export default function ChatScreen() {
   // ─── جيب الرسائل + سجل التعيين من الـ DB ────────────────────────────
   // بنجيب بس آخر MESSAGES_PAGE_SIZE رسالة (مش كل تاريخ المحادثة) وبندمجهم مع اللي محمّل قبل كده
   // (زي رسايل أقدم اتحملت بزرار "تحميل رسائل أقدم")، عشان محادثة طويلة العمر متتقلش كل ٤ ثواني كاملة
-  const fetchMessages = useCallback(async (scroll = true) => {
+  // withLogs=false: بنسحب الرسايل بس (الاستقصاء كل ٤ ثواني بيجيب السجلين كل ١٦ ثانية بس — السجلات بتتغير نادرًا
+  // وكانت بتضاعف عدد الطلبات ×٣ من غير فايدة). الأحداث اللحظية والفتح الأول بيجيبوهم عادي
+  const fetchMessages = useCallback(async (scroll = true, withLogs = true) => {
     if (foreignRef.current) return
     const { data } = await supabase
       .from('messages')
@@ -251,6 +253,8 @@ export default function ChatScreen() {
       if (scroll || hasNewOnes) scrollToBottom()
       return merged
     })
+
+    if (!withLogs) return
 
     // آخر ٢٠٠ حدث كفاية جدًا لعرض التايم لاين — من غير حد أقصى كان بيتجاب السجل كامل من الأول
     // في كل مرة (بما فيها كل حدث لحظي/polling)، وده بيكبر للأبد لمحادثة اتفتحت/اتقفلت كتير
@@ -393,14 +397,8 @@ export default function ChatScreen() {
         if (updated.conversation_id !== id) return
         setMessages(prev => prev.map(m => m.id === updated.id ? { ...m, ...updated } : m))
       })
-      .on('postgres_changes', {
-        event: 'INSERT',
-        schema: 'public',
-        table: 'conversation_assignment_log',
-      }, (payload) => {
-        if (payload.new.conversation_id !== id) return
-        fetchMessages(false)
-      })
+      // ملحوظة: مفيش اشتراك على conversation_assignment_log هنا — الجدول ده مش ضمن نشر Realtime أصلًا فالاشتراك
+      // كان مابيشتغلش أبدًا. التعيين بيوصل عن طريق تحديث conversations فوق + الاستقصاء الدوري
       .on('postgres_changes', {
         event: 'INSERT',
         schema: 'public',
@@ -481,8 +479,9 @@ export default function ChatScreen() {
     // الرسايل كل ٤ ثواني، والتعيين كل ١٢ ثانية بس (الـRealtime بيوصّل تغيير التعيين لحظيًا في العادة)
     let pollTick = 0
     const pollInterval = setInterval(() => {
-      fetchMessages(false)
-      if (++pollTick % 3 === 0) refreshAssignment()
+      pollTick++
+      fetchMessages(false, pollTick % 4 === 0)
+      if (pollTick % 3 === 0) refreshAssignment()
     }, 4000)
 
     return () => {

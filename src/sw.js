@@ -1,27 +1,22 @@
 import { precacheAndRoute } from 'workbox-precaching'
-import { registerRoute } from 'workbox-routing'
-import { NetworkFirst } from 'workbox-strategies'
-import { ExpirationPlugin } from 'workbox-expiration'
 
 precacheAndRoute(self.__WB_MANIFEST)
 
-registerRoute(
-  ({ url }) => url.hostname === 'qqrztdowbtjzjlpfuyig.supabase.co',
-  new NetworkFirst({
-    cacheName: 'supabase-cache',
-    // من غيرها الاستراتيجية دي بتستنى الشبكة "للأبد" — لو شبكة الموظف شغالة بس بطيئة (مش واقفة
-    // تمامًا)، بيحس إن البرنامج علّق بدل ما يرجع فورًا لنسخة محفوظة ويكمل التحديث في الخلفية
-    networkTimeoutSeconds: 3,
-    plugins: [new ExpirationPlugin({ maxEntries: 50, maxAgeSeconds: 300 })]
-  })
-)
+// ملحوظة مهمة: كان هنا كاش (NetworkFirst بمهلة ٣ ثواني) على كل طلبات Supabase، يعني أي استعلام GET (رسايل،
+// محادثات، عدّادات) اتأخر أكتر من ٣ ثواني كان بيرجع لنسخة قديمة محفوظة (لحد ٥ دقايق) بدل الرد الحي. ده كان سبب
+// "الرسالة بتوصل برا لكن مبتظهرش وأنا جوه المحادثة غير لما أخرج وأرجع" وتأخر القوائم. صندوق وارد لحظي مايصحش
+// يتكاشى. وكمان كان بيحتفظ ببيانات مرضى في تخزين المتصفح حتى بعد تسجيل الخروج. اتشال، والطلبات بتروح للشبكة مباشرة.
 
 self.addEventListener('install', () => {
   self.skipWaiting()
 })
 
 self.addEventListener('activate', (event) => {
-  event.waitUntil(self.clients.claim())
+  event.waitUntil((async () => {
+    // مسح الكاش القديم اللي كان بيحتوي نسخ قديمة من ردود Supabase على أجهزة الموظفين
+    await caches.delete('supabase-cache').catch(() => {})
+    await self.clients.claim()
+  })())
 })
 
 self.addEventListener('push', (event) => {

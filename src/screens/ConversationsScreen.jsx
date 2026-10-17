@@ -1074,17 +1074,31 @@ export default function ConversationsScreen() {
         }
       })
 
-    // Realtime هو المصدر الأساسي دلوقتي — الـ polling ده بقى بس شبكة أمان: كل ٧٥ ثانية لو
-    // الـ Realtime فعلاً معطّل، وكل ٥ دقايق بعيدة حتى لو شكله شغال (تحسبًا لحدث فاتنا بصمت)
+    // Realtime هو المصدر الأساسي، لكن اتثبت إنه بيفوّت أحداث بصمت من غير ما حالة الاشتراك تتغيّر (سيرفر Realtime
+    // بيعيد إنشاء الـslot) — فقبل كده لو حدث فات، القايمة كانت بتفضل قديمة لحد ٥ دقايق. دلوقتي شبكة الأمان ذكية:
+    // كل ٢٠ ثانية استعلام واحد خفيف (آخر نشاط في النظام كله، ~٠.١ مللي ثانية بفهرس) — لو اتغيّر نجيب القايمة فورًا،
+    // ولو ما اتغيّرش مفيش جلب تقيل. وجلب كامل كل دقيقة لو Realtime سليم، وكل ٢٠ ثانية لو واقع
     const handleVisibility = () => { if (!searchActiveRef.current) fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
     let ticks = 0
-    const pollInterval = setInterval(() => {
+    let lastTopActivity = null
+    // مفيش nulls (last_message_at فاضي) في الأول عشان الترتيب التنازلي الافتراضي بيحط الـnull الأول
+    const latestActivityChanged = async () => {
+      const { data } = await supabase.from('conversations').select('last_message_at')
+        .not('last_message_at', 'is', null).order('last_message_at', { ascending: false }).limit(1)
+      const top = data?.[0]?.last_message_at ?? null
+      const changed = lastTopActivity !== null && top !== lastTopActivity
+      lastTopActivity = top
+      return changed
+    }
+    const pollInterval = setInterval(async () => {
       ticks++
       if (searchActiveRef.current) return
-      if (!realtimeHealthyRef.current || ticks % 4 === 0) fetchConversations()
-    }, 75000)
+      let changed = false
+      try { changed = await latestActivityChanged() } catch { /* لو فشل الاستعلام الخفيف، الجلب الدوري تحت كفاية */ }
+      if (changed || !realtimeHealthyRef.current || ticks % 3 === 0) fetchConversations()
+    }, 20000)
 
     return () => {
       disposed = true
