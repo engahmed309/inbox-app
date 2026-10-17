@@ -2015,7 +2015,8 @@
       "owner": "Comments",
       "tools": "Tools",
       "team": "{{name}} team",
-      "teamNone": "Comment agents"
+      "teamNone": "Comment agents",
+      "areas": "Sections"
     },
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
@@ -2036,6 +2037,154 @@
       "offline": "Offline",
       "noAccess": "no comments access",
       "pending": "New comments assigned"
+    },
+    "areas": {
+      "inbox": "Comments",
+      "reports": "Reports",
+      "ai": "AI agent"
+    },
+    "reports": {
+      "tabs": {
+        "overview": "Overview",
+        "staff": "Staff",
+        "posts": "Posts",
+        "ai": "AI replies"
+      },
+      "ranges": {
+        "today": "Today",
+        "7d": "Last 7 days",
+        "30d": "Last 30 days",
+        "custom": "Custom"
+      },
+      "pickRange": "Pick a range",
+      "noData": "No data in this period",
+      "received": "Comments received",
+      "handled": "Handled",
+      "awaiting": "Awaiting reply now",
+      "awaitingHint": "Current queue (not affected by range)",
+      "medianResponse": "Median response time",
+      "avgHint": "Average {{v}}",
+      "publicReplies": "Public replies",
+      "privateReplies": "Private replies",
+      "deleted": "Deleted",
+      "hidden": "Hidden",
+      "perDay": "Comments received per day",
+      "byHour": "Peak hours",
+      "cairoTime": "Cairo time",
+      "aging": "Age of waiting comments",
+      "age": {
+        "lt1h": "Under 1 hour",
+        "h1_6": "1 – 6 hours",
+        "h6_24": "6 – 24 hours",
+        "d1_3": "1 – 3 days",
+        "gt3d": "Over 3 days"
+      },
+      "unassignedCount": "{{n}} of them unassigned",
+      "handledBy": "Who handled",
+      "by": {
+        "human": "Staff",
+        "ai": "AI agent",
+        "external": "From the page directly"
+      },
+      "externalHint": "\"From the page directly\" = replies made in the Facebook/Instagram app outside this tool",
+      "human": "Staff",
+      "byPlatform": "By platform",
+      "agent": "Agent",
+      "topPosts": "Most commented posts",
+      "pendingN": "{{n}} waiting",
+      "min": "min",
+      "hr": "h",
+      "day": "d",
+      "ai": {
+        "totalCost": "Total cost",
+        "estimate": "Estimate from model pricing",
+        "costPerReply": "Cost per reply",
+        "perPosted": "per published reply",
+        "processed": "Comments processed",
+        "tokens": "Tokens",
+        "statuses": "Agent outcomes",
+        "perDay": "Replies per day",
+        "costPerDay": "Daily cost (USD)",
+        "byModel": "By model",
+        "disclaimer": "Cost is an estimate from token counts and model pricing, not an official invoice. It includes every agent call, including drafts and skips."
+      }
+    },
+    "ai": {
+      "tabs": {
+        "settings": "Settings",
+        "review": "Review"
+      },
+      "status": {
+        "pending": "Pending",
+        "processing": "Processing",
+        "replied": "Replied",
+        "draft": "Draft",
+        "rejected": "Rejected",
+        "skipped": "Skipped",
+        "escalated": "Handed to staff",
+        "failed": "Failed"
+      },
+      "action": {
+        "reply": "Reply",
+        "skip": "Skip",
+        "escalate": "Hand to staff"
+      },
+      "noKey": "The AI key is not configured on the server, so the agent cannot run.",
+      "modeTitle": "Agent status",
+      "modeHint": "Start in draft mode: the agent writes replies but publishes nothing; you review and approve them in the Review tab. Go live once you trust the quality.",
+      "mode": {
+        "off": "Off",
+        "draft": "Drafts for review",
+        "live": "Live"
+      },
+      "modeDesc": {
+        "off": "Handles no comments. Comments are distributed to the team as usual.",
+        "draft": "Writes a reply for each eligible comment and saves it as a draft without publishing. Comments are still distributed to the team.",
+        "live": "Publishes replies publicly as the page. Anything it cannot answer goes to the comments team."
+      },
+      "liveConfirm": "Going live will publish public replies on your page. Are you sure?",
+      "scopeTitle": "Platforms and accounts",
+      "scopeHint": "The agent only replies on the selected platforms. Pick specific accounts below, or leave empty to include all.",
+      "channelsTitle": "Specific accounts",
+      "channelsHint": "None selected = all accounts on enabled platforms",
+      "youtubeNote": "YouTube is not supported yet (replying needs Google approval).",
+      "promptTitle": "Agent behavior",
+      "promptHint": "Style, what is allowed and what is not. Fixed safety rules cannot be changed here (no medical advice, no prices, no links or phone numbers).",
+      "replyToReplies": "Also reply to replies",
+      "replyToRepliesHint": "By default it only answers top-level comments, not discussions between followers.",
+      "useKnowledge": "Use the knowledge base",
+      "useKnowledgeHint": "Sends knowledge sources with every comment. Careful: they may contain prices that must not be public.",
+      "paceTitle": "Pace and limits",
+      "paceHint": "Random delay makes replies look natural. When the hourly or daily cap is reached, replies are postponed, not lost.",
+      "delayMin": "Minimum delay before replying",
+      "delayMax": "Maximum delay before replying",
+      "sec": "s",
+      "hours": "h",
+      "perHour": "Max replies per hour",
+      "perDay": "Max replies per day",
+      "maxAge": "Do not reply to comments older than",
+      "model": "Model",
+      "dailyBudget": "Cost limit (last 24 hours)",
+      "monthlyBudget": "Monthly cost limit",
+      "noLimit": "No limit",
+      "budgetHint": "When a cost limit is reached the agent stops replying and hands new comments to the comments team.",
+      "testTitle": "Try the agent",
+      "testHint": "Type a fake comment to see what the agent would do. Nothing is published; only the call cost is recorded.",
+      "testCaption": "Post text (optional)",
+      "testComment": "Test comment…",
+      "testRun": "Try",
+      "testAction": "Decision",
+      "testUnsafe": "would be handed to staff",
+      "unsaved": "Unsaved changes",
+      "discard": "Discard",
+      "save": "Save",
+      "saved": "Saved",
+      "approve": "Approve & publish",
+      "reject": "Reject",
+      "approved": "Reply published",
+      "rejected": "Rejected",
+      "reviewEmpty": "Nothing here",
+      "loadMore": "Load more"
     }
   }
 }

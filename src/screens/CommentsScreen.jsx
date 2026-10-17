@@ -7,10 +7,12 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
+import CommentsReports from '../components/CommentsReports'
+import CommentsAiSettings from '../components/CommentsAiSettings'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const PAGE_SIZE = 30
@@ -43,6 +45,7 @@ export default function CommentsScreen() {
   const { agent } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
+  const [view, setView] = useState('inbox')       // inbox | reports | ai
   const [status, setStatus] = useState('new')
   const [platform, setPlatform] = useState('all')
   const [scope, setScope] = useState('all')
@@ -299,6 +302,12 @@ export default function CommentsScreen() {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-4">
+        <Section title={t('comments.sections.areas')}>
+          <NavItem active={view === 'inbox'} icon={<MessageSquare size={15} />} label={t('comments.areas.inbox')} count={view === 'inbox' ? 0 : byPlatform.all} onClick={() => { setView('inbox'); afterPick() }} />
+          {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
+          {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
+        </Section>
+        {view === 'inbox' && (<>
         <Section title={t('comments.sections.platform')}>
           {platformItems.map(p => (
             <NavItem key={p.key} active={platform === p.key} icon={p.icon} label={p.label}
@@ -317,12 +326,13 @@ export default function CommentsScreen() {
               count={s.key === 'all' ? 0 : byScope[s.key]} onClick={() => { setScope(s.key); afterPick() }} />
           ))}
         </Section>
+        </>)}
         {team && (
           <Section title={team.team ? t('comments.sections.team', { name: team.team.name }) : t('comments.sections.teamNone')}>
             {team.members.length === 0 ? (
               <p className="px-3 py-1 text-[11px] text-fg-subtle">{t('comments.noMembers')}</p>
             ) : team.members.map(m => (
-              <button key={m.id} onClick={() => { setScope(scope === `agent:${m.id}` ? 'all' : `agent:${m.id}`); afterPick() }}
+              <button key={m.id} onClick={() => { setView('inbox'); setScope(scope === `agent:${m.id}` ? 'all' : `agent:${m.id}`); afterPick() }}
                 className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-colors ${scope === `agent:${m.id}` ? 'bg-brand/15' : 'hover:bg-surface-3'}`}>
                 <span className="relative flex-shrink-0">
                   <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
@@ -340,7 +350,7 @@ export default function CommentsScreen() {
             ))}
           </Section>
         )}
-        {(isAdmin || platform === 'youtube') && (
+        {view === 'inbox' && (isAdmin || platform === 'youtube') && (
           <Section title={t('comments.sections.tools')}>
             {isAdmin && <ToolItem icon={<BarChart3 size={15} />} label={t('comments.stats.button')} onClick={() => { setShowStats(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Shuffle size={15} />} label={t('comments.distribute')}
@@ -372,12 +382,20 @@ export default function CommentsScreen() {
           {!sidebarOpen && (
             <button onClick={() => setSidebar(true)} className={iconBtn} aria-label={t('comments.openMenu')}><Menu size={18} /></button>
           )}
-          <div className="relative flex-1 min-w-0">
-            <Search size={14} className="absolute top-1/2 -translate-y-1/2 start-3 text-fg-subtle pointer-events-none" />
-            <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('comments.searchPlaceholder')}
-              className="w-full bg-surface-3 rounded-xl ps-9 pe-3 py-2 text-sm text-fg" />
-          </div>
+          {view === 'inbox' ? (
+            <div className="relative flex-1 min-w-0">
+              <Search size={14} className="absolute top-1/2 -translate-y-1/2 start-3 text-fg-subtle pointer-events-none" />
+              <input value={search} onChange={e => setSearch(e.target.value)} placeholder={t('comments.searchPlaceholder')}
+                className="w-full bg-surface-3 rounded-xl ps-9 pe-3 py-2 text-sm text-fg" />
+            </div>
+          ) : (
+            <span className="flex-1 font-semibold text-fg text-sm">{t(`comments.areas.${view}`)}</span>
+          )}
         </div>
+
+        {view === 'reports' && isAdmin && <CommentsReports />}
+        {view === 'ai' && isAdmin && <CommentsAiSettings />}
+        {view === 'inbox' && (<>
 
         {/* ملخص الفلتر الحالي — عشان الموظف دايمًا عارف هو بيشوف إيه */}
         <div className="px-4 py-2 text-[11px] text-fg-subtle border-b border-surface-3 flex items-center gap-1.5 flex-wrap">
@@ -577,6 +595,7 @@ export default function CommentsScreen() {
             </div>
           )}
         </div>
+        </>)}
       </div>
 
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
