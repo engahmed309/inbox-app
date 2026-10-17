@@ -2008,6 +2008,23 @@
       "backlog": "Awaiting reply",
       "oldest": "Oldest",
       "empty": "Nothing handled in this period"
-    }
+    },
+    "sections": {
+      "platform": "Platform",
+      "status": "Status",
+      "owner": "Comments",
+      "tools": "Tools"
+    },
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu",
+    "more": "More",
+    "assign": "Move to agent",
+    "assignTitle": "Move comment to",
+    "unassign": "Unassign",
+    "noMembers": "No team members have comments access",
+    "archive": "Archive",
+    "distribute": "Distribute unclaimed",
+    "distributeConfirm": "Distribute all unassigned new comments evenly across the comments team?",
+    "distributeDone": "Distributed {{count}} comments"
   }
 }
