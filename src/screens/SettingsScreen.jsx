@@ -3823,6 +3823,68 @@ const AI_MODELS = [
   { value: 'gpt-4o-mini', labelKey: 'settings.ai.models.gptMini' },
 ]
 
+// الأدمن بيحدد لكل موظف: يشوف محادثات الذكاء الاصطناعي بس، ولا يشوفها ويستلمها ويرد. بيتحفظ فورًا مع كل تبديل
+function AiChatAccessSection() {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [agents, setAgents] = useState(null)
+  const [busy, setBusy] = useState(null)
+
+  useEffect(() => {
+    apiFetch(`${API_URL}/ai/chat-access`)
+      .then(async r => { const d = await r.json(); if (!r.ok) throw new Error(d.error); setAgents(d.agents || []) })
+      .catch(err => { toast.error(err.message); setAgents([]) })
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const save = async (a, see, reply) => {
+    setBusy(a.id)
+    try {
+      const res = await apiFetch(`${API_URL}/ai/chat-access`, {
+        method: 'PUT', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ agent_id: a.id, can_see: see, can_reply: reply })
+      })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error || t('settings.ai.aiChatAccessSaveFailed'))
+      setAgents(prev => prev.map(x => x.id === a.id ? { ...x, can_see_ai_chats: d.agent.can_see_ai_chats, can_reply_ai_chats: d.agent.can_reply_ai_chats } : x))
+    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
+
+  return (
+    <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
+      <h3 className="text-sm font-semibold text-fg">{t('settings.ai.aiChatAccessTitle')}</h3>
+      <p className="text-[11px] text-fg-subtle leading-relaxed">{t('settings.ai.aiChatAccessHint')}</p>
+      {agents === null ? (
+        <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+      ) : agents.length === 0 ? (
+        <p className="text-[11px] text-fg-subtle">{t('settings.ai.aiChatAccessNone')}</p>
+      ) : (
+        <div className="divide-y divide-surface-3">
+          <div className="flex items-center gap-3 pb-1.5 text-[10px] text-fg-subtle">
+            <span className="flex-1" />
+            <span className="w-16 text-center">{t('settings.ai.aiChatAccessSee')}</span>
+            <span className="w-20 text-center">{t('settings.ai.aiChatAccessReply')}</span>
+          </div>
+          {agents.map(a => {
+            const reply = !!a.can_reply_ai_chats
+            const see = !!a.can_see_ai_chats || reply
+            return (
+              <div key={a.id} className={`flex items-center gap-3 py-2 ${busy === a.id ? 'opacity-60' : ''}`}>
+                <span className="flex-1 text-[13px] text-fg truncate">{a.name}</span>
+                <span className="w-16 flex justify-center">
+                  <input type="checkbox" checked={see} disabled={busy === a.id} onChange={e => save(a, e.target.checked, e.target.checked ? reply : false)} />
+                </span>
+                <span className="w-20 flex justify-center">
+                  <input type="checkbox" checked={reply} disabled={busy === a.id} onChange={e => save(a, e.target.checked || see, e.target.checked)} />
+                </span>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
 function AiAgentTab() {
   const { t } = useTranslation()
   const toast = useToast()
@@ -4109,6 +4171,8 @@ function AiAgentTab() {
         <Toggle label={t('settings.ai.permContact')} value={settings.can_update_contact} onChange={v => setSettings({ ...settings, can_update_contact: v })} />
         <Toggle label={t('settings.ai.permTags')} value={settings.can_update_tags} onChange={v => setSettings({ ...settings, can_update_tags: v })} />
       </div>
+
+      <AiChatAccessSection />
 
       {/* سقف الاستهلاك الشهري */}
       <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">

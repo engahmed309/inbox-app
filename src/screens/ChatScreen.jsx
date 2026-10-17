@@ -302,6 +302,7 @@ export default function ChatScreen() {
         // محادثة موظف تاني: منحمّلش رسايلها ولا نسجّل قراءة — الشاشة هتعرض رسالة "معيّنة لـ..." بس
         const seeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
         foreignRef.current = !seeAll && !!convData.assigned_agent_id && convData.assigned_agent_id !== agent?.id
+          && !(convData.ai_active && (agent?.can_see_ai_chats || agent?.can_reply_ai_chats))
         setConv(convData)
         setContact(convData.contacts)
         if (foreignRef.current) return
@@ -801,7 +802,8 @@ export default function ChatScreen() {
     const { error } = await supabase.from('conversations').update({ ai_active: false }).eq('id', id)
     if (error) { toast.error(t('chat.toast.takeOverFailed')); return }
     setConv(prev => ({ ...prev, ai_active: false }))
-    if (!conv?.assigned_agent_id && agent?.id) {
+    const takesOwnership = agent?.id && (!conv?.assigned_agent_id || (conv.assigned_agent_id !== agent.id && agent.can_reply_ai_chats && !canSeeAll))
+    if (takesOwnership) {
       const { error: assignErr } = await supabase.from('conversations').update({ assigned_agent_id: agent.id }).eq('id', id)
       if (assignErr) { toast.error(t('chat.toast.assignFailed')); return }
       const { error: logErr } = await supabase.from('conversation_assignment_log').insert({ conversation_id: id, assigned_to: agent.id, assigned_by: agent?.id })
@@ -1054,7 +1056,10 @@ export default function ChatScreen() {
 
   // الموظف العادي مايشوفش ولا يرد على محادثة معيّنة لموظف تاني (الأدمن ومن عنده "رؤية كل المحادثات" بس)
   const canSeeAll = agent?.role === 'admin' || !!agent?.can_see_all_conversations
-  const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id
+  // محادثة الذكاء الاصطناعي بيردّ عليها: الموظف اللي الأدمن سمح له يشوفها (أو يستلمها) مش "غريبة" عليه
+  const seesAiChats = !!(agent?.can_see_ai_chats || agent?.can_reply_ai_chats)
+  const canTakeOverAi = canSeeAll || !conv?.assigned_agent_id || conv?.assigned_agent_id === agent?.id || !!agent?.can_reply_ai_chats
+  const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats)
   foreignRef.current = isForeign
   const [ownerName, setOwnerName] = useState('')
   const [requestingTransfer, setRequestingTransfer] = useState(false)
@@ -1402,10 +1407,14 @@ export default function ChatScreen() {
           <div className="flex items-center gap-2.5 bg-brand/10 rounded-xl px-4 py-3 text-sm text-fg">
             <Bot size={18} className="flex-shrink-0 text-brand" />
             <span className="flex-1">{t('chat.composer.aiRespondingNotice')}</span>
-            <button onClick={takeOverFromAi}
-              className="flex-shrink-0 px-3 py-1.5 bg-brand rounded-lg text-xs text-white font-medium hover:brightness-110">
-              {t('chat.composer.takeOverButton')}
-            </button>
+            {canTakeOverAi ? (
+              <button onClick={takeOverFromAi}
+                className="flex-shrink-0 px-3 py-1.5 bg-brand rounded-lg text-xs text-white font-medium hover:brightness-110">
+                {t('chat.composer.takeOverButton')}
+              </button>
+            ) : (
+              <span className="flex-shrink-0 text-[11px] text-fg-subtle">{t('chat.composer.aiViewOnly')}</span>
+            )}
           </div>
         ) : isWindowExpired ? (
           <div className="flex flex-col gap-2">

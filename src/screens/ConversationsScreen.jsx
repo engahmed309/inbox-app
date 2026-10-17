@@ -424,6 +424,9 @@ export default function ConversationsScreen() {
   const { canInstall, isIOS, promptInstall } = useInstallPrompt()
 
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
+  // الأدمن بيسمح لموظفين معيّنين يشوفوا (ويستلموا) المحادثات اللي الذكاء الاصطناعي بيردّ عليها حتى لو مش متعينة لهم
+  const seesAiChats = !!(agent?.can_see_ai_chats || agent?.can_reply_ai_chats)
+  const scopeToMe = (q) => (seesAiChats ? q.or(`assigned_agent_id.eq.${agent?.id},ai_active.eq.true`) : q.eq('assigned_agent_id', agent?.id))
 
   // الفرق التاني اللي الموظف الحالي عضو فيها — لازمة نعرفها عشان نعرف هل نستثني قنوات مقيّدة
   // بفريق (channels.restricted_team_id) من الانبوكس ولا لأ. الأدمن يشوف كل حاجة دايمًا
@@ -584,7 +587,7 @@ export default function ConversationsScreen() {
       }
       q = excludeHiddenChannels(q)
       if (!canSeeAll) {
-        q = q.eq('assigned_agent_id', agent?.id)
+        q = scopeToMe(q)
       } else if (agentFilter === 'unassigned') {
         q = q.is('assigned_agent_id', null)
       } else if (agentFilter === 'ai') {
@@ -878,7 +881,7 @@ export default function ConversationsScreen() {
     let q = supabase.from('conversations')
       .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
       .in('id', ids)
-    if (!canSeeAll) q = q.eq('assigned_agent_id', agent.id)
+    if (!canSeeAll) q = scopeToMe(q)
     q = excludeHiddenChannels(q)
     if (status !== 'all') q = q.eq('status', status)
     const { data, error } = await q
@@ -1594,7 +1597,7 @@ export default function ConversationsScreen() {
                   selected={selectedIds.has(conv.id)}
                   onToggleSelect={() => toggleSelect(conv.id)}
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
-                  isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id}
+                  isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats)}
                   onRequestTransfer={() => requestTransfer(conv)}
                   isPinned={pinnedIds.has(conv.id)}
                   onTogglePin={() => togglePin(conv)}
