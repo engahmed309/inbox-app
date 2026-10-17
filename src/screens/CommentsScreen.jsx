@@ -6,7 +6,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
-  Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, Lock, CornerDownRight, Menu, MoreHorizontal,
+  Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
   Users, UserCheck, UserX, Inbox, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
@@ -181,8 +181,7 @@ export default function CommentsScreen() {
 
   // التعليق مع زميل (الأدمن بس يتخطى). الأزرار بتتقفل بدل ما الموظف يضغط وياخد رفض
   const ownedByOther = (c) => !isAdmin && c.assigned_agent_id && c.assigned_agent_id !== agent?.id
-  const lockedByOther = (c) => c.locked_by_agent_id && c.locked_by_agent_id !== agent?.id && c.locked_until && new Date(c.locked_until) > new Date()
-  const blocked = (c) => ownedByOther(c) || lockedByOther(c)
+  const blocked = (c) => ownedByOther(c)
 
   const patchComment = async (c, body, { remove = true } = {}) => {
     setBusy(c.id)
@@ -215,22 +214,8 @@ export default function CommentsScreen() {
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
 
-  // الاستلام قبل فتح الرد: لو زميل سبقك السيرفر بيرفض ونعرف قبل ما تكتب رد كامل
-  const openReply = async (c, mode) => {
-    setBusy(c.id)
-    try {
-      const res = await apiFetch(`${API_URL}/comments/${c.id}/claim`, { method: 'POST' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      setReplyTo({ comment: c, mode })
-    } catch (err) { toast.error(err.message); load() } finally { setBusy(null) }
-  }
-
-  const closeReply = (sent) => {
-    const c = replyTo?.comment
-    setReplyTo(null)
-    if (c && !sent) apiFetch(`${API_URL}/comments/${c.id}/release`, { method: 'POST' }).catch(() => {})
-  }
+  const openReply = (c, mode) => setReplyTo({ comment: c, mode })
+  const closeReply = () => setReplyTo(null)
 
   // الحذف نهائي عند ميتا، فبنسأل مرة قبله. الصف عندنا بيفضل معلّم "اتمسح" مش بيختفي
   const deleteComment = async (c) => {
@@ -337,7 +322,8 @@ export default function CommentsScreen() {
             {team.members.length === 0 ? (
               <p className="px-3 py-1 text-[11px] text-fg-subtle">{t('comments.noMembers')}</p>
             ) : team.members.map(m => (
-              <div key={m.id} className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl">
+              <button key={m.id} onClick={() => { setScope(scope === `agent:${m.id}` ? 'all' : `agent:${m.id}`); afterPick() }}
+                className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-colors ${scope === `agent:${m.id}` ? 'bg-brand/15' : 'hover:bg-surface-3'}`}>
                 <span className="relative flex-shrink-0">
                   <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
                     style={{ background: `hsl(${avatarHue(m.name)} 45% 42%)` }}>{initial(m.name)}</span>
@@ -350,7 +336,7 @@ export default function CommentsScreen() {
                   </span>
                 </span>
                 {m.pending > 0 && <span className="text-[11px] tabular-nums px-1.5 rounded-full bg-surface-3 text-fg-subtle" title={t('comments.team.pending')}>{m.pending}</span>}
-              </div>
+              </button>
             ))}
           </Section>
         )}
@@ -397,7 +383,9 @@ export default function CommentsScreen() {
         <div className="px-4 py-2 text-[11px] text-fg-subtle border-b border-surface-3 flex items-center gap-1.5 flex-wrap">
           <span className="font-semibold text-fg-muted">{t(`comments.status.${status}`)}</span>
           <span>·</span><span>{t(`comments.platforms.${platform}`)}</span>
-          {scope !== 'all' && <><span>·</span><span>{t(`comments.scope.${scope}`)}</span></>}
+          {scope !== 'all' && <><span>·</span><span>{scope.startsWith('agent:')
+            ? (team?.members.find(m => `agent:${m.id}` === scope)?.name || '')
+            : t(`comments.scope.${scope}`)}</span></>}
           {counts[status] > 0 && <span className="ms-auto tabular-nums">{counts[status]}</span>}
         </div>
 
@@ -571,11 +559,9 @@ export default function CommentsScreen() {
                     </div>
 
                     {/* مين صاحب التعليق / مين شغال عليه / مين عالجه */}
-                    {(lockedByOther(c) || (c.status !== 'new' && c.handler?.name)) && (
+                    {c.status !== 'new' && c.handler?.name && (
                       <p className="flex items-center gap-1 mt-2 text-[10px] text-fg-subtle">
-                        {lockedByOther(c)
-                          ? <><Lock size={10} /> {t('comments.lockedBy', { name: c.locker?.name || '' })}</>
-                          : <><Check size={10} /> {t('comments.handledBy', { name: c.handler.name })}</>}
+                        <Check size={10} /> {t('comments.handledBy', { name: c.handler.name })}
                       </p>
                     )}
                   </div>
@@ -606,10 +592,10 @@ export default function CommentsScreen() {
 
       {replyTo && (
         <ReplyModal comment={replyTo.comment} mode={replyTo.mode}
-          onClose={() => closeReply(false)}
+          onClose={closeReply}
           onSent={patch => {
             patchRow(replyTo.comment.id, { ...patch, status: 'handled', assigned_agent_id: replyTo.comment.assigned_agent_id || agent?.id }, () => status !== 'handled')
-            closeReply(true)
+            closeReply()
             fetchCounts()
           }} />
       )}
