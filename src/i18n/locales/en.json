@@ -2145,7 +2145,8 @@
         "missed": "Interested, never replied to publicly",
         "missedHint": "possible lost opportunities",
         "note": "Interest words are configured in the agent settings. “Booked” is the customer's current stage, not necessarily caused by the comment alone."
-      }
+      },
+      "export": "Export CSV"
     },
     "ai": {
       "tabs": {
@@ -2233,7 +2234,35 @@
       "privateInstructionsHint": "What goes in the message. Only links and phone numbers written here verbatim are allowed; any other link or number blocks sending.",
       "privateLabel": "Private message",
       "publicLabel": "Public reply",
-      "privateSentTag": "sent"
+      "privateSentTag": "sent",
+      "learn": "Learn from your edits",
+      "learnHint": "The agent learns from drafts you edited or approved, so its style moves closer to yours over time.",
+      "hideTitle": "Automatic hiding",
+      "hideHint": "Hides a comment on the page as soon as it arrives if it contains one of the words, without reaching staff or the agent. Works even when the agent is off.",
+      "hideEnable": "Enable automatic hiding",
+      "hideKeywords": "Hide words",
+      "hideKeywordsHint": "Comma separated. Be careful with common words; they can hide legitimate comments.",
+      "perAuthor": "Max replies to the same account per day",
+      "dedupeDays": "No private message to someone messaged within",
+      "days": "days"
+    },
+    "admin": {
+      "redistributeTitle": "Move an agent's comments",
+      "redistributeHint": "Move all new pending comments from one agent (leave or absence) to another agent, or spread them evenly across the rest of the team.",
+      "from": "From agent",
+      "to": "To",
+      "toTeam": "Rest of the team, evenly",
+      "move": "Move comments",
+      "moved": "Moved {{count}} comments",
+      "autoTitle": "Automatic redistribution",
+      "autoHint": "If a new comment stays with an offline agent longer than this, it is moved to an online team member (runs every 10 minutes). Leave empty to turn off.",
+      "savedTitle": "Saved replies",
+      "savedHint": "Replies agents can insert with one tap in the reply window. Write {name} to insert the commenter's first name.",
+      "replyTitle": "Reply title",
+      "replyBody": "Reply text…",
+      "addReply": "Add",
+      "noSaved": "No saved replies yet",
+      "deleteReplyConfirm": "Delete this saved reply?"
     }
   }
 }

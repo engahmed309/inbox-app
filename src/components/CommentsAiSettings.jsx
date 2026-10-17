@@ -166,6 +166,8 @@ export default function CommentsAiSettings() {
             <div className="mt-2 divide-y divide-surface-3">
               <Toggle checked={form.reply_to_replies} onChange={v => set({ reply_to_replies: v })}
                 label={t('comments.ai.replyToReplies')} hint={t('comments.ai.replyToRepliesHint')} />
+              <Toggle checked={form.learn_from_edits} onChange={v => set({ learn_from_edits: v })}
+                label={t('comments.ai.learn')} hint={t('comments.ai.learnHint')} />
               <Toggle checked={form.use_knowledge} onChange={v => set({ use_knowledge: v })}
                 label={t('comments.ai.useKnowledge')} hint={t('comments.ai.useKnowledgeHint')} />
             </div>
@@ -190,12 +192,26 @@ export default function CommentsAiSettings() {
             </>)}
           </Section>
 
+          <Section title={t('comments.ai.hideTitle')} hint={t('comments.ai.hideHint')}>
+            <Toggle checked={form.auto_hide_enabled} onChange={v => set({ auto_hide_enabled: v })} label={t('comments.ai.hideEnable')} />
+            {form.auto_hide_enabled && (
+              <label className="block mt-2">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.hideKeywords')}</span>
+                <textarea value={(form.hide_keywords || []).join('، ')} onChange={e => set({ hide_keywords: e.target.value.split(/[,،\n]/).map(x => x.trim()).filter(Boolean) })} rows={3}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg" />
+                <span className="block text-[10px] text-fg-subtle mt-1">{t('comments.ai.hideKeywordsHint')}</span>
+              </label>
+            )}
+          </Section>
+
           <Section title={t('comments.ai.paceTitle')} hint={t('comments.ai.paceHint')}>
             <div className="grid grid-cols-2 gap-3">
               <NumberField label={t('comments.ai.delayMin')} value={form.delay_min_seconds} onChange={v => set({ delay_min_seconds: v ?? 0 })} suffix={t('comments.ai.sec')} />
               <NumberField label={t('comments.ai.delayMax')} value={form.delay_max_seconds} onChange={v => set({ delay_max_seconds: v ?? 0 })} suffix={t('comments.ai.sec')} />
               <NumberField label={t('comments.ai.perHour')} value={form.max_replies_per_hour} onChange={v => set({ max_replies_per_hour: v ?? 1 })} min={1} />
               <NumberField label={t('comments.ai.perDay')} value={form.max_replies_per_day} onChange={v => set({ max_replies_per_day: v ?? 1 })} min={1} />
+              <NumberField label={t('comments.ai.perAuthor')} value={form.max_replies_per_author_day} onChange={v => set({ max_replies_per_author_day: v ?? 1 })} min={1} />
+              <NumberField label={t('comments.ai.dedupeDays')} value={form.private_dedupe_days} onChange={v => set({ private_dedupe_days: v ?? 0 })} suffix={t('comments.ai.days')} />
               <NumberField label={t('comments.ai.maxAge')} value={form.max_age_hours} onChange={v => set({ max_age_hours: v ?? 1 })} min={1} suffix={t('comments.ai.hours')} />
               <label className="block">
                 <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.model')}</span>

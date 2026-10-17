@@ -7,12 +7,13 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import CommentsReports from '../components/CommentsReports'
 import CommentsAiSettings from '../components/CommentsAiSettings'
+import { RedistributeModal, SavedRepliesModal, loadSavedReplies, fillSavedReply } from '../components/CommentsAdminModals'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const PAGE_SIZE = 30
@@ -59,6 +60,9 @@ export default function CommentsScreen() {
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
   const [showVideos, setShowVideos] = useState(false)
   const [showStats, setShowStats] = useState(false)
+  const [showRedistribute, setShowRedistribute] = useState(false)
+  const [showSaved, setShowSaved] = useState(false)
+  const [postFilter, setPostFilter] = useState(null)   // { id, caption } — تعليقات بوست واحد (جاي من تقرير المنشورات)
   const [assignFor, setAssignFor] = useState(null)
   const [menuFor, setMenuFor] = useState(null)
   const [loading, setLoading] = useState(true)
@@ -86,7 +90,7 @@ export default function CommentsScreen() {
     return () => clearTimeout(id)
   }, [search])
 
-  const query = `status=${status}&platform=${platform}&scope=${scope}&q=${encodeURIComponent(debouncedSearch)}`
+  const query = `status=${status}&platform=${platform}&scope=${scope}&q=${encodeURIComponent(debouncedSearch)}${postFilter ? `&post_id=${encodeURIComponent(postFilter.id)}` : ''}`
   const countsQuery = `platform=${platform}&scope=${scope}`
 
   const fetchCounts = useCallback(async () => {
@@ -170,7 +174,7 @@ export default function CommentsScreen() {
   }, [hasMore, loadMore])
 
   // العدّاد مابيعدّش نتيجة البحث، فمؤشر "فيه جديد" بيتوقف أثناء البحث
-  const pendingChanges = !debouncedSearch && seenCount !== null && counts[status] !== undefined && counts[status] !== seenCount
+  const pendingChanges = !debouncedSearch && !postFilter && seenCount !== null && counts[status] !== undefined && counts[status] !== seenCount
 
   // بعد أي إجراء بنعدّل الصف مكانه ونحدّث العدادات بس — مابنعيدش تحميل القائمة، عشان الموظف
   // اللي نازل في تعليق رقم ٢٠٠ مايترميش لأول القائمة كل مرة يعالج واحد
@@ -355,6 +359,8 @@ export default function CommentsScreen() {
             {isAdmin && <ToolItem icon={<BarChart3 size={15} />} label={t('comments.stats.button')} onClick={() => { setShowStats(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Shuffle size={15} />} label={t('comments.distribute')}
               onClick={() => { postTool('distribute', {}, 'comments.distributeConfirm', 'comments.distributeDone'); afterPick() }} />}
+            {isAdmin && <ToolItem icon={<ArrowLeftRight size={15} />} label={t('comments.admin.redistributeTitle')} onClick={() => { setShowRedistribute(true); afterPick() }} />}
+            {isAdmin && <ToolItem icon={<MessageSquareText size={15} />} label={t('comments.admin.savedTitle')} onClick={() => { setShowSaved(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Archive size={15} />} label={t('comments.archiveOld')}
               onClick={() => { postTool('archive', { days: 7 }, 'comments.archiveConfirm', 'comments.archiveDone'); afterPick() }} />}
             {platform === 'youtube' && <ToolItem icon={<Film size={15} />} label={t('comments.videos.button')} onClick={() => { setShowVideos(true); afterPick() }} />}
@@ -393,7 +399,7 @@ export default function CommentsScreen() {
           )}
         </div>
 
-        {view === 'reports' && isAdmin && <CommentsReports />}
+        {view === 'reports' && isAdmin && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
         {view === 'ai' && isAdmin && <CommentsAiSettings />}
         {view === 'inbox' && (<>
 
@@ -406,6 +412,13 @@ export default function CommentsScreen() {
             : t(`comments.scope.${scope}`)}</span></>}
           {counts[status] > 0 && <span className="ms-auto tabular-nums">{counts[status]}</span>}
         </div>
+
+        {postFilter && (
+          <div className="mx-4 mt-2 flex items-center gap-2 bg-brand/10 text-brand rounded-full ps-3 pe-1 py-1 text-[11px]">
+            <span className="flex-1 truncate">{t('comments.onPost')} {postFilter.caption || t('comments.untitledPost')}</span>
+            <button onClick={() => setPostFilter(null)} className="w-6 h-6 flex items-center justify-center rounded-full hover:bg-brand/20"><X size={12} /></button>
+          </div>
+        )}
 
         {pendingChanges && !loading && (
           <button onClick={() => { setLoading(true); load() }}
@@ -600,6 +613,8 @@ export default function CommentsScreen() {
 
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
+      {showRedistribute && <RedistributeModal onClose={() => setShowRedistribute(false)} onDone={() => { load(); fetchTeam() }} />}
+      {showSaved && <SavedRepliesModal onClose={() => setShowSaved(false)} />}
       {assignFor && (
         <AssignModal comment={assignFor} onClose={() => setAssignFor(null)}
           onAssigned={(agentRow) => {
@@ -863,6 +878,8 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
   const toast = useToast()
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
+  const [saved, setSaved] = useState([])
+  useEffect(() => { loadSavedReplies().then(setSaved) }, [])
   const isPublic = mode === 'public'
 
   const send = async () => {
@@ -898,6 +915,14 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
           <div className="bg-surface-3 rounded-xl p-2.5">
             <LinkifiedText text={comment.content} className="block text-xs text-fg-muted whitespace-pre-wrap break-words" />
           </div>
+          {saved.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {saved.map(r => (
+                <button key={r.id} type="button" onClick={() => setText(fillSavedReply(r.body, comment.author_name))}
+                  className="px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg text-[11px]">{r.title}</button>
+              ))}
+            </div>
+          )}
           <textarea value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
             placeholder={t(isPublic ? 'comments.publicReplyPlaceholder' : 'comments.privateReplyPlaceholder')}
             className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />

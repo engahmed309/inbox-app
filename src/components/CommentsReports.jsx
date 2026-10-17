@@ -1,7 +1,7 @@
 import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
-import { ExternalLink, Bot } from 'lucide-react'
+import { ExternalLink, Bot, Download } from 'lucide-react'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -74,7 +74,7 @@ function Bars({ rows, color = 'bg-brand' }) {
 const axisProps = { stroke: COLORS.muted, tick: { fontSize: 10, fill: COLORS.muted }, tickLine: false, axisLine: false }
 const tooltipProps = { contentStyle: { background: '#1f2030', border: '1px solid #33354a', borderRadius: 12, fontSize: 12 }, labelStyle: { color: '#e5e7eb' } }
 
-export default function CommentsReports() {
+export default function CommentsReports({ onOpenPost }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [tab, setTab] = useState('overview')
@@ -118,6 +118,7 @@ export default function CommentsReports() {
       <div className="max-w-4xl mx-auto p-3 space-y-3">
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {TABS.map(k => <button key={k} onClick={() => setTab(k)} className={pill(tab === k)}>{t(`comments.reports.tabs.${k}`)}</button>)}
+          <button onClick={() => exportCsv(tab, data, t)} disabled={!data} className="ms-auto flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40 flex-shrink-0"><Download size={12} />{t('comments.reports.export')}</button>
         </div>
         <div className="flex gap-2 overflow-x-auto scrollbar-hide">
           {RANGES.map(k => <button key={k} onClick={() => setRange(k)} className={pill(range === k)}>{t(`comments.reports.ranges.${k}`)}</button>)}
@@ -247,8 +248,8 @@ export default function CommentsReports() {
             {(data.top_posts || []).length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
               <div className="space-y-2">
                 {data.top_posts.map(p => (
-                  <a key={p.post_id} href={p.permalink || undefined} target="_blank" rel="noopener noreferrer"
-                    className="flex items-center gap-3 bg-surface rounded-xl p-2 hover:bg-surface-3">
+                  <div key={p.post_id} onClick={() => onOpenPost?.(p)} role="button" tabIndex={0}
+                    className="flex items-center gap-3 bg-surface rounded-xl p-2 hover:bg-surface-3 cursor-pointer">
                     {p.thumbnail && <img src={p.thumbnail} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover bg-surface-3 flex-shrink-0" onError={e => { e.target.style.display = 'none' }} />}
                     <div className="flex-1 min-w-0">
                       <p className="text-xs text-fg line-clamp-2">{p.caption || t('comments.untitledPost')}</p>
@@ -258,8 +259,8 @@ export default function CommentsReports() {
                       <p className="text-sm font-bold text-fg tabular-nums">{fmt(p.n)}</p>
                       {p.pending > 0 && <p className="text-[10px] text-amber-500 tabular-nums">{t('comments.reports.pendingN', { n: fmt(p.pending) })}</p>}
                     </div>
-                    {p.permalink && <ExternalLink size={12} className="text-fg-subtle flex-shrink-0" />}
-                  </a>
+                    {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-fg-subtle hover:text-fg flex-shrink-0"><ExternalLink size={12} /></a>}
+                  </div>
                 ))}
               </div>
             )}
@@ -351,6 +352,27 @@ export default function CommentsReports() {
   )
 }
 
+
+// تصدير الجدول الظاهر كـCSV (بـBOM عشان إكسل يقرا العربي صح)
+function exportCsv(tab, data, t) {
+  if (!data) return
+  const pick = {
+    overview: () => [[t('comments.reports.perDay'), 'facebook', 'instagram', 'youtube', 'total'], ...(data.by_day || []).map(d => [d.day, d.facebook, d.instagram, d.youtube, d.total])],
+    staff: () => [['name', 'role', 'handled', 'public_replies', 'private_replies', 'median_min', 'p90_min', 'within_sla'], ...(data.by_agent || []).map(a => [a.name, a.role, a.handled, a.public_replies, a.private_replies, a.median_minutes, a.p90_minutes, a.within_sla])],
+    posts: () => [['post', 'platform', 'comments', 'waiting', 'link'], ...(data.top_posts || []).map(p => [p.caption, p.platform, p.n, p.pending, p.permalink])],
+    interest: () => [['step', 'count'], ...['interested', 'public_replied', 'private_sent', 'private_by_ai', 'conversations', 'customer_replied', 'booked_now'].map(k => [k, data[k]])],
+    followup: () => [['agent', 'late_comments', 'oldest'], ...(data.stale || []).map(x => [x.name || 'unassigned', x.n, x.oldest]), [], ['commenter', 'platform', 'comments', 'handled'], ...(data.repeat_authors || []).map(x => [x.name, x.platform, x.n, x.handled])],
+    ai: () => [['day', 'replied', 'draft', 'skipped', 'escalated', 'failed', 'cost_usd'], ...(data.by_day || []).map(d => [d.day, d.replied, d.draft, d.skipped, d.escalated, d.failed, d.cost])],
+  }[tab]
+  if (!pick) return
+  const esc = (v) => { const x = v === null || v === undefined ? '' : String(v); return /[",\n]/.test(x) ? `"${x.replace(/"/g, '""')}"` : x }
+  const csv = '\uFEFF' + pick().map(r => r.map(esc).join(',')).join('\n')
+  const url = URL.createObjectURL(new Blob([csv], { type: 'text/csv;charset=utf-8' }))
+  const a = document.createElement('a')
+  a.href = url; a.download = `comments-${tab}-${new Date().toISOString().slice(0, 10)}.csv`
+  document.body.appendChild(a); a.click(); a.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
 
 function slaLabel(minutes, t) {
   return minutes >= 1440 ? `${minutes / 1440} ${t('comments.reports.day')}` : minutes >= 60 ? `${minutes / 60} ${t('comments.reports.hr')}` : `${minutes} ${t('comments.reports.min')}`
