@@ -167,20 +167,41 @@ export default function CommentsAiSettings() {
             {(meta.agents || []).length === 0 ? (
               <p className="text-[11px] text-fg-subtle">{t('comments.ai.visibleNone')}</p>
             ) : (<>
-              <div className="flex gap-2 flex-wrap">
+              <div className="divide-y divide-surface-3">
+                <div className="flex items-center gap-3 pb-1.5 text-[10px] text-fg-subtle">
+                  <span className="flex-1" />
+                  <span className="w-14 text-center">{t('comments.ai.visibleCanSee')}</span>
+                  <span className="w-14 text-center">{t('comments.ai.visibleCanReply')}</span>
+                </div>
                 {meta.agents.map(a => {
-                  const ids = form.ai_visible_to_agent_ids || []
-                  const on = ids.includes(a.id)
+                  const see = form.ai_visible_to_agent_ids || []
+                  const reply = form.ai_reply_agent_ids || []
+                  const canReply = reply.includes(a.id)
+                  const canSee = see.includes(a.id) || canReply
+                  // الرد بيتضمن الرؤية: تفعيل "يرد" بيفعّل "يشوف"، وإلغاء "يشوف" بيلغي "يرد"
+                  const setSee = (on) => set({
+                    ai_visible_to_agent_ids: on ? [...new Set([...see, a.id])] : see.filter(x => x !== a.id),
+                    ...(on ? {} : { ai_reply_agent_ids: reply.filter(x => x !== a.id) })
+                  })
+                  const setReply = (on) => set({
+                    ai_reply_agent_ids: on ? [...new Set([...reply, a.id])] : reply.filter(x => x !== a.id),
+                    ...(on ? { ai_visible_to_agent_ids: [...new Set([...see, a.id])] } : {})
+                  })
                   return (
-                    <button key={a.id} onClick={() => set({ ai_visible_to_agent_ids: on ? ids.filter(x => x !== a.id) : [...ids, a.id] })} className={pill(on)}>
-                      {on ? '✓ ' : ''}{a.name}
-                    </button>
+                    <div key={a.id} className="flex items-center gap-3 py-2">
+                      <span className="flex-1 text-[13px] text-fg truncate">{a.name}</span>
+                      <span className="w-14 flex justify-center"><input type="checkbox" checked={canSee} onChange={e => setSee(e.target.checked)} /></span>
+                      <span className="w-14 flex justify-center"><input type="checkbox" checked={canReply} onChange={e => setReply(e.target.checked)} /></span>
+                    </div>
                   )
                 })}
               </div>
               <p className="text-[10px] text-fg-subtle mt-2">
-                {(form.ai_visible_to_agent_ids || []).length
-                  ? t('comments.ai.visibleCount', { n: (form.ai_visible_to_agent_ids || []).length })
+                {(form.ai_visible_to_agent_ids || []).length || (form.ai_reply_agent_ids || []).length
+                  ? t('comments.ai.visibleCount', {
+                      see: new Set([...(form.ai_visible_to_agent_ids || []), ...(form.ai_reply_agent_ids || [])]).size,
+                      reply: (form.ai_reply_agent_ids || []).length
+                    })
                   : t('comments.ai.visibleAdminOnly')}
               </p>
             </>)}

@@ -188,7 +188,9 @@ export default function CommentsScreen() {
   )
 
   // التعليق مع زميل (الأدمن بس يتخطى). الأزرار بتتقفل بدل ما الموظف يضغط وياخد رفض
+  // تعليق الذكاء الاصطناعي مفتوح للي الأدمن سمح له يرد (aiStatus.can_act) — وبيبقى بتاعه أول ما يتصرف فيه
   const ownedByOther = (c) => !isAdmin && c.assigned_agent_id && c.assigned_agent_id !== agent?.id
+    && !(aiStatus?.can_act && c.assigned_agent_id === aiStatus.agent_id)
   const blocked = (c) => ownedByOther(c)
 
   const patchComment = async (c, body, { remove = true } = {}) => {
