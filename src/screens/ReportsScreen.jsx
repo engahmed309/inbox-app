@@ -1942,29 +1942,22 @@ function ChannelVolumeTab() {
     load()
   }, [range, customFrom, customTo, channelsLoaded])
 
-  // بنستخدم كويري "عدّ بس" (count: 'exact', head: true) لكل قناة على حدة بدل ما نجيب الصفوف
-  // كلها ونعدّها إحنا — سوبابيز بترجع 1000 صف بالأكتر لأي كويري عادي (حتى لو حطينا limit أعلى)،
-  // فلو الرسايل أكتر من كده كانت النتيجة بتيجي غلط وأقل من الحقيقي. الـ count الحقيقي مش محدود بكده
+  // استعلام تجميع واحد على السيرفر (GROUP BY) بدل N استعلام count (واحد لكل قناة) على جدول الرسايل كله من المتصفح —
+  // كل استعلام منهم كان بيعمل join مع المحادثات ويلمس مئات آلاف الصفوف، وكلهم بيتشغّلوا في نفس اللحظة
   const load = async () => {
     setLoading(true)
     const { from, to } = computeDateBounds(range, customFrom, customTo)
-    const buildQuery = (channelId) => {
-      let q = supabase.from('messages')
-        .select('id, conversations!inner(channel_id)', { count: 'exact', head: true })
-        .eq('direction', 'inbound')
-        .neq('content_type', 'note')
-      if (from) q = q.gte('created_at', from)
-      if (to) q = q.lte('created_at', to)
-      q = channelId === null ? q.is('conversations.channel_id', null) : q.eq('conversations.channel_id', channelId)
-      return q
-    }
-
-    const channelIds = channelsList.map(c => c.id)
-    const results = await Promise.all([...channelIds.map(id => buildQuery(id)), buildQuery(null)])
+    const params = new URLSearchParams()
+    if (from) params.set('from', from)
+    if (to) params.set('to', to)
     const map = {}
-    channelIds.forEach((id, i) => { map[id] = results[i].count || 0 })
-    map.none = results[results.length - 1].count || 0
-    setCounts(map)
+    try {
+      const res = await apiFetch(`${API_URL}/reports/volume?${params}`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'volume report failed')
+      for (const r of data.counts || []) map[r.channel_id || 'none'] = r.count
+    } catch { /* هنعرض أصفار لو فشل */ }
+    setCounts({ ...map, none: map.none || 0 })
     setLoading(false)
   }
 
