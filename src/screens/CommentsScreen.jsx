@@ -222,6 +222,21 @@ export default function CommentsScreen() {
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
 
+  // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيرد علنًا ويبعت رسالة خاصة فورًا (السيرفر بيطبّق نفس فحوصات الأمان)
+  const [aiBusy, setAiBusy] = useState(null)
+  const assignToAi = async (c) => {
+    if (!window.confirm(t('comments.assignAiConfirm'))) return
+    setAiBusy(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/assign-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('comments.assignAiFailed'))
+      toast.success(data.private_skipped ? t('comments.assignAiDonePublicOnly', { reason: data.private_skipped }) : t('comments.assignAiDone'))
+      fetchCounts()
+      load()
+    } catch (err) { toast.error(err.message) } finally { setAiBusy(null) }
+  }
+
   const openReply = (c, mode) => setReplyTo({ comment: c, mode })
   const closeReply = () => setReplyTo(null)
 
@@ -567,7 +582,7 @@ export default function CommentsScreen() {
                           </button>
                           {menuOpen && (<>
                             <div className="fixed inset-0 z-30" onClick={() => setMenuFor(null)} />
-                            <div className="absolute z-40 bottom-full mb-1 end-0 w-44 bg-surface-2 border border-surface-3 rounded-xl shadow-xl py-1">
+                            <div className="absolute z-40 bottom-full mb-1 end-0 w-52 bg-surface-2 border border-surface-3 rounded-xl shadow-xl py-1">
                               {status !== 'ignored' && (
                                 <MenuItem icon={<Ban size={13} />} label={t('comments.ignore')} disabled={other}
                                   onClick={() => { setMenuFor(null); patchComment(c, { status: 'ignored' }) }} />
@@ -579,6 +594,10 @@ export default function CommentsScreen() {
                               {isAdmin && (
                                 <MenuItem icon={<UserPlus size={13} />} label={t('comments.assign')}
                                   onClick={() => { setMenuFor(null); setAssignFor(c) }} />
+                              )}
+                              {isAdmin && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
+                                <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} disabled={aiBusy === c.id}
+                                  onClick={() => { setMenuFor(null); assignToAi(c) }} />
                               )}
                               <MenuItem icon={<Archive size={13} />} label={t('comments.archive')} disabled={other}
                                 onClick={() => { setMenuFor(null); patchComment(c, { archived: true }) }} />
