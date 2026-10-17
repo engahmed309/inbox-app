@@ -1,6 +1,6 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Bot, Power, FileText, Zap, Check, X, ExternalLink, FlaskConical, Save } from 'lucide-react'
+import { Bot, Power, FileText, Zap, Check, X, ExternalLink, FlaskConical, Save, RefreshCw } from 'lucide-react'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -191,6 +191,8 @@ export default function CommentsAiSettings() {
               </label>
             </>)}
           </Section>
+
+          <LearningSection form={form} set={set} />
 
           <Section title={t('comments.ai.hideTitle')} hint={t('comments.ai.hideHint')}>
             <Toggle checked={form.auto_hide_enabled} onChange={v => set({ auto_hide_enabled: v })} label={t('comments.ai.hideEnable')} />
@@ -395,5 +397,77 @@ function ReviewList() {
         <button onClick={() => load(rows.length)} className="w-full py-2 rounded-xl bg-surface-3 text-fg-muted text-xs">{t('comments.ai.loadMore')}</button>
       )}
     </div>
+  )
+}
+
+
+// التعلم من الردود: كام مثال متخزّن، تحديث يدوي، واستخدام الموظفين لاقتراحات الذكاء الاصطناعي (آخر ٣٠ يوم)
+function LearningSection({ form, set }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [st, setSt] = useState(null)
+  const timer = useRef(null)
+
+  const fetchStatus = useCallback(async () => {
+    const res = await apiFetch(`${API_URL}/comments/learning/status`)
+    const d = await res.json()
+    if (!res.ok) throw new Error(d.error)
+    setSt(d)
+    return d
+  }, [])
+  const poll = useCallback(() => {
+    clearTimeout(timer.current)
+    timer.current = setTimeout(async () => { try { const d = await fetchStatus(); if (d.syncing) poll() } catch { /* هنحاول تاني */ } }, 3000)
+  }, [fetchStatus])
+  useEffect(() => {
+    fetchStatus().then(d => { if (d.syncing) poll() }).catch(err => toast.error(err.message))
+    return () => clearTimeout(timer.current)
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const sync = async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/comments/learning/sync`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ days: 90 }) })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      setSt(s => ({ ...s, syncing: true })); poll()
+    } catch (err) { toast.error(err.message) }
+  }
+
+  const s30 = st?.suggestions30d
+  const decided = s30 ? s30.used + s30.edited + s30.ignored : 0
+  const fmtN = (n) => Number(n || 0).toLocaleString()
+  return (
+    <Section title={t('comments.ai.learnTitle')} hint={t('comments.ai.learnIntro')}>
+      <Toggle checked={form.learning_enabled} onChange={v => set({ learning_enabled: v })} label={t('comments.ai.learnEnable')} hint={t('comments.ai.learnEnableHint')} />
+      <Toggle checked={form.learn_from_chats} onChange={v => set({ learn_from_chats: v })} label={t('comments.ai.learnChats')} hint={t('comments.ai.learnChatsHint')} />
+      <div className="mt-2 max-w-[220px]">
+        <NumberField label={t('comments.ai.examplesCount')} value={form.examples_per_suggestion} onChange={v => set({ examples_per_suggestion: Math.min(Math.max(v ?? 5, 1), 10) })} min={1} />
+      </div>
+
+      <div className="mt-4 grid grid-cols-2 gap-2.5">
+        <div className="bg-surface rounded-xl p-3"><p className="text-[10px] text-fg-subtle">{t('comments.ai.examplesComments')}</p><p className="text-lg font-bold text-fg tabular-nums">{st ? fmtN(st.examples?.comment) : '—'}</p></div>
+        <div className="bg-surface rounded-xl p-3"><p className="text-[10px] text-fg-subtle">{t('comments.ai.examplesChats')}</p><p className="text-lg font-bold text-fg tabular-nums">{st ? fmtN(st.examples?.chat) : '—'}</p></div>
+      </div>
+      <div className="mt-2 flex items-center gap-2 flex-wrap">
+        <button onClick={sync} disabled={st?.syncing} className="flex items-center gap-1.5 px-3.5 py-2 rounded-xl bg-brand/15 text-brand text-xs font-semibold disabled:opacity-50">
+          <RefreshCw size={13} className={st?.syncing ? 'animate-spin' : ''} />{st?.syncing ? t('comments.ai.learnSyncing', { n: st?.sync?.daysDone || 0 }) : t('comments.ai.learnSync')}
+        </button>
+        {st?.sync?.finishedAt && !st.syncing && <span className="text-[10px] text-fg-subtle">{t('comments.ai.learnLast', { d: localeFormatDateTime(st.sync.finishedAt) })}</span>}
+      </div>
+      <p className="text-[10px] text-fg-subtle mt-1.5">{t('comments.ai.learnAuto')}</p>
+
+      {s30 && s30.total > 0 && (
+        <div className="mt-4 bg-surface rounded-xl p-3">
+          <p className="text-xs font-semibold text-fg mb-2">{t('comments.ai.suggestionsUsage')}</p>
+          <div className="grid grid-cols-4 gap-2 text-center">
+            <div><p className="text-base font-bold text-fg tabular-nums">{fmtN(s30.total)}</p><p className="text-[10px] text-fg-subtle">{t('comments.ai.sugTotal')}</p></div>
+            <div><p className="text-base font-bold text-success tabular-nums">{decided ? Math.round((s30.used / decided) * 100) : 0}%</p><p className="text-[10px] text-fg-subtle">{t('comments.ai.sugUsed')}</p></div>
+            <div><p className="text-base font-bold text-amber-500 tabular-nums">{decided ? Math.round((s30.edited / decided) * 100) : 0}%</p><p className="text-[10px] text-fg-subtle">{t('comments.ai.sugEdited')}</p></div>
+            <div><p className="text-base font-bold text-fg-muted tabular-nums">{decided ? Math.round((s30.ignored / decided) * 100) : 0}%</p><p className="text-[10px] text-fg-subtle">{t('comments.ai.sugIgnored')}</p></div>
+          </div>
+          <p className="text-[10px] text-fg-subtle mt-2">{t('comments.ai.sugCost', { v: s30.cost.toFixed(3) })}</p>
+        </div>
+      )}
+    </Section>
   )
 }

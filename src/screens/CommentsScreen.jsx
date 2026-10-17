@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
@@ -879,7 +879,23 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
   const [text, setText] = useState('')
   const [sending, setSending] = useState(false)
   const [saved, setSaved] = useState([])
+  const [sug, setSug] = useState({ loading: false, items: [], note: null, examples: 0, asked: false })
   useEffect(() => { loadSavedReplies().then(setSaved) }, [])
+
+  // اقتراح بالذكاء الاصطناعي: بيتعلم من ردود الدكتور والموظفين السابقة. بيتحط في الصندوق والموظف يعدّل ويبعت
+  const suggest = async () => {
+    setSug(s => ({ ...s, loading: true }))
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${comment.id}/suggest-reply`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: isPublic ? 'public' : 'private' })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setSug({ loading: false, items: data.suggestions || [], note: data.note, examples: data.examples || 0, asked: true })
+      if (data.suggestions?.[0]?.text && !text.trim()) setText(data.suggestions[0].text)
+      if (!data.suggestions?.length) toast.error(t('comments.ai.noSuggestion'))
+    } catch (err) { toast.error(err.message); setSug(s => ({ ...s, loading: false })) }
+  }
   const isPublic = mode === 'public'
 
   const send = async () => {
@@ -915,6 +931,21 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
           <div className="bg-surface-3 rounded-xl p-2.5">
             <LinkifiedText text={comment.content} className="block text-xs text-fg-muted whitespace-pre-wrap break-words" />
           </div>
+          <button type="button" onClick={suggest} disabled={sug.loading}
+            className="w-full flex items-center justify-center gap-2 py-2 rounded-xl bg-brand/10 text-brand text-xs font-semibold hover:bg-brand/20 disabled:opacity-50">
+            {sug.loading ? <div className="w-3.5 h-3.5 border-2 border-brand border-t-transparent rounded-full animate-spin" /> : <Wand2 size={14} />}
+            {sug.loading ? t('comments.ai.suggesting') : sug.asked ? t('comments.ai.suggestAgain') : t('comments.ai.suggest')}
+          </button>
+          {sug.asked && sug.items.length > 0 && (
+            <div className="space-y-1.5">
+              {sug.items.map((it, i) => (
+                <button key={i} type="button" onClick={() => setText(it.text)}
+                  className="w-full text-start bg-surface-3 hover:bg-surface rounded-xl px-3 py-2 text-xs text-fg whitespace-pre-wrap break-words border border-transparent hover:border-brand/40">{it.text}</button>
+              ))}
+              {sug.note && <p className="text-[11px] text-amber-500">💡 {sug.note}</p>}
+              <p className="text-[10px] text-fg-subtle">{t('comments.ai.learnedFrom', { n: sug.examples })}</p>
+            </div>
+          )}
           {saved.length > 0 && (
             <div className="flex gap-1.5 flex-wrap">
               {saved.map(r => (

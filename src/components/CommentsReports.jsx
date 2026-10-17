@@ -283,6 +283,23 @@ export default function CommentsReports({ onOpenPost }) {
               { label: t('comments.ai.status.pending'), value: (data.by_status?.pending || 0) + (data.by_status?.processing || 0), color: 'bg-surface-3' },
             ]} />
           </Card>
+          {data.suggestions?.total > 0 && (() => {
+            const sg = data.suggestions
+            const decided = sg.used + sg.edited + sg.ignored
+            return (
+              <Card title={t('comments.reports.ai.suggestionsTitle')}>
+                <Bars rows={[
+                  { label: t('comments.ai.sugUsed'), value: sg.used, color: 'bg-success' },
+                  { label: t('comments.ai.sugEdited'), value: sg.edited, color: 'bg-amber-500' },
+                  { label: t('comments.ai.sugIgnored'), value: sg.ignored, color: 'bg-surface-3' },
+                  { label: t('comments.reports.ai.sugPending'), value: sg.shown, color: 'bg-brand' },
+                ]} />
+                <p className="text-[10px] text-fg-subtle mt-2">
+                  {t('comments.reports.ai.suggestionsHint', { total: fmt(sg.total), pct: decided ? Math.round(((sg.used + sg.edited) / decided) * 100) : 0, cost: usd(sg.cost, 3) })}
+                </p>
+              </Card>
+            )
+          })()}
           {(data.drafts?.approved || data.drafts?.rejected || data.drafts?.pending) ? (
             <Card title={t('comments.reports.ai.draftsTitle')}>
               <Bars rows={[
