@@ -2013,7 +2013,9 @@
       "platform": "Platform",
       "status": "Status",
       "owner": "Comments",
-      "tools": "Tools"
+      "tools": "Tools",
+      "team": "{{name}} team",
+      "teamNone": "Comment agents"
     },
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
@@ -2025,6 +2027,15 @@
     "archive": "Archive",
     "distribute": "Distribute unclaimed",
     "distributeConfirm": "Distribute all unassigned new comments evenly across the comments team?",
-    "distributeDone": "Distributed {{count}} comments"
+    "distributeDone": "Distributed {{count}} comments",
+    "assignedToMe": "Assigned to you",
+    "assignedTo": "Assigned to {{name}}",
+    "unassignedBadge": "Unassigned",
+    "team": {
+      "online": "Online",
+      "offline": "Offline",
+      "noAccess": "no comments access",
+      "pending": "New comments assigned"
+    }
   }
 }

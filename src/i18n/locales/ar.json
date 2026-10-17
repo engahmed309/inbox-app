@@ -2013,7 +2013,9 @@
       "platform": "المنصة",
       "status": "الحالة",
       "owner": "التعليقات",
-      "tools": "أدوات"
+      "tools": "أدوات",
+      "team": "فريق {{name}}",
+      "teamNone": "موظفو التعليقات"
     },
     "openMenu": "فتح القائمة",
     "closeMenu": "إغلاق القائمة",
@@ -2025,6 +2027,15 @@
     "archive": "أرشفة",
     "distribute": "توزيع غير المستلم",
     "distributeConfirm": "توزيع كل التعليقات الجديدة غير المعيّنة على فريق التعليقات بالتساوي؟",
-    "distributeDone": "تم توزيع {{count}} تعليق"
+    "distributeDone": "تم توزيع {{count}} تعليق",
+    "assignedToMe": "معيّن لك",
+    "assignedTo": "معيّن لـ {{name}}",
+    "unassignedBadge": "غير معيّن",
+    "team": {
+      "online": "متصل",
+      "offline": "غير متصل",
+      "noAccess": "بدون صلاحية تعليقات",
+      "pending": "تعليقات جديدة عنده"
+    }
   }
 }

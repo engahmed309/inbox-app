@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, Lock, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, Inbox, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
+  Users, UserCheck, UserX, Inbox, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
@@ -52,6 +52,7 @@ export default function CommentsScreen() {
   const [counts, setCounts] = useState({})
   const [byPlatform, setByPlatform] = useState({})
   const [byScope, setByScope] = useState({})
+  const [team, setTeam] = useState(null)             // { team, members } — فريق التعليقات وحالة أونلاين لكل موظف
   const [sidebarOpen, setSidebarOpen] = useState(readSidebarPref)
   const [showVideos, setShowVideos] = useState(false)
   const [showStats, setShowStats] = useState(false)
@@ -99,6 +100,14 @@ export default function CommentsScreen() {
     return null
   }, [countsQuery])
 
+  const fetchTeam = useCallback(async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/comments/team`)
+      const data = await res.json()
+      if (res.ok) setTeam(data)
+    } catch { /* بنسيب القايمة القديمة */ }
+  }, [])
+
   // بيرجّع القائمة لأول صفحة. بنستدعيها عند فتح التبويب وبعد أي إجراء — مش كل ٣٠ ثانية،
   // عشان القائمة ماتتحركش تحت إيد الموظف وهو بيقرا
   const load = useCallback(async () => {
@@ -144,9 +153,10 @@ export default function CommentsScreen() {
   // بنعرض زرار للموظف يحدّث لما يحب، بدل ما نقفز بالقائمة وهو نازل فيها
   useEffect(() => {
     if (!canSee) return
-    const id = setInterval(fetchCounts, 30000)
+    fetchTeam()
+    const id = setInterval(() => { fetchCounts(); fetchTeam() }, 30000)
     return () => clearInterval(id)
-  }, [fetchCounts, canSee])
+  }, [fetchCounts, fetchTeam, canSee])
 
   // التحميل التدريجي بيتشغّل لما آخر الصفحة يبان — من غير زرار الموظف يدوّر عليه
   useEffect(() => {
@@ -323,6 +333,28 @@ export default function CommentsScreen() {
               count={s.key === 'all' ? 0 : byScope[s.key]} onClick={() => { setScope(s.key); afterPick() }} />
           ))}
         </Section>
+        {team && (
+          <Section title={team.team ? t('comments.sections.team', { name: team.team.name }) : t('comments.sections.teamNone')}>
+            {team.members.length === 0 ? (
+              <p className="px-3 py-1 text-[11px] text-fg-subtle">{t('comments.noMembers')}</p>
+            ) : team.members.map(m => (
+              <div key={m.id} className="flex items-center gap-2.5 px-3 py-1.5 rounded-xl">
+                <span className="relative flex-shrink-0">
+                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                    style={{ background: `hsl(${avatarHue(m.name)} 45% 42%)` }}>{initial(m.name)}</span>
+                  <span className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface-2 ${m.online ? 'bg-success' : 'bg-fg-subtle'}`} />
+                </span>
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[13px] text-fg truncate">{m.name}</span>
+                  <span className={`block text-[10px] ${m.online ? 'text-success' : 'text-fg-subtle'}`}>
+                    {m.online ? t('comments.team.online') : t('comments.team.offline')}{!m.eligible ? ` · ${t('comments.team.noAccess')}` : ''}
+                  </span>
+                </span>
+                {m.pending > 0 && <span className="text-[11px] tabular-nums px-1.5 rounded-full bg-surface-3 text-fg-subtle" title={t('comments.team.pending')}>{m.pending}</span>}
+              </div>
+            ))}
+          </Section>
+        )}
         {(isAdmin || platform === 'youtube') && (
           <Section title={t('comments.sections.tools')}>
             {isAdmin && <ToolItem icon={<BarChart3 size={15} />} label={t('comments.stats.button')} onClick={() => { setShowStats(true); afterPick() }} />}
@@ -415,6 +447,18 @@ export default function CommentsScreen() {
                           {c.deleted_at && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-danger/15 text-danger">{t('comments.deletedBadge')}</span>}
                           {c.hidden_at && live && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-subtle">{t('comments.hiddenBadge')}</span>}
                           <span className="text-[11px] text-fg-subtle ms-auto">{localeFormatDateTime(c.posted_at || c.created_at)}</span>
+                        </div>
+                        {/* حالة التعيين ظاهرة دايمًا: متعيّن لمين، أو لسه ماحدش استلمه */}
+                        <div className="mt-1">
+                          {c.assigned_agent_id ? (
+                            <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full ${c.assigned_agent_id === agent?.id ? 'bg-brand/15 text-brand' : 'bg-surface-3 text-fg-muted'}`}>
+                              <UserCheck size={10} /> {c.assigned_agent_id === agent?.id ? t('comments.assignedToMe') : t('comments.assignedTo', { name: c.agents?.name || '' })}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full bg-amber-500/15 text-amber-500">
+                              <UserX size={10} /> {t('comments.unassignedBadge')}
+                            </span>
+                          )}
                         </div>
 
                         {/* الرد على تعليق بنعرض الأصل فوقه، عشان الموظف مايرُدش على جملة مقطوعة من سياقها */}
@@ -528,13 +572,11 @@ export default function CommentsScreen() {
                     </div>
 
                     {/* مين صاحب التعليق / مين شغال عليه / مين عالجه */}
-                    {(c.agents?.name || c.handler?.name || lockedByOther(c)) && (
+                    {(lockedByOther(c) || (c.status !== 'new' && c.handler?.name)) && (
                       <p className="flex items-center gap-1 mt-2 text-[10px] text-fg-subtle">
                         {lockedByOther(c)
                           ? <><Lock size={10} /> {t('comments.lockedBy', { name: c.locker?.name || '' })}</>
-                          : <><UserCheck size={10} /> {c.status !== 'new' && c.handler?.name
-                              ? t('comments.handledBy', { name: c.handler.name })
-                              : t('comments.ownedBy', { name: c.agents?.name || '' })}</>}
+                          : <><Check size={10} /> {t('comments.handledBy', { name: c.handler.name })}</>}
                       </p>
                     )}
                   </div>
