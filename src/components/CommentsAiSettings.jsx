@@ -171,6 +171,25 @@ export default function CommentsAiSettings() {
             </div>
           </Section>
 
+          <Section title={t('comments.ai.privateTitle')} hint={t('comments.ai.privateHint')}>
+            <Toggle checked={form.private_reply_enabled} onChange={v => set({ private_reply_enabled: v })}
+              label={t('comments.ai.privateEnable')} hint={t('comments.ai.privateEnableHint')} />
+            {form.private_reply_enabled && (<>
+              <label className="block mt-3">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.interestKeywords')}</span>
+                <input value={(form.interest_keywords || []).join('، ')} onChange={e => set({ interest_keywords: e.target.value.split(/[,،\n]/).map(x => x.trim()).filter(Boolean) })}
+                  className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg" />
+                <span className="block text-[10px] text-fg-subtle mt-1">{t('comments.ai.interestKeywordsHint')}</span>
+              </label>
+              <label className="block mt-3">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.privateInstructions')}</span>
+                <textarea value={form.private_reply_instructions} onChange={e => set({ private_reply_instructions: e.target.value })} rows={10}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-[13px] text-fg leading-relaxed" />
+                <span className="block text-[10px] text-fg-subtle mt-1">{t('comments.ai.privateInstructionsHint')}</span>
+              </label>
+            </>)}
+          </Section>
+
           <Section title={t('comments.ai.paceTitle')} hint={t('comments.ai.paceHint')}>
             <div className="grid grid-cols-2 gap-3">
               <NumberField label={t('comments.ai.delayMin')} value={form.delay_min_seconds} onChange={v => set({ delay_min_seconds: v ?? 0 })} suffix={t('comments.ai.sec')} />
@@ -244,6 +263,12 @@ function TestBox() {
           <p className="text-[11px] text-fg-subtle">{t('comments.ai.testAction')}: <b className="text-fg">{t(`comments.ai.action.${out.action}`, { defaultValue: out.action || '—' })}</b>
             {out.unsafe && <span className="text-danger"> · {t('comments.ai.testUnsafe')}: {out.unsafe}</span>}</p>
           {out.reply_text && <p className="text-sm text-fg whitespace-pre-wrap">{out.reply_text}</p>}
+          {out.private_text && (
+            <div className="border-s-2 border-brand/50 ps-2.5">
+              <p className="text-[10px] text-brand mb-0.5">{t('comments.ai.privateLabel')}</p>
+              <p className="text-sm text-fg whitespace-pre-wrap">{out.private_text}</p>
+            </div>
+          )}
           <p className="text-[11px] text-fg-subtle">{out.reason}</p>
           <p className="text-[10px] text-fg-subtle">${Number(out.cost_usd).toFixed(5)}</p>
         </div>
@@ -262,6 +287,7 @@ function ReviewList() {
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)
   const [edits, setEdits] = useState({})
+  const [pedits, setPedits] = useState({})
 
   const load = useCallback(async (offset = 0) => {
     if (offset === 0) setLoading(true)
@@ -281,7 +307,7 @@ function ReviewList() {
     try {
       const res = await apiFetch(`${API_URL}/comments/ai/replies/${r.id}/${kind}`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(kind === 'approve' ? { text: edits[r.id] ?? r.reply_text } : {})
+        body: JSON.stringify(kind === 'approve' ? { text: edits[r.id] ?? r.reply_text ?? '', private_text: pedits[r.id] ?? r.private_text ?? '' } : {})
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
@@ -316,12 +342,24 @@ function ReviewList() {
             <LinkifiedText text={r.comment?.content} className="block text-sm text-fg whitespace-pre-wrap break-words" />
             {r.comment?.post_caption && <p className="text-[10px] text-fg-subtle mt-1 line-clamp-1">{r.comment.post_caption}</p>}
           </div>
-          {r.status === 'draft' ? (
-            <textarea value={edits[r.id] ?? r.reply_text ?? ''} onChange={e => setEdits(prev => ({ ...prev, [r.id]: e.target.value }))} rows={3}
+          {r.status === 'draft' ? (<>
+            <p className="text-[10px] text-fg-subtle">{t('comments.ai.publicLabel')}</p>
+            <textarea value={edits[r.id] ?? r.reply_text ?? ''} onChange={e => setEdits(prev => ({ ...prev, [r.id]: e.target.value }))} rows={2}
               className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg" />
-          ) : r.reply_text && (
-            <div className="ps-2.5 border-s-2 border-brand/40"><p className="text-sm text-fg whitespace-pre-wrap break-words">{r.reply_text}</p></div>
-          )}
+            {(r.private_text || pedits[r.id] !== undefined) && (<>
+              <p className="text-[10px] text-brand">{t('comments.ai.privateLabel')}</p>
+              <textarea value={pedits[r.id] ?? r.private_text ?? ''} onChange={e => setPedits(prev => ({ ...prev, [r.id]: e.target.value }))} rows={3}
+                className="w-full bg-surface-3 rounded-xl px-3 py-2 text-sm text-fg" />
+            </>)}
+          </>) : (<>
+            {r.reply_text && <div className="ps-2.5 border-s-2 border-brand/40"><p className="text-sm text-fg whitespace-pre-wrap break-words">{r.reply_text}</p></div>}
+            {r.private_text && (
+              <div className="ps-2.5 border-s-2 border-emerald-500/50">
+                <p className="text-[10px] text-emerald-500 mb-0.5">{t('comments.ai.privateLabel')}{r.private_sent_at ? ` · ${t('comments.ai.privateSentTag')}` : ''}</p>
+                <p className="text-sm text-fg whitespace-pre-wrap break-words">{r.private_text}</p>
+              </div>
+            )}
+          </>)}
           {(r.reason || r.error) && <p className="text-[11px] text-fg-subtle">{r.error ? `⚠ ${r.error}` : r.reason}</p>}
           <div className="flex items-center gap-2">
             {r.status === 'draft' && (<>

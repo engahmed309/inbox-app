@@ -2048,7 +2048,9 @@
         "overview": "Overview",
         "staff": "Staff",
         "posts": "Posts",
-        "ai": "AI replies"
+        "ai": "AI replies",
+        "interest": "Interested",
+        "followup": "Follow-up"
       },
       "ranges": {
         "today": "Today",
@@ -2106,7 +2108,43 @@
         "perDay": "Replies per day",
         "costPerDay": "Daily cost (USD)",
         "byModel": "By model",
-        "disclaimer": "Cost is an estimate from token counts and model pricing, not an official invoice. It includes every agent call, including drafts and skips."
+        "disclaimer": "Cost is an estimate from token counts and model pricing, not an official invoice. It includes every agent call, including drafts and skips.",
+        "privateSent": "Private messages sent by agent",
+        "privateHint": "conversations it started with interested people",
+        "draftsTitle": "Draft quality",
+        "approvedAsIs": "Approved as is",
+        "approvedEdited": "Approved after edits",
+        "rejected": "Rejected",
+        "pendingReview": "Waiting for your review",
+        "draftsHint": "The higher the “as is” share, the better the agent — a good signal before going live."
+      },
+      "p90": "Slowest 10%",
+      "p90Hint": "90% of replies are faster than this",
+      "withinSla": "Replied within {{v}}",
+      "slaLabel": "Acceptable reply time:",
+      "lateNow": "Late now",
+      "lateHint": "waiting longer than {{v}}",
+      "lateByAgent": "Late comments by agent",
+      "noneLate": "Nothing late 👌",
+      "oldestAt": "Oldest {{d}}",
+      "repeatTitle": "Repeat commenters",
+      "repeatHint": "People who commented 3+ times in the period — potential customers or annoying accounts worth a look",
+      "handledN": "{{n}} handled",
+      "funnel": {
+        "title": "From interest to booking",
+        "hint": "Comments containing an interest word (like “interested”) and what happened to them: replied, conversation opened, customer answered, booked.",
+        "interested": "Showed interest",
+        "public_replied": "Replied publicly",
+        "private_sent": "Got a private message",
+        "conversations": "Conversation opened",
+        "customer_replied": "Customer replied",
+        "booked_now": "Currently in “Booked” stage",
+        "ofPrev": "{{p}}% of previous",
+        "byAi": "Private messages started by the agent",
+        "byAiHint": "of all private messages",
+        "missed": "Interested, never replied to publicly",
+        "missedHint": "possible lost opportunities",
+        "note": "Interest words are configured in the agent settings. “Booked” is the customer's current stage, not necessarily caused by the comment alone."
       }
     },
     "ai": {
@@ -2184,7 +2222,18 @@
       "approved": "Reply published",
       "rejected": "Rejected",
       "reviewEmpty": "Nothing here",
-      "loadMore": "Load more"
+      "loadMore": "Load more",
+      "privateTitle": "Private messages to interested people",
+      "privateHint": "When a commenter shows interest the agent sends a private message that starts a conversation, which is distributed to the messages team (call center) to continue.",
+      "privateEnable": "Enable private messages",
+      "privateEnableHint": "Meta allows one private message per comment, within 7 days only. If it fails no public reply is posted and the comment returns to the team.",
+      "interestKeywords": "Interest words",
+      "interestKeywordsHint": "Comma separated. Any of them in a comment tells the agent the person is interested (also used by the Interested report).",
+      "privateInstructions": "Private message instructions",
+      "privateInstructionsHint": "What goes in the message. Only links and phone numbers written here verbatim are allowed; any other link or number blocks sending.",
+      "privateLabel": "Private message",
+      "publicLabel": "Public reply",
+      "privateSentTag": "sent"
     }
   }
 }

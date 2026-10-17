@@ -8,7 +8,8 @@ import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const RANGES = ['today', '7d', '30d', 'custom']
 const PLATFORMS = ['all', 'facebook', 'instagram', 'youtube']
-const TABS = ['overview', 'staff', 'posts', 'ai']
+const TABS = ['overview', 'staff', 'posts', 'interest', 'followup', 'ai']
+const SLAS = [60, 240, 1440]
 const COLORS = { facebook: '#60a5fa', instagram: '#f472b6', youtube: '#ef4444', brand: '#8b7cf6', ok: '#34d399', warn: '#fbbf24', bad: '#f87171', muted: '#9ca3af' }
 
 // حدود الفترة (ISO) بتوقيت جهاز المستخدم. الأيام نفسها بتتجمّع بتوقيت القاهرة جوه الداتابيز
@@ -81,11 +82,11 @@ export default function CommentsReports() {
   const [platform, setPlatform] = useState('all')
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
+  const [sla, setSla] = useState(240)
   const [data, setData] = useState(null)
   const [loading, setLoading] = useState(true)
 
   const b = useMemo(() => bounds(range, customFrom, customTo), [range, customFrom, customTo])
-  const isAi = tab === 'ai'
 
   const load = useCallback(async () => {
     if (!b) return
@@ -93,12 +94,14 @@ export default function CommentsReports() {
     try {
       const qs = new URLSearchParams({ from: b.from, platform })
       if (b.to) qs.set('to', b.to)
-      const res = await apiFetch(`${API_URL}/comments/reports/${isAi ? 'ai' : 'overview'}?${qs}`)
+      qs.set('sla', String(sla))
+      const endpoint = tab === 'ai' ? 'ai' : tab === 'interest' ? 'funnel' : 'overview'
+      const res = await apiFetch(`${API_URL}/comments/reports/${endpoint}?${qs}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setData(json)
     } catch (err) { toast.error(err.message); setData(null) } finally { setLoading(false) }
-  }, [b, platform, isAi]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [b, platform, tab, sla]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => { setData(null); load() }, [load])
 
@@ -203,8 +206,13 @@ export default function CommentsReports() {
               <Bars rows={['facebook', 'instagram', 'youtube'].map(p => ({ label: t(`comments.platforms.${p}`), value: data.by_platform?.[p] || 0, color: p === 'facebook' ? 'bg-blue-400' : p === 'instagram' ? 'bg-pink-400' : 'bg-red-500' }))} />
             </Card>
           </div>
-        </>) : tab === 'staff' ? (
+        </>) : tab === 'interest' ? (
+          <Funnel data={data} t={t} />
+        ) : tab === 'followup' ? (
+          <Followup data={data} t={t} sla={sla} setSla={setSla} />
+        ) : tab === 'staff' ? (
           <Card title={t('comments.reports.tabs.staff')}>
+            <SlaPicker sla={sla} setSla={setSla} t={t} />
             {(data.by_agent || []).length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full text-xs">
@@ -214,6 +222,8 @@ export default function CommentsReports() {
                     <th className="font-medium pb-2">{t('comments.reports.publicReplies')}</th>
                     <th className="font-medium pb-2">{t('comments.reports.privateReplies')}</th>
                     <th className="font-medium pb-2">{t('comments.reports.medianResponse')}</th>
+                    <th className="font-medium pb-2">{t('comments.reports.p90')}</th>
+                    <th className="font-medium pb-2">{t('comments.reports.withinSla', { v: slaLabel(sla, t) })}</th>
                   </tr></thead>
                   <tbody>
                     {data.by_agent.map(a => (
@@ -223,6 +233,8 @@ export default function CommentsReports() {
                         </td>
                         <td className="py-2 text-fg">{fmt(a.handled)}</td><td className="py-2 text-fg-muted">{fmt(a.public_replies)}</td>
                         <td className="py-2 text-fg-muted">{fmt(a.private_replies)}</td><td className="py-2 text-fg-muted">{minutesLabel(a.median_minutes, t)}</td>
+                        <td className="py-2 text-fg-muted">{minutesLabel(a.p90_minutes, t)}</td>
+                        <td className="py-2 text-fg-muted">{a.handled ? `${Math.round((a.within_sla / a.handled) * 100)}%` : '—'}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -257,6 +269,7 @@ export default function CommentsReports() {
             <Kpi label={t('comments.reports.ai.totalCost')} value={usd(data.cost_usd, 3)} tone="text-brand" hint={t('comments.reports.ai.estimate')} />
             <Kpi label={t('comments.reports.ai.costPerReply')} value={usd(data.by_status?.replied ? data.cost_usd / data.by_status.replied : 0)} hint={t('comments.reports.ai.perPosted')} />
             <Kpi label={t('comments.reports.ai.processed')} value={fmt(data.total)} />
+            <Kpi label={t('comments.reports.ai.privateSent')} value={fmt(data.private_sent)} hint={t('comments.reports.ai.privateHint')} />
             <Kpi label={t('comments.reports.ai.tokens')} value={fmt((data.input_tokens || 0) + (data.output_tokens || 0))} hint={`${fmt(data.input_tokens)} / ${fmt(data.output_tokens)}`} />
           </div>
           <Card title={t('comments.reports.ai.statuses')}>
@@ -269,6 +282,17 @@ export default function CommentsReports() {
               { label: t('comments.ai.status.pending'), value: (data.by_status?.pending || 0) + (data.by_status?.processing || 0), color: 'bg-surface-3' },
             ]} />
           </Card>
+          {(data.drafts?.approved || data.drafts?.rejected || data.drafts?.pending) ? (
+            <Card title={t('comments.reports.ai.draftsTitle')}>
+              <Bars rows={[
+                { label: t('comments.reports.ai.approvedAsIs'), value: Math.max((data.drafts.approved || 0) - (data.drafts.approved_edited || 0), 0), color: 'bg-success' },
+                { label: t('comments.reports.ai.approvedEdited'), value: data.drafts.approved_edited || 0, color: 'bg-amber-500' },
+                { label: t('comments.reports.ai.rejected'), value: data.drafts.rejected || 0, color: 'bg-danger' },
+                { label: t('comments.reports.ai.pendingReview'), value: data.drafts.pending || 0, color: 'bg-surface-3' },
+              ]} />
+              <p className="text-[10px] text-fg-subtle mt-2">{t('comments.reports.ai.draftsHint')}</p>
+            </Card>
+          ) : null}
           <Card title={t('comments.reports.ai.perDay')}>
             {(data.by_day || []).length === 0 ? <p className="text-xs text-fg-subtle">{t('comments.reports.noData')}</p> : (
               <div className="h-56" dir="ltr">
@@ -323,6 +347,119 @@ export default function CommentsReports() {
           <p className="text-[10px] text-fg-subtle">{t('comments.reports.ai.disclaimer')}</p>
         </>)}
       </div>
+    </div>
+  )
+}
+
+
+function slaLabel(minutes, t) {
+  return minutes >= 1440 ? `${minutes / 1440} ${t('comments.reports.day')}` : minutes >= 60 ? `${minutes / 60} ${t('comments.reports.hr')}` : `${minutes} ${t('comments.reports.min')}`
+}
+
+// مهلة الرد المقبولة — بتتحكم في "الردود خلال المهلة" وفي "التعليقات المتأخرة"
+function SlaPicker({ sla, setSla, t }) {
+  return (
+    <div className="flex items-center gap-2 mb-3 flex-wrap">
+      <span className="text-[11px] text-fg-subtle">{t('comments.reports.slaLabel')}</span>
+      {SLAS.map(m => (
+        <button key={m} onClick={() => setSla(m)}
+          className={`px-2.5 py-1 rounded-full text-[11px] ${sla === m ? 'bg-brand/20 text-brand font-semibold' : 'bg-surface-3 text-fg-subtle'}`}>{slaLabel(m, t)}</button>
+      ))}
+    </div>
+  )
+}
+
+// قمع المهتمين: من كتب كلمة اهتمام ← اتردّ عليه ← اتفتحت معاه محادثة ← رد ← حجز. الكلمات من إعدادات الوكيل
+function Funnel({ data, t }) {
+  const steps = [
+    { key: 'interested', value: data.interested || 0 },
+    { key: 'public_replied', value: data.public_replied || 0 },
+    { key: 'private_sent', value: data.private_sent || 0 },
+    { key: 'conversations', value: data.conversations || 0 },
+    { key: 'customer_replied', value: data.customer_replied || 0 },
+    { key: 'booked_now', value: data.booked_now || 0 },
+  ]
+  const top = Math.max(1, steps[0].value)
+  return (
+    <div className="space-y-3">
+      <Card title={t('comments.reports.funnel.title')}>
+        <p className="text-[11px] text-fg-subtle -mt-1 mb-3 leading-relaxed">{t('comments.reports.funnel.hint')}</p>
+        {steps[0].value === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
+          <div className="space-y-2.5">
+            {steps.map((st, i) => (
+              <div key={st.key}>
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span className="text-fg">{t(`comments.reports.funnel.${st.key}`)}</span>
+                  <span className="tabular-nums text-fg">
+                    {fmt(st.value)}
+                    <span className="text-fg-subtle ms-1.5">{Math.round((st.value / top) * 100)}%</span>
+                    {i > 0 && steps[i - 1].value > 0 && <span className="text-fg-subtle ms-1.5">({t('comments.reports.funnel.ofPrev', { p: Math.round((st.value / steps[i - 1].value) * 100) })})</span>}
+                  </span>
+                </div>
+                <div className="h-2.5 bg-surface-3 rounded-full overflow-hidden">
+                  <div className="h-full rounded-full bg-brand" style={{ width: `${(st.value / top) * 100}%`, opacity: 1 - i * 0.12 }} />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+      {steps[0].value > 0 && (
+        <div className="grid grid-cols-2 gap-2.5">
+          <Kpi label={t('comments.reports.funnel.byAi')} value={fmt(data.private_by_ai)} hint={t('comments.reports.funnel.byAiHint')} />
+          <Kpi label={t('comments.reports.funnel.missed')} value={fmt(Math.max(steps[0].value - steps[1].value, 0))} hint={t('comments.reports.funnel.missedHint')} tone="text-amber-500" />
+        </div>
+      )}
+      <p className="text-[10px] text-fg-subtle">{t('comments.reports.funnel.note')}</p>
+    </div>
+  )
+}
+
+// المتابعة: الالتزام بمهلة الرد + التعليقات المتأخرة لكل موظف + المتفاعلين المتكررين
+function Followup({ data, t, sla, setSla }) {
+  const r = data.response || {}
+  const stale = data.stale || []
+  const repeat = data.repeat_authors || []
+  const staleTotal = stale.reduce((s, x) => s + x.n, 0)
+  return (
+    <div className="space-y-3">
+      <SlaPicker sla={sla} setSla={setSla} t={t} />
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+        <Kpi label={t('comments.reports.withinSla', { v: slaLabel(sla, t) })} value={r.n ? `${Math.round(((r.within_sla || 0) / r.n) * 100)}%` : '—'} hint={r.n ? `${fmt(r.within_sla)} / ${fmt(r.n)}` : null} tone="text-success" />
+        <Kpi label={t('comments.reports.p90')} value={minutesLabel(r.p90, t)} hint={t('comments.reports.p90Hint')} />
+        <Kpi label={t('comments.reports.medianResponse')} value={minutesLabel(r.median, t)} />
+        <Kpi label={t('comments.reports.lateNow')} value={fmt(staleTotal)} hint={t('comments.reports.lateHint', { v: slaLabel(sla, t) })} tone={staleTotal ? 'text-amber-500' : undefined} />
+      </div>
+
+      <Card title={t('comments.reports.lateByAgent')}>
+        {stale.length === 0 ? <p className="text-xs text-fg-subtle py-3 text-center">{t('comments.reports.noneLate')}</p> : (
+          <div className="space-y-1.5">
+            {stale.map(x => (
+              <div key={x.agent_id || 'none'} className="flex items-center text-xs gap-2">
+                <span className={`flex-1 ${x.name ? 'text-fg' : 'text-amber-500'}`}>{x.name || t('comments.unassignedBadge')}</span>
+                <span className="text-fg-subtle">{t('comments.reports.oldestAt', { d: localeFormatDateTime(x.oldest) })}</span>
+                <span className="w-14 text-end tabular-nums text-fg font-semibold">{fmt(x.n)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
+
+      <Card title={t('comments.reports.repeatTitle')}>
+        <p className="text-[11px] text-fg-subtle -mt-1 mb-2">{t('comments.reports.repeatHint')}</p>
+        {repeat.length === 0 ? <p className="text-xs text-fg-subtle py-3 text-center">{t('comments.reports.noData')}</p> : (
+          <div className="space-y-1.5">
+            {repeat.map((x, i) => (
+              <div key={`${x.platform}-${x.name}-${i}`} className="flex items-center text-xs gap-2">
+                <span className="flex-1 min-w-0 text-fg truncate">{x.name || t('comments.unknownAuthor')}</span>
+                <span className="text-fg-subtle">{t(`comments.platforms.${x.platform}`, { defaultValue: x.platform })}</span>
+                <span className="text-fg-subtle tabular-nums">{t('comments.reports.handledN', { n: x.handled })}</span>
+                <span className="w-10 text-end tabular-nums text-fg font-semibold">{fmt(x.n)}</span>
+              </div>
+            ))}
+          </div>
+        )}
+      </Card>
     </div>
   )
 }
