@@ -13,7 +13,7 @@ import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import CommentsReports from '../components/CommentsReports'
 import CommentsAiSettings from '../components/CommentsAiSettings'
-import { RedistributeModal, SavedRepliesModal, loadSavedReplies, fillSavedReply } from '../components/CommentsAdminModals'
+import { RedistributeModal, SavedRepliesModal, BackfillModal, loadSavedReplies, fillSavedReply } from '../components/CommentsAdminModals'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const PAGE_SIZE = 30
@@ -62,6 +62,7 @@ export default function CommentsScreen() {
   const [showStats, setShowStats] = useState(false)
   const [showRedistribute, setShowRedistribute] = useState(false)
   const [showSaved, setShowSaved] = useState(false)
+  const [showBackfill, setShowBackfill] = useState(false)
   const [postFilter, setPostFilter] = useState(null)   // { id, caption } — تعليقات بوست واحد (جاي من تقرير المنشورات)
   const [assignFor, setAssignFor] = useState(null)
   const [menuFor, setMenuFor] = useState(null)
@@ -291,9 +292,10 @@ export default function CommentsScreen() {
       <div className="space-y-0.5">{children}</div>
     </div>
   )
-  const ToolItem = ({ icon, label, onClick }) => (
+  const ToolItem = ({ icon, label, onClick, count }) => (
     <button onClick={onClick} className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-fg-muted hover:bg-surface-3 hover:text-fg">
       <span className="flex-shrink-0">{icon}</span><span className="flex-1 text-start truncate">{label}</span>
+      {count > 0 && <span className="text-[11px] tabular-nums px-1.5 rounded-full bg-amber-500/20 text-amber-500">{count}</span>}
     </button>
   )
 
@@ -354,13 +356,14 @@ export default function CommentsScreen() {
             ))}
           </Section>
         )}
-        {view === 'inbox' && (isAdmin || platform === 'youtube') && (
+        {view === 'inbox' && (
           <Section title={t('comments.sections.tools')}>
             {isAdmin && <ToolItem icon={<BarChart3 size={15} />} label={t('comments.stats.button')} onClick={() => { setShowStats(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Shuffle size={15} />} label={t('comments.distribute')}
               onClick={() => { postTool('distribute', {}, 'comments.distributeConfirm', 'comments.distributeDone'); afterPick() }} />}
             {isAdmin && <ToolItem icon={<ArrowLeftRight size={15} />} label={t('comments.admin.redistributeTitle')} onClick={() => { setShowRedistribute(true); afterPick() }} />}
-            {isAdmin && <ToolItem icon={<MessageSquareText size={15} />} label={t('comments.admin.savedTitle')} onClick={() => { setShowSaved(true); afterPick() }} />}
+            <ToolItem icon={<MessageSquareText size={15} />} label={t('comments.admin.savedTitle')} count={isAdmin ? team?.pending_saved_replies : 0} onClick={() => { setShowSaved(true); afterPick() }} />
+            {isAdmin && <ToolItem icon={<RefreshCw size={15} />} label={t('comments.admin.backfillTitle')} onClick={() => { setShowBackfill(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Archive size={15} />} label={t('comments.archiveOld')}
               onClick={() => { postTool('archive', { days: 7 }, 'comments.archiveConfirm', 'comments.archiveDone'); afterPick() }} />}
             {platform === 'youtube' && <ToolItem icon={<Film size={15} />} label={t('comments.videos.button')} onClick={() => { setShowVideos(true); afterPick() }} />}
@@ -614,7 +617,8 @@ export default function CommentsScreen() {
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRedistribute && <RedistributeModal onClose={() => setShowRedistribute(false)} onDone={() => { load(); fetchTeam() }} />}
-      {showSaved && <SavedRepliesModal onClose={() => setShowSaved(false)} />}
+      {showSaved && <SavedRepliesModal isAdmin={isAdmin} onClose={() => setShowSaved(false)} onChanged={fetchTeam} />}
+      {showBackfill && <BackfillModal onClose={() => setShowBackfill(false)} onDone={() => { load(); fetchTeam() }} />}
       {assignFor && (
         <AssignModal comment={assignFor} onClose={() => setAssignFor(null)}
           onAssigned={(agentRow) => {
@@ -654,15 +658,11 @@ function AssignModal({ comment, onClose, onAssigned }) {
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    apiFetch(`${API_URL}/teams`)
+    apiFetch(`${API_URL}/comments/team`)
       .then(async r => {
         const d = await r.json()
         if (!r.ok) throw new Error(d.error)
-        const map = new Map()
-        for (const team of d.teams || []) for (const m of team.members || []) {
-          if (['comments', 'both'].includes(m.access_scope)) map.set(m.id, m)
-        }
-        setAgents([...map.values()])
+        setAgents((d.members || []).filter(m => m.eligible))
       })
       .catch(err => { toast.error(err.message); onClose() })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps

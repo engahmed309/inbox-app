@@ -2248,21 +2248,48 @@
     },
     "admin": {
       "redistributeTitle": "Move an agent's comments",
-      "redistributeHint": "Move all new pending comments from one agent (leave or absence) to another agent, or spread them evenly across the rest of the team.",
+      "redistributeHint": "Move all new pending comments from an agent (leave or absence) to another agent in the comments team, or spread them evenly across the rest of the team.",
       "from": "From agent",
       "to": "To",
       "toTeam": "Rest of the team, evenly",
       "move": "Move comments",
       "moved": "Moved {{count}} comments",
-      "autoTitle": "Automatic redistribution",
-      "autoHint": "If a new comment stays with an offline agent longer than this, it is moved to an online team member (runs every 10 minutes). Leave empty to turn off.",
       "savedTitle": "Saved replies",
       "savedHint": "Replies agents can insert with one tap in the reply window. Write {name} to insert the commenter's first name.",
       "replyTitle": "Reply title",
       "replyBody": "Reply text…",
       "addReply": "Add",
       "noSaved": "No saved replies yet",
-      "deleteReplyConfirm": "Delete this saved reply?"
+      "deleteReplyConfirm": "Delete this saved reply?",
+      "savedHintAgent": "Suggest saved replies you use when answering comments. They appear for everyone once the admin approves. Write {name} to insert the commenter's first name.",
+      "proposeReply": "Suggest for approval",
+      "needsApproval": "A reply you add is only usable after the admin approves it.",
+      "sentForApproval": "Sent to the admin for approval",
+      "pendingTitle": "Waiting for approval ({{n}})",
+      "proposedBy": "Suggested by {{name}}",
+      "approveBtn": "Approve",
+      "status": {
+        "approved": "Approved",
+        "pending": "Pending",
+        "rejected": "Rejected"
+      },
+      "backfillTitle": "Sync comments from Meta",
+      "backfillHint": "Pulls comments that were missed (server downtime or Meta delays) and sends them through the normal comment pipeline: storage, auto-hide and distribution to the team. Existing comments are not duplicated.",
+      "lastHours": "Last {{n}} hours",
+      "syncNow": "Sync now",
+      "syncing": "Syncing…",
+      "lastRun": "Last sync: {{d}} ({{s}})",
+      "source": {
+        "auto": "automatic",
+        "startup": "after restart",
+        "manual": "manual"
+      },
+      "postsChecked": "Posts checked",
+      "fetched": "Comments fetched",
+      "newFound": "New",
+      "errors": "Errors ({{n}})",
+      "autoSync": "Automatic sync",
+      "autoSyncHint": "Every 30 minutes it checks the last 6 hours, and after each server restart the last 24 hours."
     }
   }
 }
