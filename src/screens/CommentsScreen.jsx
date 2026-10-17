@@ -222,20 +222,8 @@ export default function CommentsScreen() {
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
 
-  // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيرد علنًا ويبعت رسالة خاصة فورًا (السيرفر بيطبّق نفس فحوصات الأمان)
-  const [aiBusy, setAiBusy] = useState(null)
-  const assignToAi = async (c) => {
-    if (!window.confirm(t('comments.assignAiConfirm'))) return
-    setAiBusy(c.id)
-    try {
-      const res = await apiFetch(`${API_URL}/comments/${c.id}/assign-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || t('comments.assignAiFailed'))
-      toast.success(data.private_skipped ? t('comments.assignAiDonePublicOnly', { reason: data.private_skipped }) : t('comments.assignAiDone'))
-      fetchCounts()
-      load()
-    } catch (err) { toast.error(err.message) } finally { setAiBusy(null) }
-  }
+  // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيطلع له مسودة (رد علني + رسالة خاصة) يراجعها ويعدّلها ويختار يبعت إيه
+  const [aiFor, setAiFor] = useState(null)
 
   const openReply = (c, mode) => setReplyTo({ comment: c, mode })
   const closeReply = () => setReplyTo(null)
@@ -596,8 +584,7 @@ export default function CommentsScreen() {
                                   onClick={() => { setMenuFor(null); setAssignFor(c) }} />
                               )}
                               {isAdmin && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
-                                <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} disabled={aiBusy === c.id}
-                                  onClick={() => { setMenuFor(null); assignToAi(c) }} />
+                                <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} onClick={() => { setMenuFor(null); setAiFor(c) }} />
                               )}
                               <MenuItem icon={<Archive size={13} />} label={t('comments.archive')} disabled={other}
                                 onClick={() => { setMenuFor(null); patchComment(c, { archived: true }) }} />
@@ -636,6 +623,7 @@ export default function CommentsScreen() {
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRedistribute && <RedistributeModal onClose={() => setShowRedistribute(false)} onDone={() => { load(); fetchTeam() }} />}
+      {aiFor && <AiAssignModal comment={aiFor} onClose={() => setAiFor(null)} onDone={() => { setAiFor(null); fetchCounts(); load() }} />}
       {showSaved && <SavedRepliesModal isAdmin={isAdmin} onClose={() => setShowSaved(false)} onChanged={fetchTeam} />}
       {showBackfill && <BackfillModal onClose={() => setShowBackfill(false)} onDone={() => { load(); fetchTeam() }} />}
       {assignFor && (
@@ -892,6 +880,133 @@ function YoutubeVideosModal({ onClose, onSynced }) {
 // نفس المودال للردين — الفرق الوحيد المسار والنصوص. الفرق اللي يهم الموظف إن العام بيشوفه
 // كل الناس والخاص لأ، وإن الخاص مرة واحدة وخلال ٧ أيام (قاعدة ميتا) — بنقولهاله قبل ما يكتب
 // مش بعد ما الرسالة تفشل
+// ─── ردّ بالذكاء الاصطناعي (تسليم يدوي من الأدمن) ────────────────────────
+// بيجيب مسودة من السيرفر (رد علني + رسالة خاصة) من غير نشر، الأدمن يراجعها ويعدّل ويختار يبعت الاتنين أو واحد بس
+function AiAssignModal({ comment, onClose, onDone }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [state, setState] = useState({ loading: true, error: null })
+  const [draft, setDraft] = useState(null)   // { id, private_possible, private_skipped }
+  const [pubText, setPubText] = useState('')
+  const [privText, setPrivText] = useState('')
+  const [sendPub, setSendPub] = useState(true)
+  const [sendPriv, setSendPriv] = useState(true)
+  const [sending, setSending] = useState(false)
+
+  const generate = async () => {
+    setState({ loading: true, error: null })
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${comment.id}/assign-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('comments.aiAssign.failed'))
+      setDraft({ id: data.id, private_possible: data.private_possible !== false, private_skipped: data.private_skipped })
+      setPubText(data.reply_text || '')
+      setPrivText(data.private_text || '')
+      setSendPub(Boolean(data.reply_text) && !comment.public_reply_at)
+      setSendPriv(Boolean(data.private_text) && data.private_possible !== false)
+      setState({ loading: false, error: null })
+    } catch (err) { setState({ loading: false, error: err.message }) }
+  }
+  useEffect(() => { generate() }, [])   // eslint-disable-line react-hooks/exhaustive-deps
+
+  // الإلغاء بيرفض المسودة عشان ما تفضلش معلّقة في قايمة مسودات الذكاء الاصطناعي
+  const cancel = () => {
+    if (sending) return
+    if (draft?.id) apiFetch(`${API_URL}/comments/ai/replies/${draft.id}/reject`, { method: 'POST' }).catch(() => {})
+    onClose()
+  }
+
+  const canPub = !comment.public_reply_at
+  const canPriv = draft?.private_possible !== false && !comment.private_replied_at
+  const pubOn = sendPub && canPub && pubText.trim()
+  const privOn = sendPriv && canPriv && privText.trim()
+  const label = pubOn && privOn ? 'sendBoth' : pubOn ? 'sendPublic' : privOn ? 'sendPrivate' : null
+
+  const send = async () => {
+    if (!label) return
+    setSending(true)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/ai/replies/${draft.id}/approve`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: pubText.trim(), private_text: privText.trim(), send_public: Boolean(pubOn), send_private: Boolean(privOn) })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || t('comments.aiAssign.failed'))
+      toast.success(t('comments.aiAssign.sent'))
+      onDone()
+    } catch (err) { toast.error(err.message) } finally { setSending(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={cancel}>
+      <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[480px] max-h-[88vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3">
+          <span className="font-semibold text-fg text-sm flex items-center gap-2"><Bot size={16} className="text-brand" /> {t('comments.aiAssign.title')}</span>
+          <button onClick={cancel} className="text-fg-subtle hover:text-fg"><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          <div className="bg-surface-3 rounded-xl p-2.5">
+            <p className="text-[11px] text-fg-subtle mb-1">{comment.author_name || t('comments.unknownAuthor')}</p>
+            <LinkifiedText text={comment.content} className="block text-xs text-fg-muted whitespace-pre-wrap break-words" />
+          </div>
+
+          {state.loading ? (
+            <div className="flex items-center justify-center gap-2 py-8 text-xs text-fg-muted">
+              <div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" /> {t('comments.aiAssign.preparing')}
+            </div>
+          ) : state.error ? (
+            <div className="space-y-3">
+              <p className="text-xs text-danger bg-danger/10 rounded-xl p-3">{state.error}</p>
+              <div className="flex gap-2">
+                <button onClick={generate} className="flex-1 py-2 rounded-xl bg-brand text-white text-sm font-semibold">{t('comments.aiAssign.retry')}</button>
+                <button onClick={onClose} className="px-4 py-2 rounded-xl bg-surface-3 text-fg-muted text-sm">{t('comments.aiAssign.cancel')}</button>
+              </div>
+            </div>
+          ) : (<>
+            <p className="text-[11px] text-fg-subtle">{t('comments.aiAssign.hint')}</p>
+
+            <div className={`rounded-xl border p-2.5 space-y-1.5 ${pubOn ? 'border-brand/40' : 'border-surface-3 opacity-70'}`}>
+              <label className="flex items-center gap-2 text-xs font-semibold text-fg cursor-pointer">
+                <input type="checkbox" checked={sendPub && canPub} disabled={!canPub} onChange={e => setSendPub(e.target.checked)} />
+                <MessageCircle size={13} /> {t('comments.aiAssign.publicLabel')}
+                <span className="ms-auto text-[10px] font-normal text-fg-subtle">{t('comments.aiAssign.chars', { n: pubText.length })}</span>
+              </label>
+              <textarea value={pubText} onChange={e => setPubText(e.target.value)} rows={3} disabled={!canPub}
+                className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg" />
+            </div>
+
+            <div className={`rounded-xl border p-2.5 space-y-1.5 ${privOn ? 'border-brand/40' : 'border-surface-3 opacity-70'}`}>
+              <label className="flex items-center gap-2 text-xs font-semibold text-fg cursor-pointer">
+                <input type="checkbox" checked={sendPriv && canPriv} disabled={!canPriv} onChange={e => setSendPriv(e.target.checked)} />
+                <Send size={13} /> {t('comments.aiAssign.privateLabel')}
+                <span className="ms-auto text-[10px] font-normal text-fg-subtle">{t('comments.aiAssign.chars', { n: privText.length })}</span>
+              </label>
+              {canPriv ? (
+                <textarea value={privText} onChange={e => setPrivText(e.target.value)} rows={4}
+                  className="w-full bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg" />
+              ) : (
+                <p className="text-[11px] text-amber-500">{t('comments.aiAssign.privateUnavailable', { reason: draft?.private_skipped || t('comments.privateReplySent') })}</p>
+              )}
+            </div>
+
+            <div className="flex gap-2 pt-1">
+              <button onClick={send} disabled={sending || !label}
+                className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40">
+                {sending ? t('comments.sending') : label ? t('comments.aiAssign.' + label) : t('comments.aiAssign.pickOne')}
+              </button>
+              <button onClick={generate} disabled={sending} title={t('comments.aiAssign.regenerate')}
+                className="px-3 py-2.5 rounded-xl bg-surface-3 text-fg-muted hover:text-fg text-xs flex items-center gap-1.5 disabled:opacity-40">
+                <Wand2 size={14} /> {t('comments.aiAssign.regenerate')}
+              </button>
+              <button onClick={cancel} disabled={sending} className="px-3 py-2.5 rounded-xl bg-surface-3 text-fg-muted text-xs disabled:opacity-40">{t('comments.aiAssign.cancel')}</button>
+            </div>
+          </>)}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ReplyModal({ comment, mode, onClose, onSent }) {
   const { t } = useTranslation()
   const toast = useToast()
