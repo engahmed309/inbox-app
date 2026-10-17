@@ -225,6 +225,39 @@ export default function CommentsScreen() {
   // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيطلع له مسودة (رد علني + رسالة خاصة) يراجعها ويعدّلها ويختار يبعت إيه
   const [aiFor, setAiFor] = useState(null)
 
+  // الذكاء الاصطناعي كموظف: حالته (نشط/متوقف) وطابوره، ويتحدّث كل ١٥ ثانية. وأي تعليق هو ماسكه دلوقتي (في الطابور/بيكتب)
+  // بنحدّث حالته كل ٥ ثواني لوحده من غير ما القايمة تتحمّل وتتحرك تحت إيد الموظف
+  const [aiStatus, setAiStatus] = useState(null)
+  const [nowTick, setNowTick] = useState(Date.now())
+  const fetchAiStatus = useCallback(async () => {
+    try {
+      const res = await apiFetch(`${API_URL}/comments/ai/status`)
+      const data = await res.json()
+      if (res.ok) setAiStatus(data)
+    } catch { /* بنسيب آخر حالة معروضة */ }
+  }, [])
+  useEffect(() => {
+    fetchAiStatus()
+    const id = setInterval(fetchAiStatus, 15000)
+    return () => clearInterval(id)
+  }, [fetchAiStatus])
+  const inFlightIds = comments.filter(c => c.ai && ['pending', 'processing'].includes(c.ai.status)).map(c => c.id).join(',')
+  useEffect(() => {
+    if (!inFlightIds) return undefined
+    const id = setInterval(async () => {
+      setNowTick(Date.now())
+      try {
+        const res = await apiFetch(`${API_URL}/comments/refresh?ids=${inFlightIds}`)
+        const data = await res.json()
+        if (!res.ok || !data.comments?.length) return
+        const byId = Object.fromEntries(data.comments.map(c => [c.id, c]))
+        setComments(prev => prev.map(c => (byId[c.id] ? { ...c, ...byId[c.id] } : c)))
+        if (data.comments.some(c => !['pending', 'processing'].includes(c.ai?.status))) { fetchCounts(); fetchAiStatus() }
+      } catch { /* المحاولة الجاية */ }
+    }, 5000)
+    return () => clearInterval(id)
+  }, [inFlightIds, fetchCounts, fetchAiStatus])
+
   const openReply = (c, mode) => setReplyTo({ comment: c, mode })
   const closeReply = () => setReplyTo(null)
 
@@ -336,6 +369,32 @@ export default function CommentsScreen() {
           ))}
         </Section>
         </>)}
+        {aiStatus && (
+          <Section title={t('comments.aiCard.title')}>
+            <div className="mx-1 rounded-xl bg-surface-3 px-3 py-2.5 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${aiStatus.available && aiStatus.active ? 'bg-success' : 'bg-fg-subtle'}`} />
+                <span className={`text-[12px] font-semibold ${aiStatus.available && aiStatus.active ? 'text-success' : 'text-fg-muted'}`}>
+                  {!aiStatus.available ? t('comments.aiCard.unavailable') : t(`comments.aiCard.${aiStatus.mode === 'live' ? 'live' : aiStatus.mode === 'draft' ? 'draft' : 'off'}`)}
+                </span>
+              </div>
+              {aiStatus.active && (<>
+                <p className="text-[11px] text-fg-muted">{t('comments.aiCard.queue', { pending: aiStatus.pending, processing: aiStatus.processing, drafts: aiStatus.drafts })}</p>
+                {aiStatus.next_run_at && aiStatus.pending > 0 && (
+                  <p className="text-[11px] text-fg-subtle">{t('comments.aiCard.next', { s: Math.max(0, Math.round((new Date(aiStatus.next_run_at).getTime() - Date.now()) / 1000)) })}</p>
+                )}
+                <p className="text-[11px] text-fg-subtle">{t('comments.aiCard.day', { replied: aiStatus.replied_24h, back: aiStatus.handed_back_24h })}</p>
+              </>)}
+              <div className="flex items-center gap-3 pt-0.5">
+                {aiStatus.agent_id && (
+                  <button onClick={() => { setView('inbox'); setScope(scope === `agent:${aiStatus.agent_id}` ? 'all' : `agent:${aiStatus.agent_id}`); afterPick() }}
+                    className="text-[11px] text-brand hover:underline">{t('comments.aiCard.filter')}</button>
+                )}
+                {isAdmin && <button onClick={() => { setView('ai'); afterPick() }} className="text-[11px] text-brand hover:underline">{t('comments.aiCard.settings')}</button>}
+              </div>
+            </div>
+          </Section>
+        )}
         {team && (
           <Section title={team.team ? t('comments.sections.team', { name: team.team.name }) : t('comments.sections.teamNone')}>
             {team.members.length === 0 ? (
@@ -344,14 +403,20 @@ export default function CommentsScreen() {
               <button key={m.id} onClick={() => { setView('inbox'); setScope(scope === `agent:${m.id}` ? 'all' : `agent:${m.id}`); afterPick() }}
                 className={`w-full flex items-center gap-2.5 px-3 py-1.5 rounded-xl transition-colors ${scope === `agent:${m.id}` ? 'bg-brand/15' : 'hover:bg-surface-3'}`}>
                 <span className="relative flex-shrink-0">
-                  <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
-                    style={{ background: `hsl(${avatarHue(m.name)} 45% 42%)` }}>{initial(m.name)}</span>
+                  {m.is_ai ? (
+                    <span className="w-7 h-7 rounded-full flex items-center justify-center text-white bg-brand"><Bot size={15} /></span>
+                  ) : (
+                    <span className="w-7 h-7 rounded-full flex items-center justify-center text-[11px] font-bold text-white"
+                      style={{ background: `hsl(${avatarHue(m.name)} 45% 42%)` }}>{initial(m.name)}</span>
+                  )}
                   <span className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface-2 ${m.online ? 'bg-success' : 'bg-fg-subtle'}`} />
                 </span>
                 <span className="flex-1 min-w-0">
                   <span className="block text-[13px] text-fg truncate">{m.name}</span>
                   <span className={`block text-[10px] ${m.online ? 'text-success' : 'text-fg-subtle'}`}>
-                    {m.online ? t('comments.team.online') : t('comments.team.offline')}{!m.eligible ? ` · ${t('comments.team.noAccess')}` : ''}
+                    {m.is_ai
+                      ? t(`comments.aiCard.${m.mode === 'live' ? 'live' : m.mode === 'draft' ? 'draft' : 'off'}`)
+                      : <>{m.online ? t('comments.team.online') : t('comments.team.offline')}{!m.eligible ? ` · ${t('comments.team.noAccess')}` : ''}</>}
                   </span>
                 </span>
                 {m.pending > 0 && <span className="text-[11px] tabular-nums px-1.5 rounded-full bg-surface-3 text-fg-subtle" title={t('comments.team.pending')}>{m.pending}</span>}
@@ -531,6 +596,8 @@ export default function CommentsScreen() {
                         )}
                       </div>
                     )}
+
+                    <AiBadge c={c} now={nowTick} />
 
                     <div className="flex items-center gap-2 mt-3">
                       {status === 'archived' ? (
@@ -880,6 +947,32 @@ function YoutubeVideosModal({ onClose, onSynced }) {
 // نفس المودال للردين — الفرق الوحيد المسار والنصوص. الفرق اللي يهم الموظف إن العام بيشوفه
 // كل الناس والخاص لأ، وإن الخاص مرة واحدة وخلال ٧ أيام (قاعدة ميتا) — بنقولهاله قبل ما يكتب
 // مش بعد ما الرسالة تفشل
+// حالة الذكاء الاصطناعي على التعليق: عشان الموظف والأدمن يفهموا إيه اللي بيحصل بدل ما يكون كله في الخلفية
+function AiBadge({ c, now }) {
+  const { t } = useTranslation()
+  const a = c.ai
+  if (!a) return null
+  const reason = a.reason || a.error || ''
+  const manual = a.manual ? ` · ${t('comments.aiState.manual')}` : ''
+  let text = null, tone = 'text-fg-muted', spin = false
+  if (a.status === 'pending') {
+    const s = Math.round((new Date(a.run_after).getTime() - now) / 1000)
+    text = s > 1 ? t('comments.aiState.pending', { s }) : t('comments.aiState.pendingSoon'); tone = 'text-brand'
+  } else if (a.status === 'processing') { text = t('comments.aiState.processing'); tone = 'text-brand'; spin = true }
+  else if (a.status === 'draft') { text = t('comments.aiState.draft'); tone = 'text-amber-500' }
+  else if (a.status === 'replied') { text = t(a.edited ? 'comments.aiState.repliedEdited' : 'comments.aiState.replied'); tone = 'text-success' }
+  else if (a.status === 'escalated') { text = reason ? t('comments.aiState.escalated', { reason }) : t('comments.aiState.escalatedNoReason'); tone = 'text-amber-500' }
+  else if (a.status === 'failed') { text = t('comments.aiState.failed', { reason: reason || '—' }); tone = 'text-danger' }
+  else if (a.status === 'skipped') { text = reason ? t('comments.aiState.skipped', { reason }) : t('comments.aiState.skippedNoReason') }
+  if (!text) return null
+  return (
+    <p className={`flex items-center gap-1.5 mt-2.5 text-[11px] ${tone}`}>
+      {spin ? <span className="w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" /> : <Bot size={12} className="flex-shrink-0" />}
+      <span className="min-w-0 break-words">{text}{manual}</span>
+    </p>
+  )
+}
+
 // ─── ردّ بالذكاء الاصطناعي (تسليم يدوي من الأدمن) ────────────────────────
 // بيجيب مسودة من السيرفر (رد علني + رسالة خاصة) من غير نشر، الأدمن يراجعها ويعدّل ويختار يبعت الاتنين أو واحد بس
 function AiAssignModal({ comment, onClose, onDone }) {

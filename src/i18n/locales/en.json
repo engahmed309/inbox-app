@@ -2023,6 +2023,32 @@
     "more": "More",
     "assign": "Move to agent",
     "assignAi": "Reply with AI",
+    "aiState": {
+      "pending": "The AI will reply in {{s}}s",
+      "pendingSoon": "The AI will start in a moment",
+      "processing": "The AI is writing the reply now…",
+      "draft": "AI draft ready for review",
+      "replied": "Replied by the AI",
+      "repliedEdited": "Replied by the AI (edited by an admin)",
+      "escalated": "The AI handed it to an agent: {{reason}}",
+      "escalatedNoReason": "The AI handed it to an agent",
+      "failed": "The AI could not handle it: {{reason}}",
+      "skipped": "The AI skipped it: {{reason}}",
+      "skippedNoReason": "The AI skipped it",
+      "manual": "requested by an admin"
+    },
+    "aiCard": {
+      "title": "AI (comments agent)",
+      "live": "Active — replies automatically",
+      "draft": "Active — writes drafts for review",
+      "off": "Off",
+      "unavailable": "Not configured (no API key)",
+      "queue": "Queued {{pending}} · writing {{processing}} · drafts {{drafts}}",
+      "day": "Last 24h: replied to {{replied}} · handed {{back}} to agents",
+      "next": "Next reply in {{s}}s",
+      "settings": "Settings",
+      "filter": "AI comments"
+    },
     "aiAssign": {
       "title": "Reply with AI",
       "preparing": "The AI is writing the reply…",
