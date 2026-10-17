@@ -1914,7 +1914,8 @@
     "status": {
       "new": "New",
       "handled": "Handled",
-      "ignored": "Ignored"
+      "ignored": "Ignored",
+      "archived": "Archived"
     },
     "privateReply": "Private reply",
     "markHandled": "Mark handled",
@@ -1922,16 +1923,16 @@
     "privateReplySent": "Private reply sent",
     "openConversation": "Open conversation",
     "privateReplyTitle": "Private reply to {{name}}",
-    "privateReplyPlaceholder": "Write your private messageâ€¦",
+    "privateReplyPlaceholder": "Write your private message…",
     "privateReplyHint": "Sent as a private message. Meta allows one private reply per comment, within 7 days of it.",
     "sendPrivateReply": "Send private reply",
-    "sending": "Sendingâ€¦",
+    "sending": "Sending…",
     "privateReplyDone": "Private reply sent",
     "onPost": "On post:",
     "untitledPost": "Post with no caption",
     "publicReply": "Public reply",
     "publicReplyTitle": "Public reply to {{name}}",
-    "publicReplyPlaceholder": "Write your replyâ€¦",
+    "publicReplyPlaceholder": "Write your reply…",
     "publicReplyHint": "Posted publicly under the comment as the page, visible to everyone.",
     "sendPublicReply": "Post reply",
     "publicReplyDone": "Reply posted",
@@ -1961,6 +1962,52 @@
       "commentsOff": "Comments are turned off on this video",
       "loadMore": "Load 5 older"
     },
-    "refreshAvailable": "New updates â€” tap to load"
+    "refreshAvailable": "New updates — tap to load",
+    "intent": {
+      "all": "All",
+      "actionable": "Needs reply",
+      "price": "Price",
+      "booking": "Booking",
+      "lead": "Contact",
+      "complaint": "Complaint",
+      "question": "Question",
+      "praise": "Praise",
+      "spam": "Spam",
+      "other": "Other"
+    },
+    "scope": {
+      "all": "All",
+      "mine": "Mine",
+      "unassigned": "Unclaimed"
+    },
+    "archivedTab": "Archived",
+    "searchPlaceholder": "Search comments…",
+    "ownedBy": "With {{name}}",
+    "handledBy": "Handled by {{name}}",
+    "lockedBy": "{{name}} is working on it",
+    "hide": "Hide",
+    "unhide": "Unhide",
+    "hiddenBadge": "Hidden",
+    "hideDone": "Comment hidden",
+    "unhideDone": "Comment visible again",
+    "restore": "Restore",
+    "archiveOld": "Archive old",
+    "archiveConfirm": "Archive every new comment older than 7 days? Nothing is deleted; they just leave the queue.",
+    "archiveDone": "Archived {{count}} comments",
+    "privateExpired": "Private reply window (7 days) has passed",
+    "replyTo": "In reply to {{name}}:",
+    "stats": {
+      "button": "Stats",
+      "title": "Comment performance",
+      "range": "Last {{days}} days",
+      "handled": "Handled",
+      "publicReplies": "Public replies",
+      "privateReplies": "Private replies",
+      "median": "Median reply",
+      "minutes": "min",
+      "backlog": "Awaiting reply",
+      "oldest": "Oldest",
+      "empty": "Nothing handled in this period"
+    }
   }
 }

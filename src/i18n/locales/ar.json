@@ -1914,7 +1914,8 @@
     "status": {
       "new": "جديدة",
       "handled": "تمت المعالجة",
-      "ignored": "متجاهلة"
+      "ignored": "متجاهلة",
+      "archived": "مؤرشفة"
     },
     "privateReply": "رد خاص",
     "markHandled": "تمت المعالجة",
@@ -1961,6 +1962,52 @@
       "counts": "{{total}} تعليق على يوتيوب · {{stored}} عندنا",
       "commentsOff": "التعليقات مغلقة على هذا الفيديو",
       "loadMore": "حمّل ٥ أقدم"
+    },
+    "intent": {
+      "all": "الكل",
+      "actionable": "يحتاج رد",
+      "price": "سعر",
+      "booking": "حجز",
+      "lead": "تواصل",
+      "complaint": "شكوى",
+      "question": "سؤال",
+      "praise": "مجاملة",
+      "spam": "سبام",
+      "other": "أخرى"
+    },
+    "scope": {
+      "all": "الكل",
+      "mine": "تعليقاتي",
+      "unassigned": "غير مستلمة"
+    },
+    "archivedTab": "مؤرشفة",
+    "searchPlaceholder": "ابحث في التعليقات…",
+    "ownedBy": "مع {{name}}",
+    "handledBy": "عالجه {{name}}",
+    "lockedBy": "{{name}} يعمل عليه الآن",
+    "hide": "إخفاء",
+    "unhide": "إظهار",
+    "hiddenBadge": "مخفي",
+    "hideDone": "تم إخفاء التعليق",
+    "unhideDone": "تم إظهار التعليق",
+    "restore": "استعادة",
+    "archiveOld": "أرشفة القديم",
+    "archiveConfirm": "أرشفة كل التعليقات الجديدة الأقدم من ٧ أيام؟ لن تُحذف، فقط تختفي من الطابور.",
+    "archiveDone": "تمت أرشفة {{count}} تعليق",
+    "privateExpired": "انتهت مهلة الرد الخاص (٧ أيام)",
+    "replyTo": "ردًا على {{name}}:",
+    "stats": {
+      "button": "الإحصائيات",
+      "title": "أداء التعليقات",
+      "range": "آخر {{days}} أيام",
+      "handled": "عولج",
+      "publicReplies": "ردود عامة",
+      "privateReplies": "ردود خاصة",
+      "median": "وسيط الرد",
+      "minutes": "د",
+      "backlog": "ينتظر رد",
+      "oldest": "أقدمها",
+      "empty": "لا توجد معالجات في هذه الفترة"
     }
   }
 }
