@@ -132,6 +132,10 @@ export default function CommentsAiSettings() {
             </div>
           </Section>
 
+          {form.mode !== 'off' && form.active_since && (
+            <p className="text-[11px] text-fg-subtle -mt-1 px-1">{t('comments.ai.activeSince', { d: localeFormatDateTime(form.active_since) })}</p>
+          )}
+
           <Section title={t('comments.ai.scopeTitle')} hint={t('comments.ai.scopeHint')}>
             <div className="flex gap-2 flex-wrap mb-3">
               {['facebook', 'instagram'].map(p => {

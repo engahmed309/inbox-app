@@ -2274,7 +2274,8 @@
       "sugCost": "Estimated cost: ${{v}}",
       "defaultAck": "We have contacted you privately 💚 please check your messages",
       "alsoPublic": "Also reply publicly that we contacted them privately",
-      "ackFailed": "The private message was sent, but the public reply failed: {{error}}"
+      "ackFailed": "The private message was sent, but the public reply failed: {{error}}",
+      "activeSince": "Handles new comments only, from {{d}}. Anything older stays with staff."
     },
     "admin": {
       "redistributeTitle": "Move an agent's comments",
