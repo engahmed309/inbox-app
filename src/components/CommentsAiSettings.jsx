@@ -163,6 +163,29 @@ export default function CommentsAiSettings() {
             <p className="text-[10px] text-fg-subtle mt-3">{t('comments.ai.youtubeNote')}</p>
           </Section>
 
+          <Section title={t('comments.ai.visibleTitle')} hint={t('comments.ai.visibleHint')}>
+            {(meta.agents || []).length === 0 ? (
+              <p className="text-[11px] text-fg-subtle">{t('comments.ai.visibleNone')}</p>
+            ) : (<>
+              <div className="flex gap-2 flex-wrap">
+                {meta.agents.map(a => {
+                  const ids = form.ai_visible_to_agent_ids || []
+                  const on = ids.includes(a.id)
+                  return (
+                    <button key={a.id} onClick={() => set({ ai_visible_to_agent_ids: on ? ids.filter(x => x !== a.id) : [...ids, a.id] })} className={pill(on)}>
+                      {on ? '✓ ' : ''}{a.name}
+                    </button>
+                  )
+                })}
+              </div>
+              <p className="text-[10px] text-fg-subtle mt-2">
+                {(form.ai_visible_to_agent_ids || []).length
+                  ? t('comments.ai.visibleCount', { n: (form.ai_visible_to_agent_ids || []).length })
+                  : t('comments.ai.visibleAdminOnly')}
+              </p>
+            </>)}
+          </Section>
+
           <Section title={t('comments.ai.promptTitle')} hint={t('comments.ai.promptHint')}>
             <textarea value={form.system_prompt} onChange={e => set({ system_prompt: e.target.value })} rows={14}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-[13px] text-fg leading-relaxed" />

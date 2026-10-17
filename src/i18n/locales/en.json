@@ -2230,6 +2230,11 @@
         "live": "Publishes replies publicly as the page. Anything it cannot answer goes to the comments team."
       },
       "liveConfirm": "Going live will publish public replies on your page. Are you sure?",
+      "visibleTitle": "Who can see the AI's comments?",
+      "visibleHint": "Comments held by the AI are always visible to admins. Pick the employees who can also see them (view only — they cannot reply). With nobody selected: admins only.",
+      "visibleNone": "No employees with comments access",
+      "visibleCount": "{{n}} employee(s) can see the AI's comments",
+      "visibleAdminOnly": "Admins only",
       "scopeTitle": "Platforms and accounts",
       "scopeHint": "The agent only replies on the selected platforms. Pick specific accounts below, or leave empty to include all.",
       "channelsTitle": "Specific accounts",
