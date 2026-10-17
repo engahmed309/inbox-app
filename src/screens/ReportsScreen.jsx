@@ -28,23 +28,6 @@ const SECTIONS = [
   { key: 'export', labelKey: 'reports.sections.export', icon: Download },
 ]
 
-// بتجيب كل صفوف كويري معينة من غير ما تقف عند حد الـ 1000 صف الافتراضي بتاع سوبابيز — بتلف
-// بصفحات من 1000 لحد ما ترجع صفحة أصغر من كده (يعني خلصت). بناخد factory function بترجع كويري
-// جديدة كل مرة (مش نفس الكائن) عشان .range() يتطبق نضيف من غير آثار جانبية بين الصفحات
-async function fetchAllRows(buildQuery) {
-  const PAGE = 1000
-  let offset = 0
-  let all = []
-  while (true) {
-    const { data, error } = await buildQuery().range(offset, offset + PAGE - 1)
-    if (error) throw error
-    all = all.concat(data || [])
-    if (!data || data.length < PAGE) break
-    offset += PAGE
-  }
-  return all
-}
-
 export default function ReportsScreen() {
   const { t } = useTranslation()
   const [section, setSection] = useState('overview')
@@ -2044,33 +2027,24 @@ function ExportTab() {
   const exportBackup = async () => {
     setExporting(true)
     try {
+      // العملاء بتيجي من السيرفر صفحات (استعلام واحد لكل صفحة، ومعاها التاجات والحقول المخصصة جاهزة) بدل سحب 3 جداول كاملة
+      // من المتصفح — شوف GET /export/contacts
       setProgress(t('reports.export.fetchingContacts'))
-      const contacts = await fetchAllRows(() => supabase.from('contacts').select('*').order('created_at', { ascending: true }))
+      const contacts = []
+      let cursor = null
+      do {
+        const params = new URLSearchParams({ limit: '2000' })
+        if (cursor) { params.set('after_at', cursor.after_at); params.set('after_id', cursor.after_id) }
+        const res = await apiFetch(`${API_URL}/export/contacts?${params}`)
+        const page = await res.json()
+        if (!res.ok) throw new Error(page.error || 'export failed')
+        contacts.push(...page.contacts)
+        cursor = page.next
+        setProgress(`${t('reports.export.fetchingContacts')} (${contacts.length})`)
+      } while (cursor)
 
       setProgress(t('reports.export.fetchingMeta'))
-      const [{ data: stages }, { data: tags }, { data: fieldDefs }] = await Promise.all([
-        supabase.from('lifecycle_stages').select('id, name'),
-        supabase.from('tags').select('id, name'),
-        supabase.from('custom_field_definitions').select('id, name').order('name')
-      ])
-      const stageMap = Object.fromEntries((stages || []).map(s => [s.id, s.name]))
-      const tagMap = Object.fromEntries((tags || []).map(tg => [tg.id, tg.name]))
-
-      setProgress(t('reports.export.fetchingContactExtras'))
-      const [contactTags, customValues] = await Promise.all([
-        fetchAllRows(() => supabase.from('contact_tags').select('contact_id, tag_id')),
-        fetchAllRows(() => supabase.from('contact_custom_fields').select('contact_id, field_definition_id, value'))
-      ])
-      const tagsByContact = {}
-      contactTags.forEach(r => {
-        if (!tagsByContact[r.contact_id]) tagsByContact[r.contact_id] = []
-        if (tagMap[r.tag_id]) tagsByContact[r.contact_id].push(tagMap[r.tag_id])
-      })
-      const customByContact = {}
-      customValues.forEach(r => {
-        if (!customByContact[r.contact_id]) customByContact[r.contact_id] = {}
-        customByContact[r.contact_id][r.field_definition_id] = r.value
-      })
+      const { data: fieldDefs } = await supabase.from('custom_field_definitions').select('id, name').order('name')
 
       setProgress(t('reports.export.buildingFile'))
       const PLATFORM_LABEL = { whatsapp: t('reports.platforms.whatsapp'), facebook: t('reports.platforms.facebook'), instagram: t('reports.platforms.instagram'), tiktok: t('reports.platforms.tiktok') }
@@ -2089,12 +2063,12 @@ function ExportTab() {
           c.country || '',
           PLATFORM_LABEL[c.platform] || c.platform || '',
           c.created_at ? localeFormatDate(c.created_at) : '',
-          stageMap[c.lifecycle_stage_id] || '',
-          (tagsByContact[c.id] || []).join(' / '),
+          c.lifecycle_stage || '',
+          (c.tags || []).join(' / '),
           c.notes || '',
           c.is_blocked ? t('reports.export.yes') : t('reports.export.no')
         ]
-        const fields = (fieldDefs || []).map(f => customByContact[c.id]?.[f.id] ?? '')
+        const fields = (fieldDefs || []).map(f => c.custom?.[f.id] ?? '')
         return [...base, ...fields]
       })
 
