@@ -2237,6 +2237,18 @@
       },
       "export": "Export CSV"
     },
+    "thread": {
+      "view": "View conversation",
+      "viewWithCount": "View conversation ({{n}} replies)",
+      "title": "Comment conversation",
+      "close": "Close",
+      "page": "The page",
+      "current": "This comment",
+      "noReplies": "No replies on this comment.",
+      "missingRoot": "The original comment is not available (it may have been deleted).",
+      "fromDb": "Conversation from our records (the platform could not be reached)",
+      "aiIgnored": "The AI does not answer replies to other comments (people talking to each other), so this one was left to the team."
+    },
     "mod": {
       "saved": "Saved",
       "modeTitle": "Protection mode",

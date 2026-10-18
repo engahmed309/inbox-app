@@ -14,6 +14,7 @@ import LinkifiedText from '../components/LinkifiedText'
 import CommentsReports from '../components/CommentsReports'
 import CommentsAiSettings from '../components/CommentsAiSettings'
 import CommentsModeration from '../components/CommentsModeration'
+import CommentThread from '../components/CommentThread'
 import { RedistributeModal, SavedRepliesModal, BackfillModal, loadSavedReplies, fillSavedReply } from '../components/CommentsAdminModals'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
@@ -254,6 +255,7 @@ export default function CommentsScreen() {
 
   // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيطلع له مسودة (رد علني + رسالة خاصة) يراجعها ويعدّلها ويختار يبعت إيه
   const [aiFor, setAiFor] = useState(null)
+  const [threadFor, setThreadFor] = useState(null)   // محادثة تعليق (الأساسي + الردود الفرعية)
 
   // إيقاف الذكاء الاصطناعي على تعليق واقف/بيكتب/في الطابور: بيرجع للفريق ويقدر الموظف يرد عليه
   const stopAi = async (c) => {
@@ -622,6 +624,13 @@ export default function CommentsScreen() {
                           </div>
                         )}
 
+                        {(c.parent_comment_id || c.replies_count > 0) && (
+                          <button type="button" onClick={() => setThreadFor(c)} className="mt-1.5 inline-flex items-center gap-1 text-[11px] text-brand hover:underline">
+                            <MessageSquareText size={12} />
+                            {c.replies_count > 0 ? t('comments.thread.viewWithCount', { n: c.replies_count }) : t('comments.thread.view')}
+                          </button>
+                        )}
+
                         <LinkifiedText text={c.content} className="block text-sm text-fg whitespace-pre-wrap break-words mt-1" />
                       </div>
                     </div>
@@ -661,6 +670,11 @@ export default function CommentsScreen() {
                       </div>
                     )}
 
+                    {c.parent_comment_id && !c.ai && aiStatus?.active && aiStatus.reply_to_replies === false && (
+                      <p className="flex items-center gap-1.5 mt-2.5 text-[11px] text-fg-subtle">
+                        <Bot size={12} className="flex-shrink-0" /> <span>{t('comments.thread.aiIgnored')}</span>
+                      </p>
+                    )}
                     <AiBadge c={c} now={nowTick} canStop={isAdmin || !!aiStatus?.can_act} onStop={() => stopAi(c)} stopping={busy === c.id} />
 
                     <div className="flex items-center gap-2 mt-3">
@@ -761,6 +775,7 @@ export default function CommentsScreen() {
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRedistribute && <RedistributeModal onClose={() => setShowRedistribute(false)} onDone={() => { load(); fetchTeam() }} />}
+      {threadFor && <CommentThread comment={threadFor} onClose={() => setThreadFor(null)} />}
       {aiFor && <AiAssignModal comment={aiFor} onClose={() => setAiFor(null)} onDone={() => { setAiFor(null); fetchCounts(); load() }} />}
       {showSaved && <SavedRepliesModal isAdmin={isAdmin} onClose={() => setShowSaved(false)} onChanged={fetchTeam} />}
       {showBackfill && <BackfillModal onClose={() => setShowBackfill(false)} onDone={() => { load(); fetchTeam() }} />}
