@@ -245,6 +245,10 @@ export default function CommentsAiSettings() {
 
           <LearningSection form={form} set={set} />
 
+          <Section title={t('comments.ai.likeTitle')} hint={t('comments.ai.likeHint')}>
+            <Toggle checked={!!form.auto_like_enabled} onChange={v => set({ auto_like_enabled: v })} label={t('comments.ai.likeEnable')} />
+          </Section>
+
           <Section title={t('comments.ai.hideTitle')} hint={t('comments.ai.hideHint')}>
             <Toggle checked={form.auto_hide_enabled} onChange={v => set({ auto_hide_enabled: v })} label={t('comments.ai.hideEnable')} />
             {form.auto_hide_enabled && (

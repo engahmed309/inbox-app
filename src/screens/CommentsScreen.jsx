@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert, ThumbsUp
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
@@ -235,6 +235,20 @@ export default function CommentsScreen() {
       patchRow(c.id, { hidden_at: hide ? new Date().toISOString() : null, ...(hide && c.status === 'new' ? { status: 'handled' } : {}) },
         () => hide && c.status === 'new' && status === 'new')
       fetchCounts()
+    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
+
+  // لايك الصفحة على تعليق فيسبوك (ميتا مش بتدّي لايك على إنستجرام ويوتيوب من الـAPI)
+  const toggleLike = async (c) => {
+    const liked = !c.liked_at
+    setBusy(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/like`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ liked })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      patchRow(c.id, { liked_at: liked ? new Date().toISOString() : null })
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
 
@@ -673,6 +687,13 @@ export default function CommentsScreen() {
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg">
                             <ExternalLink size={13} /> {t('comments.openOnYoutube')}
                           </a>
+                        )}
+                        {c.platform === 'facebook' && live && (
+                          <button onClick={() => toggleLike(c)} disabled={other || busy === c.id} aria-pressed={!!c.liked_at}
+                            title={c.liked_at ? t('comments.unlike') : t('comments.like')}
+                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs disabled:opacity-40 ${c.liked_at ? 'bg-brand/15 text-brand font-medium' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                            <ThumbsUp size={13} className={c.liked_at ? 'fill-current' : ''} /> {c.liked_at ? t('comments.liked') : t('comments.like')}
+                          </button>
                         )}
                         {status !== 'handled' && (
                           <button onClick={() => patchComment(c, { status: 'handled' })} disabled={other || busy === c.id}
