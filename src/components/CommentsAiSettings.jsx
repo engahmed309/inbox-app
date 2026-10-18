@@ -138,7 +138,7 @@ export default function CommentsAiSettings() {
 
           <Section title={t('comments.ai.scopeTitle')} hint={t('comments.ai.scopeHint')}>
             <div className="flex gap-2 flex-wrap mb-3">
-              {['facebook', 'instagram'].map(p => {
+              {['facebook', 'instagram', 'youtube'].map(p => {
                 const on = form.platforms.includes(p)
                 return (
                   <button key={p} onClick={() => set({ platforms: on ? form.platforms.filter(x => x !== p) : [...form.platforms, p], channel_ids: null })}
@@ -161,6 +161,9 @@ export default function CommentsAiSettings() {
               </div>
             )}
             <p className="text-[10px] text-fg-subtle mt-3">{t('comments.ai.youtubeNote')}</p>
+            {form.platforms.includes('youtube') && !meta.youtube_can_reply && (
+              <p className="text-[11px] text-amber-500 mt-2">{t('comments.ai.youtubeNeedsLink')}</p>
+            )}
           </Section>
 
           <Section title={t('comments.ai.visibleTitle')} hint={t('comments.ai.visibleHint')}>
