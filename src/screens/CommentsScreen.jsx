@@ -775,7 +775,7 @@ export default function CommentsScreen() {
       {showVideos && <YoutubeVideosModal onClose={() => setShowVideos(false)} onSynced={load} />}
       {showStats && <StatsModal onClose={() => setShowStats(false)} />}
       {showRedistribute && <RedistributeModal onClose={() => setShowRedistribute(false)} onDone={() => { load(); fetchTeam() }} />}
-      {threadFor && <CommentThread comment={threadFor} onClose={() => setThreadFor(null)} />}
+      {threadFor && <CommentThread comment={threadFor} onClose={() => setThreadFor(null)} onReplied={() => { fetchCounts(); load() }} />}
       {aiFor && <AiAssignModal comment={aiFor} onClose={() => setAiFor(null)} onDone={() => { setAiFor(null); fetchCounts(); load() }} />}
       {showSaved && <SavedRepliesModal isAdmin={isAdmin} onClose={() => setShowSaved(false)} onChanged={fetchTeam} />}
       {showBackfill && <BackfillModal onClose={() => setShowBackfill(false)} onDone={() => { load(); fetchTeam() }} />}

@@ -2240,6 +2240,11 @@
     "thread": {
       "view": "View conversation",
       "viewWithCount": "View conversation ({{n}} replies)",
+      "reply": "Reply",
+      "replyPlaceholder": "Write your public reply to {{name}}…",
+      "send": "Send",
+      "cancel": "Cancel",
+      "publicHint": "Public reply as the page",
       "title": "Comment conversation",
       "close": "Close",
       "page": "The page",

@@ -2240,6 +2240,11 @@
     "thread": {
       "view": "عرض المحادثة",
       "viewWithCount": "عرض المحادثة ({{n}} رد)",
+      "reply": "رد",
+      "replyPlaceholder": "اكتب ردك العلني على {{name}}…",
+      "send": "إرسال",
+      "cancel": "إلغاء",
+      "publicHint": "رد علني باسم الصفحة",
       "title": "محادثة التعليق",
       "close": "إغلاق",
       "page": "الصفحة",
