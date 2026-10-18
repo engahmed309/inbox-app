@@ -2064,7 +2064,10 @@
       "failed": "The AI could not handle it: {{reason}}",
       "skipped": "The AI skipped it: {{reason}}",
       "skippedNoReason": "The AI skipped it",
-      "manual": "requested by an admin"
+      "manual": "requested by an admin",
+      "stop": "Stop the AI",
+      "stopped": "The AI was stopped on this comment and it is back with the team",
+      "stopConfirm": "Stop the AI on this comment? Its reply will be cancelled and the comment goes back to the team."
     },
     "aiCard": {
       "title": "AI (comments agent)",
@@ -2076,7 +2079,10 @@
       "day": "Last 24h: replied to {{replied}} · handed {{back}} to agents",
       "next": "Next reply in {{s}}s",
       "settings": "Settings",
-      "filter": "AI comments"
+      "filter": "AI comments",
+      "stopAll": "Stop the AI completely",
+      "stopAllConfirm": "Automatic replies to all comments will stop, and comments still queued go back to the team. Continue?",
+      "stoppedAll": "The AI was stopped. You can turn it on again from Settings."
     },
     "aiAssign": {
       "title": "Reply with AI",

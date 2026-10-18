@@ -229,6 +229,30 @@ export default function CommentsScreen() {
   // الأدمن يسلّم التعليق للذكاء الاصطناعي: بيطلع له مسودة (رد علني + رسالة خاصة) يراجعها ويعدّلها ويختار يبعت إيه
   const [aiFor, setAiFor] = useState(null)
 
+  // إيقاف الذكاء الاصطناعي على تعليق واقف/بيكتب/في الطابور: بيرجع للفريق ويقدر الموظف يرد عليه
+  const stopAi = async (c) => {
+    if (!window.confirm(t('comments.aiState.stopConfirm'))) return
+    setBusy(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/ai/stop`, { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('comments.aiState.stopped'))
+      fetchAiStatus(); fetchCounts(); load()
+    } catch (err) { toast.error(err.message); load() } finally { setBusy(null) }
+  }
+  // مفتاح إيقاف سريع للأدمن: يقفل الوكيل كله (التعليقات الواقفة في الطابور بترجع للفريق لوحدها)
+  const stopAllAi = async () => {
+    if (!window.confirm(t('comments.aiCard.stopAllConfirm'))) return
+    try {
+      const res = await apiFetch(`${API_URL}/comments/ai/settings`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ mode: 'off' }) })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('comments.aiCard.stoppedAll'))
+      fetchAiStatus()
+    } catch (err) { toast.error(err.message) }
+  }
+
   // الذكاء الاصطناعي كموظف: حالته (نشط/متوقف) وطابوره، ويتحدّث كل ١٥ ثانية. وأي تعليق هو ماسكه دلوقتي (في الطابور/بيكتب)
   // بنحدّث حالته كل ٥ ثواني لوحده من غير ما القايمة تتحمّل وتتحرك تحت إيد الموظف
   const [aiStatus, setAiStatus] = useState(null)
@@ -395,6 +419,7 @@ export default function CommentsScreen() {
                     className="text-[11px] text-brand hover:underline">{t('comments.aiCard.filter')}</button>
                 )}
                 {isAdmin && <button onClick={() => { setView('ai'); afterPick() }} className="text-[11px] text-brand hover:underline">{t('comments.aiCard.settings')}</button>}
+                {isAdmin && aiStatus.active && <button onClick={stopAllAi} className="text-[11px] text-danger hover:underline">{t('comments.aiCard.stopAll')}</button>}
               </div>
             </div>
           </Section>
@@ -601,7 +626,7 @@ export default function CommentsScreen() {
                       </div>
                     )}
 
-                    <AiBadge c={c} now={nowTick} />
+                    <AiBadge c={c} now={nowTick} canStop={isAdmin || !!aiStatus?.can_act} onStop={() => stopAi(c)} stopping={busy === c.id} />
 
                     <div className="flex items-center gap-2 mt-3">
                       {status === 'archived' ? (
@@ -952,7 +977,7 @@ function YoutubeVideosModal({ onClose, onSynced }) {
 // كل الناس والخاص لأ، وإن الخاص مرة واحدة وخلال ٧ أيام (قاعدة ميتا) — بنقولهاله قبل ما يكتب
 // مش بعد ما الرسالة تفشل
 // حالة الذكاء الاصطناعي على التعليق: عشان الموظف والأدمن يفهموا إيه اللي بيحصل بدل ما يكون كله في الخلفية
-function AiBadge({ c, now }) {
+function AiBadge({ c, now, canStop, onStop, stopping }) {
   const { t } = useTranslation()
   const a = c.ai
   if (!a) return null
@@ -973,6 +998,12 @@ function AiBadge({ c, now }) {
     <p className={`flex items-center gap-1.5 mt-2.5 text-[11px] ${tone}`}>
       {spin ? <span className="w-3 h-3 border-2 border-brand border-t-transparent rounded-full animate-spin flex-shrink-0" /> : <Bot size={12} className="flex-shrink-0" />}
       <span className="min-w-0 break-words">{text}{manual}</span>
+      {canStop && ['pending', 'processing', 'draft'].includes(a.status) && (
+        <button type="button" onClick={onStop} disabled={stopping}
+          className="ms-auto flex-shrink-0 px-2 py-0.5 rounded-lg bg-danger/10 text-danger text-[10px] font-semibold hover:bg-danger/20 disabled:opacity-40">
+          {t('comments.aiState.stop')}
+        </button>
+      )}
     </p>
   )
 }
