@@ -1646,6 +1646,11 @@
   },
   "notificationBell": {
     "title": "الإشعارات",
+    "tab": { "delays": "التأخيرات", "comments": "مشاكل الكومنتات", "requests": "طلبات الموظفين" },
+    "empty": { "delays": "لا توجد تأخيرات", "comments": "لا توجد مشاكل في الكومنتات 👌", "requests": "لا توجد طلبات" },
+    "unreadOnly": "غير المقروءة فقط",
+    "allEmployees": "كل الموظفين",
+    "noEmployee": "بدون موظف",
     "noNotifications": "لا توجد إشعارات",
     "filterAll": "الكل",
     "filterUnread": "غير المقروءة",

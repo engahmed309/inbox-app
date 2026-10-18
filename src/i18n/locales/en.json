@@ -1646,6 +1646,11 @@
   },
   "notificationBell": {
     "title": "Notifications",
+    "tab": { "delays": "Delays", "comments": "Comment issues", "requests": "Staff requests" },
+    "empty": { "delays": "No delays", "comments": "No comment issues 👌", "requests": "No requests" },
+    "unreadOnly": "Unread only",
+    "allEmployees": "All employees",
+    "noEmployee": "No employee",
     "noNotifications": "No notifications",
     "filterAll": "All",
     "filterUnread": "Unread",
