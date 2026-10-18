@@ -77,6 +77,7 @@ export default function CommentsScreen() {
   const [deleting, setDeleting] = useState(null)
   const [busy, setBusy] = useState(null)
   const sentinelRef = useRef(null)
+  const scrollRef = useRef(null)
 
   const isAdmin = agent?.role === 'admin'
   const canSee = isAdmin || ['comments', 'both'].includes(agent?.access_scope)
@@ -181,6 +182,14 @@ export default function CommentsScreen() {
 
   // العدّاد مابيعدّش نتيجة البحث، فمؤشر "فيه جديد" بيتوقف أثناء البحث
   const pendingChanges = !debouncedSearch && !postFilter && seenCount !== null && counts[status] !== undefined && counts[status] !== seenCount
+
+  // التعليقات الجديدة تظهر لوحدها: لو الموظف فوق في القائمة ومش في نص إجراء (رد/تعيين/قايمة مفتوحة) بنحدّث من غير ما يضغط.
+  // لو نازل في القائمة أو بيرد على حاجة، بنسيب الزرار بدل ما نقفز بالقائمة تحت إيده. التحميل من غير سبينر عشان ماترمّش
+  useEffect(() => {
+    if (!pendingChanges || loading) return
+    const idle = !replyTo && !assignFor && !menuFor && !deleting && !busy
+    if (idle && (scrollRef.current?.scrollTop ?? 0) < 80) load()
+  }, [pendingChanges, loading, replyTo, assignFor, menuFor, deleting, busy, load])
 
   // بعد أي إجراء بنعدّل الصف مكانه ونحدّث العدادات بس — مابنعيدش تحميل القائمة، عشان الموظف
   // اللي نازل في تعليق رقم ٢٠٠ مايترميش لأول القائمة كل مرة يعالج واحد
@@ -539,7 +548,7 @@ export default function CommentsScreen() {
           </button>
         )}
 
-        <div className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto">
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
