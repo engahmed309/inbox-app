@@ -15,7 +15,7 @@ import LinkifiedText from '../components/LinkifiedText'
 import { copyText } from '../lib/clipboard'
 import {
   Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Wand2, Megaphone, Music2, FileText, QrCode, Languages
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Eye, Wand2, Megaphone, Music2, FileText, QrCode, Languages
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -303,6 +303,7 @@ export default function ChatScreen() {
         const seeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
         foreignRef.current = !seeAll && !!convData.assigned_agent_id && convData.assigned_agent_id !== agent?.id
           && !(convData.ai_active && (agent?.can_see_ai_chats || agent?.can_reply_ai_chats))
+          && !(convData.ai_comment_origin && (agent?.can_see_ai_comment_dms || agent?.can_reply_ai_comment_dms))
         setConv(convData)
         setContact(convData.contacts)
         if (foreignRef.current) return
@@ -1059,7 +1060,11 @@ export default function ChatScreen() {
   // محادثة الذكاء الاصطناعي بيردّ عليها: الموظف اللي الأدمن سمح له يشوفها (أو يستلمها) مش "غريبة" عليه
   const seesAiChats = !!(agent?.can_see_ai_chats || agent?.can_reply_ai_chats)
   const canTakeOverAi = canSeeAll || !conv?.assigned_agent_id || conv?.assigned_agent_id === agent?.id || !!agent?.can_reply_ai_chats
-  const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats)
+  const seesAiDms = !!(agent?.can_see_ai_comment_dms || agent?.can_reply_ai_comment_dms)
+  const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats) && !(conv.ai_comment_origin && seesAiDms)
+  // محادثة معيّنة لزميل وأنا شايفها بس (بسماح من الأدمن) من غير صلاحية رد: نقفل مربع الكتابة بدل ما الرد يترفض من السيرفر
+  const viewOnlyForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id
+    && !(conv.ai_active && agent?.can_reply_ai_chats) && !(conv.ai_comment_origin && agent?.can_reply_ai_comment_dms)
   foreignRef.current = isForeign
   const [ownerName, setOwnerName] = useState('')
   const [requestingTransfer, setRequestingTransfer] = useState(false)
@@ -1397,6 +1402,11 @@ export default function ChatScreen() {
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">
             <Ban size={18} className="flex-shrink-0" />
             <span>{t('chat.composer.channelDisconnected', { platform: t(PLATFORM_LABEL_KEYS[conv?.platform] || 'chat.platformLabels.facebook') })}</span>
+          </div>
+        ) : viewOnlyForeign ? (
+          <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
+            <Eye size={18} className="flex-shrink-0" />
+            <span>{t('chat.composer.viewOnlyNotice', { name: ownerName || '…' })}</span>
           </div>
         ) : contact?.is_blocked ? (
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">

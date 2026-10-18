@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Fragment } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
@@ -3836,49 +3836,71 @@ function AiChatAccessSection() {
       .catch(err => { toast.error(err.message); setAgents([]) })
   }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
-  const save = async (a, see, reply) => {
-    setBusy(a.id)
+  // kind: 'chats' (محادثات الذكاء الاصطناعي) | 'comment_dms' (رسائل خاصة بدأها الذكاء الاصطناعي على تعليقات)
+  const save = async (a, kind, see, reply) => {
+    setBusy(a.id + kind)
     try {
       const res = await apiFetch(`${API_URL}/ai/chat-access`, {
         method: 'PUT', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ agent_id: a.id, can_see: see, can_reply: reply })
+        body: JSON.stringify({ agent_id: a.id, kind, can_see: see, can_reply: reply })
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error || t('settings.ai.aiChatAccessSaveFailed'))
-      setAgents(prev => prev.map(x => x.id === a.id ? { ...x, can_see_ai_chats: d.agent.can_see_ai_chats, can_reply_ai_chats: d.agent.can_reply_ai_chats } : x))
+      setAgents(prev => prev.map(x => x.id === a.id ? { ...x, ...d.agent } : x))
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
+
+  const GROUPS = [
+    { kind: 'chats', title: 'aiDmAccessGroupChats', see: 'can_see_ai_chats', reply: 'can_reply_ai_chats', replyLabel: 'aiChatAccessReply' },
+    { kind: 'comment_dms', title: 'aiDmAccessGroupDms', see: 'can_see_ai_comment_dms', reply: 'can_reply_ai_comment_dms', replyLabel: 'aiDmAccessReplyShort' },
+  ]
 
   return (
     <div className="bg-surface-2 rounded-2xl p-4 space-y-3 border border-surface-3">
       <h3 className="text-sm font-semibold text-fg">{t('settings.ai.aiChatAccessTitle')}</h3>
       <p className="text-[11px] text-fg-subtle leading-relaxed">{t('settings.ai.aiChatAccessHint')}</p>
+      <p className="text-[11px] text-fg-subtle leading-relaxed">{t('settings.ai.aiDmAccessHint')}</p>
       {agents === null ? (
         <div className="flex justify-center py-4"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
       ) : agents.length === 0 ? (
         <p className="text-[11px] text-fg-subtle">{t('settings.ai.aiChatAccessNone')}</p>
       ) : (
-        <div className="divide-y divide-surface-3">
-          <div className="flex items-center gap-3 pb-1.5 text-[10px] text-fg-subtle">
-            <span className="flex-1" />
-            <span className="w-16 text-center">{t('settings.ai.aiChatAccessSee')}</span>
-            <span className="w-20 text-center">{t('settings.ai.aiChatAccessReply')}</span>
-          </div>
-          {agents.map(a => {
-            const reply = !!a.can_reply_ai_chats
-            const see = !!a.can_see_ai_chats || reply
-            return (
-              <div key={a.id} className={`flex items-center gap-3 py-2 ${busy === a.id ? 'opacity-60' : ''}`}>
-                <span className="flex-1 text-[13px] text-fg truncate">{a.name}</span>
-                <span className="w-16 flex justify-center">
-                  <input type="checkbox" checked={see} disabled={busy === a.id} onChange={e => save(a, e.target.checked, e.target.checked ? reply : false)} />
-                </span>
-                <span className="w-20 flex justify-center">
-                  <input type="checkbox" checked={reply} disabled={busy === a.id} onChange={e => save(a, e.target.checked || see, e.target.checked)} />
-                </span>
-              </div>
-            )
-          })}
+        <div className="overflow-x-auto">
+          <table className="w-full text-[13px]">
+            <thead>
+              <tr className="text-[10px] text-fg-subtle">
+                <th />
+                {GROUPS.map(g => <th key={g.kind} colSpan={2} className="px-2 pb-1 font-medium border-s border-surface-3">{t(`settings.ai.${g.title}`)}</th>)}
+              </tr>
+              <tr className="text-[10px] text-fg-subtle">
+                <th />
+                {GROUPS.map(g => (
+                  <Fragment key={g.kind}>
+                    <th className="px-2 pb-1.5 font-normal border-s border-surface-3">{t('settings.ai.aiChatAccessSee')}</th>
+                    <th className="px-2 pb-1.5 font-normal">{t(`settings.ai.${g.replyLabel}`)}</th>
+                  </Fragment>
+                ))}
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-surface-3">
+              {agents.map(a => (
+                <tr key={a.id}>
+                  <td className="py-2 pe-2 text-fg truncate max-w-[9rem]">{a.name}</td>
+                  {GROUPS.map(g => {
+                    const reply = !!a[g.reply]
+                    const see = !!a[g.see] || reply
+                    const off = busy === a.id + g.kind
+                    return (
+                      <Fragment key={g.kind}>
+                        <td className="text-center border-s border-surface-3"><input type="checkbox" checked={see} disabled={off} onChange={e => save(a, g.kind, e.target.checked, e.target.checked ? reply : false)} /></td>
+                        <td className="text-center"><input type="checkbox" checked={reply} disabled={off} onChange={e => save(a, g.kind, e.target.checked || see, e.target.checked)} /></td>
+                      </Fragment>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
     </div>

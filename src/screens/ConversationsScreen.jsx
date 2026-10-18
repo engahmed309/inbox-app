@@ -426,7 +426,14 @@ export default function ConversationsScreen() {
   const canSeeAll = agent?.role === 'admin' || agent?.can_see_all_conversations
   // الأدمن بيسمح لموظفين معيّنين يشوفوا (ويستلموا) المحادثات اللي الذكاء الاصطناعي بيردّ عليها حتى لو مش متعينة لهم
   const seesAiChats = !!(agent?.can_see_ai_chats || agent?.can_reply_ai_chats)
-  const scopeToMe = (q) => (seesAiChats ? q.or(`assigned_agent_id.eq.${agent?.id},ai_active.eq.true`) : q.eq('assigned_agent_id', agent?.id))
+  // ... وكمان المحادثات اللي الذكاء الاصطناعي بدأها برسالة خاصة على تعليق
+  const seesAiDms = !!(agent?.can_see_ai_comment_dms || agent?.can_reply_ai_comment_dms)
+  const scopeToMe = (q) => {
+    const parts = [`assigned_agent_id.eq.${agent?.id}`]
+    if (seesAiChats) parts.push('ai_active.eq.true')
+    if (seesAiDms) parts.push('ai_comment_origin.eq.true')
+    return parts.length === 1 ? q.eq('assigned_agent_id', agent?.id) : q.or(parts.join(','))
+  }
 
   // الفرق التاني اللي الموظف الحالي عضو فيها — لازمة نعرفها عشان نعرف هل نستثني قنوات مقيّدة
   // بفريق (channels.restricted_team_id) من الانبوكس ولا لأ. الأدمن يشوف كل حاجة دايمًا
@@ -1597,7 +1604,7 @@ export default function ConversationsScreen() {
                   selected={selectedIds.has(conv.id)}
                   onToggleSelect={() => toggleSelect(conv.id)}
                   onClick={() => selectionMode ? toggleSelect(conv.id) : navigate(`/chat/${conv.id}`)}
-                  isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats)}
+                  isForeign={!canSeeAll && conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats) && !(conv.ai_comment_origin && seesAiDms)}
                   onRequestTransfer={() => requestTransfer(conv)}
                   isPinned={pinnedIds.has(conv.id)}
                   onTogglePin={() => togglePin(conv)}
