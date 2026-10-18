@@ -132,6 +132,11 @@ export default function CommentsAiSettings() {
             </div>
           </Section>
 
+          <Section title={t('comments.ai.styleTitle')} hint={t('comments.ai.styleHint')}>
+            <Toggle checked={form.reply_mode === 'template'} onChange={v => set({ reply_mode: v ? 'template' : 'ai' })}
+              label={t('comments.ai.styleTemplate')} hint={form.reply_mode === 'template' ? t('comments.ai.styleTemplateOn') : t('comments.ai.styleTemplateOff')} />
+          </Section>
+
           {form.mode !== 'off' && form.active_since && (
             <p className="text-[11px] text-fg-subtle -mt-1 px-1">{t('comments.ai.activeSince', { d: localeFormatDateTime(form.active_since) })}</p>
           )}
