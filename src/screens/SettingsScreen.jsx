@@ -1144,6 +1144,8 @@ function ChannelSettingsPanel({ channel, onClose, onChanged }) {
             <ChannelTemplates channel={channel} />
           )}
 
+          {channel.platform === 'youtube' && channel.status === 'active' && <YoutubeReplySection />}
+
           <div className="pt-1 space-y-1.5">
             {channel.waba_id && (
               <p className="text-[11px] text-fg-subtle">WABA ID: {channel.waba_id}</p>
@@ -1982,14 +1984,11 @@ function ConnectNewChannel() {
   )
 }
 
-// يوتيوب مفيهوش ويب هوك للتعليقات، فالربط الأساسي مفتاح قراءة + لينك القناة (سحب دوري من السيرفر). الرد على التعليقات محتاج
-// OAuth: الأدمن بيدخل Client ID/Secret بتوع مشروعه ويسمح لحساب جوجل اللي بيدير القناة (القسم التاني في المودال)
-function YoutubeConnectModal({ onClose }) {
+// الرد على تعليقات يوتيوب (OAuth): الأدمن بيدخل Client ID/Secret بتوع مشروعه في Google Cloud ويسمح لحساب جوجل اللي بيدير القناة.
+// قسم مستقل بيجيب حالته بنفسه — بيظهر في نافذة ربط يوتيوب وفي إعدادات قناة يوتيوب المربوطة (الترس)
+function YoutubeReplySection() {
   const { t } = useTranslation()
   const toast = useToast()
-  const [apiKey, setApiKey] = useState('')
-  const [channelUrl, setChannelUrl] = useState('')
-  const [saving, setSaving] = useState(false)
   const [yt, setYt] = useState(undefined)            // قناة يوتيوب المربوطة (من /channels) أو null
   const [clientId, setClientId] = useState('')
   const [clientSecret, setClientSecret] = useState('')
@@ -2007,22 +2006,6 @@ function YoutubeConnectModal({ onClose }) {
     } catch { setYt(null); return null }
   }, [])
   useEffect(() => { loadChannel() }, [loadChannel])
-
-  const connect = async () => {
-    if (!apiKey.trim() || !channelUrl.trim()) return
-    setSaving(true)
-    try {
-      const res = await apiFetch(`${API_URL}/channels/youtube/connect`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey.trim(), channel_url: channelUrl.trim() })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
-      toast.success(t('settings.channels.youtube.connected', { name: data.channel?.display_name || '' }))
-      setApiKey(''); setChannelUrl('')
-      loadChannel()
-    } catch (err) { toast.error(err.message) } finally { setSaving(false) }
-  }
 
   // بيفتح صفحة موافقة جوجل في تاب جديد ويستنى (كل ٣ ثواني) لحد ما السيرفر يستلم الرد من جوجل ويفعّل الرد
   const linkGoogle = async () => {
@@ -2052,12 +2035,78 @@ function YoutubeConnectModal({ onClose }) {
     } catch (err) { toast.error(err.message) }
   }
 
-  const reply = yt?.youtube_reply
-  const hasClient = clientId.trim() && clientSecret.trim()
-  const canLink = hasClient || reply?.client_saved
+  if (!yt) return null
+  const reply = yt.youtube_reply
+  const canLink = (clientId.trim() && clientSecret.trim()) || (reply?.client_saved && !clientId.trim() && !clientSecret.trim())
 
   return (
-    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !saving && !linking && onClose()}>
+    <div className="space-y-3">
+      <p className="text-sm font-semibold text-fg">{t('settings.channels.youtube.replyTitle')}</p>
+      <p className={`text-xs rounded-xl px-3 py-2 ${reply?.enabled ? 'bg-success/10 text-success' : reply?.error ? 'bg-danger/10 text-danger' : 'bg-surface-3 text-fg-muted'}`}>
+        {reply?.enabled ? t('settings.channels.youtube.replyOn', { name: reply.account || yt.display_name })
+          : reply?.error ? t('settings.channels.youtube.replyExpired') : t('settings.channels.youtube.replyOff')}
+      </p>
+
+      {!reply?.enabled && (<>
+        <p className="text-[11px] text-fg-subtle leading-relaxed whitespace-pre-line">{t('settings.channels.youtube.replySteps')}</p>
+        <div>
+          <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.redirectUri')}</label>
+          <div className="flex gap-2">
+            <input readOnly value={redirectUri} dir="ltr" onFocus={e => e.target.select()} className="flex-1 min-w-0 bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg font-mono" />
+            <button type="button" onClick={() => { navigator.clipboard?.writeText(redirectUri).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {}) }}
+              className="px-3 rounded-xl bg-surface-3 text-xs text-fg-muted hover:text-fg">{copied ? t('settings.channels.youtube.copied') : t('settings.channels.youtube.copy')}</button>
+          </div>
+        </div>
+        <div>
+          <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.clientId')}</label>
+          <input value={clientId} onChange={e => setClientId(e.target.value)} dir="ltr" spellCheck={false} autoComplete="off"
+            placeholder={reply?.client_saved ? t('settings.channels.youtube.clientSaved') : '123456-abc.apps.googleusercontent.com'}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
+        </div>
+        <div>
+          <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.clientSecret')}</label>
+          <input type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} dir="ltr" spellCheck={false} autoComplete="new-password"
+            placeholder={reply?.client_saved ? t('settings.channels.youtube.clientSaved') : 'GOCSPX-...'}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
+        </div>
+        <button onClick={linkGoogle} disabled={linking || !canLink}
+          className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+          {linking ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> {t('settings.channels.youtube.waiting')}</> : <><Youtube size={15} /> {t('settings.channels.youtube.connectGoogle')}</>}
+        </button>
+      </>)}
+      {reply?.enabled && (
+        <button onClick={disconnectGoogle} className="w-full py-2 rounded-xl bg-surface-3 text-fg-muted hover:text-danger text-xs">{t('settings.channels.youtube.disconnect')}</button>
+      )}
+      <p className="text-[10px] text-fg-subtle leading-relaxed">{t('settings.channels.youtube.quotaNote')}</p>
+    </div>
+  )
+}
+
+// يوتيوب مفيهوش ويب هوك للتعليقات، فالربط الأساسي مفتاح قراءة + لينك القناة (سحب دوري من السيرفر). الرد على التعليقات في القسم تحت
+function YoutubeConnectModal({ onClose }) {
+  const { t } = useTranslation()
+  const toast = useToast()
+  const [apiKey, setApiKey] = useState('')
+  const [channelUrl, setChannelUrl] = useState('')
+  const [saving, setSaving] = useState(false)
+
+  const connect = async () => {
+    if (!apiKey.trim() || !channelUrl.trim()) return
+    setSaving(true)
+    try {
+      const res = await apiFetch(`${API_URL}/channels/youtube/connect`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ api_key: apiKey.trim(), channel_url: channelUrl.trim() })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('settings.channels.youtube.connected', { name: data.channel?.display_name || '' }))
+      onClose()
+    } catch (err) { toast.error(err.message) } finally { setSaving(false) }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={() => !saving && onClose()}>
       <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[500px] max-h-[88vh] overflow-y-auto">
         <div className="flex items-center gap-2.5 px-5 py-4 border-b border-surface-3 sticky top-0 bg-surface-2 z-10">
           <div className="w-9 h-9 rounded-full bg-surface-3 flex items-center justify-center flex-shrink-0">
@@ -2070,68 +2119,24 @@ function YoutubeConnectModal({ onClose }) {
         </div>
         <div className="p-5 space-y-3">
           <p className="text-xs text-fg-muted leading-relaxed">{t('settings.channels.youtube.intro')}</p>
-
-          {yt && (
-            <div className="border-t border-surface-3 pt-3 space-y-3">
-              <p className="text-sm font-semibold text-fg">{t('settings.channels.youtube.replyTitle')}</p>
-              <p className={`text-xs rounded-xl px-3 py-2 ${reply?.enabled ? 'bg-success/10 text-success' : reply?.error ? 'bg-danger/10 text-danger' : 'bg-surface-3 text-fg-muted'}`}>
-                {reply?.enabled ? t('settings.channels.youtube.replyOn', { name: reply.account || yt.display_name })
-                  : reply?.error ? t('settings.channels.youtube.replyExpired') : t('settings.channels.youtube.replyOff')}
-              </p>
-
-              {!reply?.enabled && (<>
-                <p className="text-[11px] text-fg-subtle leading-relaxed whitespace-pre-line">{t('settings.channels.youtube.replySteps')}</p>
-                <div>
-                  <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.redirectUri')}</label>
-                  <div className="flex gap-2">
-                    <input readOnly value={redirectUri} dir="ltr" onFocus={e => e.target.select()} className="flex-1 min-w-0 bg-surface-3 rounded-xl px-3 py-2 text-xs text-fg font-mono" />
-                    <button type="button" onClick={() => { navigator.clipboard?.writeText(redirectUri).then(() => { setCopied(true); setTimeout(() => setCopied(false), 1500) }).catch(() => {}) }}
-                      className="px-3 rounded-xl bg-surface-3 text-xs text-fg-muted hover:text-fg">{copied ? t('settings.channels.youtube.copied') : t('settings.channels.youtube.copy')}</button>
-                  </div>
-                </div>
-                <div>
-                  <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.clientId')}</label>
-                  <input value={clientId} onChange={e => setClientId(e.target.value)} dir="ltr" spellCheck={false} autoComplete="off"
-                    placeholder={reply?.client_saved ? t('settings.channels.youtube.clientSaved') : '123456-abc.apps.googleusercontent.com'}
-                    className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
-                </div>
-                <div>
-                  <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.clientSecret')}</label>
-                  <input type="password" value={clientSecret} onChange={e => setClientSecret(e.target.value)} dir="ltr" spellCheck={false} autoComplete="new-password"
-                    placeholder={reply?.client_saved ? t('settings.channels.youtube.clientSaved') : 'GOCSPX-...'}
-                    className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
-                </div>
-                <button onClick={linkGoogle} disabled={linking || !canLink || (clientId.trim() ? !clientSecret.trim() : false)}
-                  className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
-                  {linking ? <><div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" /> {t('settings.channels.youtube.waiting')}</> : <><Youtube size={15} /> {t('settings.channels.youtube.connectGoogle')}</>}
-                </button>
-              </>)}
-              {reply?.enabled && (
-                <button onClick={disconnectGoogle} className="w-full py-2 rounded-xl bg-surface-3 text-fg-muted hover:text-danger text-xs">{t('settings.channels.youtube.disconnect')}</button>
-              )}
-              <p className="text-[10px] text-fg-subtle leading-relaxed">{t('settings.channels.youtube.quotaNote')}</p>
-            </div>
-          )}
-
-          <div className="border-t border-surface-3 pt-3 space-y-3">
-            <div>
-              <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.apiKeyLabel')}</label>
-              <input value={apiKey} onChange={e => setApiKey(e.target.value)} dir="ltr"
-                placeholder="AIza..." spellCheck={false} autoComplete="off"
-                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
-            </div>
-            <div>
-              <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.channelLabel')}</label>
-              <input value={channelUrl} onChange={e => setChannelUrl(e.target.value)} dir="ltr"
-                placeholder="https://www.youtube.com/@..." spellCheck={false} autoComplete="off"
-                className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
-            </div>
-            <p className="text-[11px] text-fg-subtle">{t('settings.channels.youtube.readOnlyHint')}</p>
-            <button onClick={connect} disabled={saving || !apiKey.trim() || !channelUrl.trim()}
-              className="w-full py-2.5 rounded-xl bg-surface-3 text-fg text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
-              <Youtube size={15} /> {saving ? t('settings.channels.youtube.connecting') : t('settings.channels.youtube.connectButton')}
-            </button>
+          <div>
+            <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.apiKeyLabel')}</label>
+            <input value={apiKey} onChange={e => setApiKey(e.target.value)} dir="ltr"
+              placeholder="AIza..." spellCheck={false} autoComplete="off"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg font-mono" />
           </div>
+          <div>
+            <label className="block text-[11px] text-fg-subtle mb-1">{t('settings.channels.youtube.channelLabel')}</label>
+            <input value={channelUrl} onChange={e => setChannelUrl(e.target.value)} dir="ltr"
+              placeholder="https://www.youtube.com/@..." spellCheck={false} autoComplete="off"
+              className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+          </div>
+          <p className="text-[11px] text-fg-subtle">{t('settings.channels.youtube.readOnlyHint')}</p>
+          <button onClick={connect} disabled={saving || !apiKey.trim() || !channelUrl.trim()}
+            className="w-full py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40 flex items-center justify-center gap-2">
+            <Youtube size={15} /> {saving ? t('settings.channels.youtube.connecting') : t('settings.channels.youtube.connectButton')}
+          </button>
+          <div className="border-t border-surface-3 pt-3"><YoutubeReplySection /></div>
         </div>
       </div>
     </div>
