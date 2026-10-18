@@ -2379,6 +2379,8 @@
       "channelsTitle": "Specific accounts",
       "channelsHint": "None selected = all accounts on enabled platforms",
       "youtubeNote": "YouTube: public replies only (YouTube has no private messages) and it needs a linked Google account (YouTube channel settings). Up to 100 replies a day to protect the Google quota, and only recent comments (last 48 hours).",
+      "ytNumberLabel": "Official WhatsApp number for YouTube followers",
+      "ytNumberHint": "YouTube has no private messages, so when a comment calls for contact, a booking or an enquiry, the AI points its author to this number in the public reply. It is the only number allowed in a public reply. Leave empty to turn this off.",
       "youtubeNeedsLink": "The Google account for YouTube is not linked yet — without it the AI will not reply on YouTube (Settings > Channels > YouTube gear).",
       "promptTitle": "Agent behavior",
       "promptHint": "Style, what is allowed and what is not. Fixed safety rules cannot be changed here (no medical advice, no prices, no links or phone numbers).",

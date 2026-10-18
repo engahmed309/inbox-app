@@ -161,6 +161,14 @@ export default function CommentsAiSettings() {
               </div>
             )}
             <p className="text-[10px] text-fg-subtle mt-3">{t('comments.ai.youtubeNote')}</p>
+            {form.platforms.includes('youtube') && (
+              <label className="block mt-3">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.ytNumberLabel')}</span>
+                <input value={form.youtube_contact_number || ''} onChange={e => set({ youtube_contact_number: e.target.value })} dir="ltr" inputMode="tel"
+                  placeholder="+971 54 888 5161" className="w-full sm:w-72 bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg tabular-nums" />
+                <span className="block text-[10px] text-fg-subtle mt-1 leading-relaxed">{t('comments.ai.ytNumberHint')}</span>
+              </label>
+            )}
             {form.platforms.includes('youtube') && !meta.youtube_can_reply && (
               <p className="text-[11px] text-amber-500 mt-2">{t('comments.ai.youtubeNeedsLink')}</p>
             )}
