@@ -358,7 +358,23 @@
         "readOnlyHint": "This key is read-only â€” it grants no permission to reply, delete, or reach anything private on the channel. Replying and deleting need Google to approve the app (a later stage).",
         "connectButton": "Connect channel",
         "connecting": "Connectingâ€¦",
-        "connected": "{{name}} connected â€” comments will start arriving within minutes"
+        "connected": "{{name}} connected â€” comments will start arriving within minutes",
+        "replyTitle": "Replying to comments",
+        "replyOn": "Replying is on — replies are posted as \"{{name}}\"",
+        "replyOff": "Replying is off (read-only). Turn it on with the steps below.",
+        "replyExpired": "The Google link expired — link it again.",
+        "replySteps": "1) Open Google Cloud Console in the same project as the API key.\n2) APIs & Services > Credentials > Create credentials > OAuth client ID > Web application.\n3) Add this exact URL to Authorized redirect URIs.\n4) On the OAuth consent screen set the app to In production (or add your email as a Test user — in testing mode the link expires every 7 days).\n5) Paste the Client ID and Client Secret here, press Link, and pick the Google account that manages the channel.",
+        "redirectUri": "Redirect URI",
+        "copy": "Copy",
+        "copied": "Copied",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "clientSaved": "Saved — leave empty to use the saved one",
+        "connectGoogle": "Link Google account",
+        "waiting": "Waiting for your approval on the Google page…",
+        "linked": "Replying to YouTube is on",
+        "disconnect": "Turn replying off",
+        "quotaNote": "Each reply uses 50 units of the daily YouTube quota (10,000) and the periodic sync uses about 4,400, so the cap is 100 replies a day."
       },
       "calling": {
         "title": "Calls",

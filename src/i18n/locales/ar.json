@@ -446,7 +446,23 @@
         "readOnlyHint": "هذا المفتاح للقراءة فقط — لا يمنح أي صلاحية للرد أو الحذف أو الوصول لبيانات القناة الخاصة. الرد والحذف يحتاجان موافقة جوجل على التطبيق (مرحلة لاحقة).",
         "connectButton": "ربط القناة",
         "connecting": "جارٍ الربط…",
-        "connected": "تم ربط {{name}} — التعليقات ستبدأ بالوصول خلال دقائق"
+        "connected": "تم ربط {{name}} — التعليقات ستبدأ بالوصول خلال دقائق",
+        "replyTitle": "الرد على التعليقات",
+        "replyOn": "الرد مفعّل — الردود بتتنشر باسم \"{{name}}\"",
+        "replyOff": "الرد غير مفعّل (القراءة فقط). فعّله بالخطوات تحت.",
+        "replyExpired": "انتهى ربط حساب جوجل — أعد الربط.",
+        "replySteps": "١) افتح Google Cloud Console في نفس المشروع اللي فيه مفتاح الـ API.\n٢) APIs & Services ← Credentials ← Create credentials ← OAuth client ID ← نوعه Web application.\n٣) في Authorized redirect URIs ضيف الرابط ده بالظبط.\n٤) من OAuth consent screen خلّي التطبيق In production (أو ضيف إيميلك Test user، لكن الربط بينتهي كل ٧ أيام في وضع الاختبار).\n٥) انسخ Client ID و Client Secret هنا واضغط ربط، واختار حساب جوجل اللي بيدير القناة.",
+        "redirectUri": "Redirect URI",
+        "copy": "نسخ",
+        "copied": "اتنسخ",
+        "clientId": "Client ID",
+        "clientSecret": "Client Secret",
+        "clientSaved": "محفوظ — سيبه فاضي عشان تستخدم المحفوظ",
+        "connectGoogle": "ربط حساب جوجل",
+        "waiting": "بنستنى موافقتك في صفحة جوجل…",
+        "linked": "تم تفعيل الرد على يوتيوب",
+        "disconnect": "فصل الرد",
+        "quotaNote": "كل رد بياخد ٥٠ وحدة من كوتة يوتيوب اليومية (١٠٬٠٠٠) والسحب الدوري بياخد حوالي ٤٬٤٠٠، فالحد الأقصى ١٠٠ رد في اليوم."
       },
       "calling": {
         "title": "المكالمات",

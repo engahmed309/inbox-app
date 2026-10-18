@@ -69,6 +69,7 @@ export default function CommentsScreen() {
   const [loading, setLoading] = useState(true)
   const [loadingMore, setLoadingMore] = useState(false)
   const [hasMore, setHasMore] = useState(false)
+  const [ytCanReply, setYtCanReply] = useState(false)   // الأدمن ربط حساب جوجل للرد على يوتيوب
   const [seenCount, setSeenCount] = useState(null)  // عدّاد التبويب وقت آخر تحميل للقائمة
   const [replyTo, setReplyTo] = useState(null)      // { comment, mode: 'private' | 'public' }
   const [deleting, setDeleting] = useState(null)
@@ -127,6 +128,7 @@ export default function CommentsScreen() {
       if (listRes.ok) {
         setComments(listData.comments || [])
         setHasMore(!!listData.hasMore)
+        setYtCanReply(!!listData.youtube_can_reply)
       }
     } catch { /* هنسيب اللي معروض زي ما هو */ } finally { setLoading(false) }
   }, [query, status, fetchCounts])
@@ -608,7 +610,7 @@ export default function CommentsScreen() {
                           <RotateCcw size={13} /> {t('comments.restore')}
                         </button>
                       ) : (<>
-                        {!isYoutube && live && (
+                        {(!isYoutube || ytCanReply) && live && (
                           <button onClick={() => openReply(c, 'public')} disabled={other || busy === c.id}
                             className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-brand text-white hover:opacity-90 disabled:opacity-40">
                             <MessageCircle size={13} /> {c.public_reply_at ? t('comments.publicReplyAgain') : t('comments.publicReply')}
