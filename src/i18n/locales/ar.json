@@ -2100,7 +2100,9 @@
       "sent": "اتبعت",
       "failed": "تعذّر تجهيز الرد",
       "retry": "حاول تاني",
-      "chars": "{{n}} حرف"
+      "chars": "{{n}} حرف",
+      "publicOnlyButton": "اكتب رد علني فقط",
+      "privatePrefix": "الرسالة الخاصة:"
     },
     "assignTitle": "نقل التعليق إلى",
     "unassign": "إلغاء التعيين",

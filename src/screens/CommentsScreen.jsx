@@ -1020,11 +1020,15 @@ function AiAssignModal({ comment, onClose, onDone }) {
   const [sendPub, setSendPub] = useState(true)
   const [sendPriv, setSendPriv] = useState(true)
   const [sending, setSending] = useState(false)
+  const [privRefused, setPrivRefused] = useState(null)   // رسالة الخطأ لو فيسبوك رفض الرسالة الخاصة
 
-  const generate = async () => {
+  // noPrivate: بعد ما فيسبوك يرفض الرسالة الخاصة، بنطلب مسودة رد علني بس (من غير ادّعاء رسالة خاصة)
+  const generate = async (opts) => {
+    const noPrivate = opts?.noPrivate === true
+    setPrivRefused(false)
     setState({ loading: true, error: null })
     try {
-      const res = await apiFetch(`${API_URL}/comments/${comment.id}/assign-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const res = await apiFetch(`${API_URL}/comments/${comment.id}/assign-ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(noPrivate ? { no_private: true } : {}) })
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('comments.aiAssign.failed'))
       setDraft({ id: data.id, private_possible: data.private_possible !== false, private_skipped: data.private_skipped })
@@ -1062,7 +1066,11 @@ function AiAssignModal({ comment, onClose, onDone }) {
       if (!res.ok) throw new Error(data.error || t('comments.aiAssign.failed'))
       toast.success(t('comments.aiAssign.sent'))
       onDone()
-    } catch (err) { toast.error(err.message) } finally { setSending(false) }
+    } catch (err) {
+      // رفض الرسالة الخاصة من ميتا: المسودة اتستهلكت، فنعرض الرسالة ونقترح مسودة رد علني بس
+      if (String(err.message).startsWith(t('comments.aiAssign.privatePrefix'))) setPrivRefused(err.message)
+      else toast.error(err.message)
+    } finally { setSending(false) }
   }
 
   return (
@@ -1086,7 +1094,7 @@ function AiAssignModal({ comment, onClose, onDone }) {
             <div className="space-y-3">
               <p className="text-xs text-danger bg-danger/10 rounded-xl p-3">{state.error}</p>
               <div className="flex gap-2">
-                <button onClick={generate} className="flex-1 py-2 rounded-xl bg-brand text-white text-sm font-semibold">{t('comments.aiAssign.retry')}</button>
+                <button onClick={() => generate()} className="flex-1 py-2 rounded-xl bg-brand text-white text-sm font-semibold">{t('comments.aiAssign.retry')}</button>
                 <button onClick={onClose} className="px-4 py-2 rounded-xl bg-surface-3 text-fg-muted text-sm">{t('comments.aiAssign.cancel')}</button>
               </div>
             </div>
@@ -1117,12 +1125,20 @@ function AiAssignModal({ comment, onClose, onDone }) {
               )}
             </div>
 
+            {privRefused && (
+              <div className="bg-amber-500/10 border border-amber-500/30 rounded-xl p-3 space-y-2">
+                <p className="text-xs text-amber-500 leading-relaxed">{privRefused}</p>
+                <button onClick={() => generate({ noPrivate: true })}
+                  className="w-full py-2 rounded-lg bg-amber-500 text-white text-xs font-semibold">{t('comments.aiAssign.publicOnlyButton')}</button>
+              </div>
+            )}
+
             <div className="flex gap-2 pt-1">
               <button onClick={send} disabled={sending || !label}
                 className="flex-1 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40">
                 {sending ? t('comments.sending') : label ? t('comments.aiAssign.' + label) : t('comments.aiAssign.pickOne')}
               </button>
-              <button onClick={generate} disabled={sending} title={t('comments.aiAssign.regenerate')}
+              <button onClick={() => generate()} disabled={sending} title={t('comments.aiAssign.regenerate')}
                 className="px-3 py-2.5 rounded-xl bg-surface-3 text-fg-muted hover:text-fg text-xs flex items-center gap-1.5 disabled:opacity-40">
                 <Wand2 size={14} /> {t('comments.aiAssign.regenerate')}
               </button>

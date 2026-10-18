@@ -2100,7 +2100,9 @@
       "sent": "Sent",
       "failed": "Could not prepare the reply",
       "retry": "Try again",
-      "chars": "{{n}} chars"
+      "chars": "{{n}} chars",
+      "publicOnlyButton": "Write a public-only reply",
+      "privatePrefix": "الرسالة الخاصة:"
     },
     "assignTitle": "Move comment to",
     "unassign": "Unassign",
