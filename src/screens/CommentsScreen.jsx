@@ -215,6 +215,11 @@ export default function CommentsScreen() {
 
   // حظر صاحب تعليق مسيء (فريق التعليقات والأدمن): بيتحظر من الصفحة لو المنصة بتسمح، وتعليقاته الجديدة بتتخفي تلقائي
   const blockAuthor = async (c) => {
+    // انستجرام: بنفتح صفحة الحساب على انستجرام والحظر بيتعمل من هناك (تعليقاته بتفضل توصل عادي)
+    if (c.platform === 'instagram') {
+      if (c.author_name) window.open(`https://www.instagram.com/${encodeURIComponent(c.author_name)}/`, '_blank', 'noopener')
+      return
+    }
     if (!window.confirm(t('comments.mod.blockConfirm', { name: c.author_name || '—' }))) return
     setBusy(c.id)
     try {
@@ -776,7 +781,7 @@ export default function CommentsScreen() {
                                 <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} onClick={() => { setMenuFor(null); setAiFor(c) }} />
                               )}
                               {canModerate && c.author_platform_id && (
-                                <MenuItem icon={<UserX size={13} />} label={t('comments.mod.block')} danger
+                                <MenuItem icon={<UserX size={13} />} label={c.platform === 'instagram' ? t('comments.mod.blockIg') : t('comments.mod.block')} danger
                                   onClick={() => { setMenuFor(null); blockAuthor(c) }} />
                               )}
                               <MenuItem icon={<Archive size={13} />} label={t('comments.archive')} disabled={other}

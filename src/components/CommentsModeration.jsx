@@ -213,6 +213,11 @@ function Queue({ t, toast, onChanged }) {
   }
 
   const block = async (c) => {
+    // انستجرام: بنفتح صفحة الحساب على انستجرام والحظر بيتعمل من هناك (تعليقاته بتفضل توصل عادي)
+    if (c.platform === 'instagram') {
+      if (c.author_name) window.open(`https://www.instagram.com/${encodeURIComponent(c.author_name)}/`, '_blank', 'noopener')
+      return
+    }
     if (!window.confirm(t('comments.mod.blockConfirm', { name: c.author_name || '—' }))) return
     setBusy(c.id)
     try {
@@ -288,7 +293,7 @@ function Queue({ t, toast, onChanged }) {
                   className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-3 text-fg disabled:opacity-50"><Check size={13} />{t('comments.mod.reject')}</button>
                 {c.author_platform_id && (
                   <button disabled={busy === c.id || c._blocked} onClick={() => block(c)}
-                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-danger/40 text-danger disabled:opacity-50"><UserX size={13} />{c._blocked ? t('comments.mod.blockedShort') : t('comments.mod.block')}</button>
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-danger/40 text-danger disabled:opacity-50"><UserX size={13} />{c.platform === 'instagram' ? t('comments.mod.blockIg') : c._blocked ? t('comments.mod.blockedShort') : t('comments.mod.block')}</button>
                 )}
               </>) : c.mod_decided_at && <span className="text-[11px] text-fg-subtle">{localeFormatDateTime(c.mod_decided_at)}</span>}
               {c.post_permalink && <a href={c.post_permalink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-brand hover:underline"><ExternalLink size={12} />{t('comments.mod.openPost')}</a>}
