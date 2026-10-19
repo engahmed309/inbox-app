@@ -802,7 +802,8 @@ export default function ConversationsScreen() {
           .select('*, contacts(id, name, profile_pic, platform_id, country, lifecycle_stage_id, lifecycle_stages(id, name, color, icon))')
           .in('contact_id', contactIds.length ? contactIds : ['00000000-0000-0000-0000-000000000000'])
       } else {
-        let msgQuery = supabase.from('messages').select('conversation_id').ilike('content', `%${q}%`).limit(300)
+        // messages_all = الرسايل الشغالة + المتأرشفة (محادثات ساكتة من ٣ شهور)، عشان البحث بنص رسالة قديمة يلاقيها
+        let msgQuery = supabase.from('messages_all').select('conversation_id').ilike('content', `%${q}%`).limit(300)
         msgQuery = searchType === 'comment' ? msgQuery.eq('content_type', 'note') : msgQuery.neq('content_type', 'note')
         const { data: msgs } = await msgQuery
         const convIds = [...new Set((msgs || []).map(m => m.conversation_id))]
