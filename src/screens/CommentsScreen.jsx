@@ -49,6 +49,7 @@ export default function CommentsScreen() {
   const toast = useToast()
   const navigate = useNavigate()
   const [view, setView] = useState('inbox')       // inbox | reports | ai | protection
+  const [canModerate, setCanModerate] = useState(false)   // الأدمن + فريق التعليقات: مراجعة المحجوز والحظر (السيرفر بيرجّع العدد ليهم بس)
   const [modPending, setModPending] = useState(0)    // تعليقات محجوزة للأدمن (سبام/إساءة) بانتظار موافقة/رفض
   const [status, setStatus] = useState('new')
   const [platform, setPlatform] = useState('all')
@@ -108,6 +109,7 @@ export default function CommentsScreen() {
         setByPlatform(data.byPlatform || {})
         setByScope(data.byScope || {})
         setModPending(data.moderation_pending || 0)
+        setCanModerate(data.moderation_pending !== undefined)
         return data.counts || {}
       }
     } catch { /* بنسيب العدادات القديمة معروضة */ }
@@ -210,6 +212,19 @@ export default function CommentsScreen() {
   const ownedByOther = (c) => !isAdmin && c.assigned_agent_id && c.assigned_agent_id !== agent?.id
     && !(aiStatus?.can_act && c.assigned_agent_id === aiStatus.agent_id)
   const blocked = (c) => ownedByOther(c)
+
+  // حظر صاحب تعليق مسيء (فريق التعليقات والأدمن): بيتحظر من الصفحة لو المنصة بتسمح، وتعليقاته الجديدة بتتخفي تلقائي
+  const blockAuthor = async (c) => {
+    if (!window.confirm(t('comments.mod.blockConfirm', { name: c.author_name || '—' }))) return
+    setBusy(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/block-author`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      if (d.platform_blocked) toast.success(t('comments.mod.blocked'))
+      else toast.error(t('comments.mod.blockedLocal', { note: d.note || '' }))
+    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
 
   const patchComment = async (c, body, { remove = true } = {}) => {
     setBusy(c.id)
@@ -407,7 +422,7 @@ export default function CommentsScreen() {
           <NavItem active={view === 'inbox'} icon={<MessageSquare size={15} />} label={t('comments.areas.inbox')} count={view === 'inbox' ? 0 : byPlatform.all} onClick={() => { setView('inbox'); afterPick() }} />
           {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
           {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
-          {isAdmin && <NavItem active={view === 'protection'} icon={<ShieldAlert size={15} />} label={t('comments.areas.protection')} count={modPending} onClick={() => { setView('protection'); afterPick() }} />}
+          {canModerate && <NavItem active={view === 'protection'} icon={<ShieldAlert size={15} />} label={t('comments.areas.protection')} count={modPending} onClick={() => { setView('protection'); afterPick() }} />}
         </Section>
         {view === 'inbox' && (<>
         <Section title={t('comments.sections.platform')}>
@@ -534,7 +549,7 @@ export default function CommentsScreen() {
 
       <div className="flex-1 min-w-0 flex flex-col">
         <div className="flex items-center gap-2 px-3 pt-safe pt-3 pb-2.5 bg-surface-2 border-b border-surface-3">
-          <button onClick={() => navigate('/')} className={iconBtn}><BackArrow /></button>
+          {!(!isAdmin && agent?.access_scope === 'comments') && <button onClick={() => navigate('/')} className={iconBtn}><BackArrow /></button>}
           {!sidebarOpen && (
             <button onClick={() => setSidebar(true)} className={iconBtn} aria-label={t('comments.openMenu')}><Menu size={18} /></button>
           )}
@@ -551,8 +566,8 @@ export default function CommentsScreen() {
 
         {view === 'reports' && isAdmin && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
         {view === 'ai' && isAdmin && <CommentsAiSettings />}
-        {view === 'protection' && isAdmin && <CommentsModeration />}
-        {view === 'inbox' && isAdmin && modPending > 0 && (
+        {view === 'protection' && canModerate && <CommentsModeration adminView={isAdmin} />}
+        {view === 'inbox' && canModerate && modPending > 0 && (
           <button onClick={() => setView('protection')} className="w-full flex items-center gap-2 px-4 py-2.5 bg-danger/10 border-b border-danger/30 text-danger text-[12px] font-medium hover:bg-danger/15">
             <ShieldAlert size={15} className="flex-shrink-0" />
             <span className="flex-1 text-start">{t('comments.mod.banner', { n: modPending })}</span>
@@ -759,6 +774,10 @@ export default function CommentsScreen() {
                               {/* ردّ بالذكاء الاصطناعي: للأدمن ولموظف التعليقات على التعليق اللي يقدر يتصرف فيه (مش مع زميل) */}
                               {(isAdmin || !other) && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
                                 <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} onClick={() => { setMenuFor(null); setAiFor(c) }} />
+                              )}
+                              {canModerate && c.author_platform_id && (
+                                <MenuItem icon={<UserX size={13} />} label={t('comments.mod.block')} danger
+                                  onClick={() => { setMenuFor(null); blockAuthor(c) }} />
                               )}
                               <MenuItem icon={<Archive size={13} />} label={t('comments.archive')} disabled={other}
                                 onClick={() => { setMenuFor(null); patchComment(c, { archived: true }) }} />

@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, ShieldAlert, Check, X, Trash2, Plus, Search, FlaskConical, ExternalLink, EyeOff, Facebook, Instagram, Youtube, Power, Hand, Zap } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Check, X, Trash2, Plus, Search, FlaskConical, ExternalLink, EyeOff, Facebook, Instagram, Youtube, Power, Hand, Zap, UserX } from 'lucide-react'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -53,9 +53,22 @@ function Toggle({ checked, onChange, label, hint, disabled }) {
   )
 }
 
-export default function CommentsModeration() {
+// adminView=false: فريق التعليقات — قايمة المحجوز والمحظورين بس (الإعدادات والقاموس للأدمن)
+export default function CommentsModeration({ adminView = true }) {
   const { t } = useTranslation()
   const toast = useToast()
+  if (!adminView) return (
+    <div className="flex-1 min-h-0 overflow-y-auto">
+      <div className="max-w-3xl mx-auto p-3 space-y-3 pb-24">
+        <Queue t={t} toast={toast} />
+        <Blocked t={t} toast={toast} />
+      </div>
+    </div>
+  )
+  return <AdminModeration t={t} toast={toast} />
+}
+
+function AdminModeration({ t, toast }) {
   const [settings, setSettings] = useState(null)
   const [meta, setMeta] = useState(null)
   const [counts, setCounts] = useState(null)
@@ -135,6 +148,7 @@ export default function CommentsModeration() {
           </Section>
 
           <Queue t={t} toast={toast} onChanged={loadCounts} />
+          <Blocked t={t} toast={toast} />
         </>)}
 
         <Words t={t} toast={toast} aiAvailable={!!meta.ai_available} />
@@ -195,6 +209,19 @@ function Queue({ t, toast, onChanged }) {
       if (d.failed?.length) toast.error(d.failed[0].error)
       await load(0)
       onChanged?.()
+    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
+
+  const block = async (c) => {
+    if (!window.confirm(t('comments.mod.blockConfirm', { name: c.author_name || '—' }))) return
+    setBusy(c.id)
+    try {
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/block-author`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{}' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      if (d.platform_blocked) toast.success(t('comments.mod.blocked'))
+      else toast.error(t('comments.mod.blockedLocal', { note: d.note || '' }))
+      setRows(r => r.map(x => x.author_platform_id && x.author_platform_id === c.author_platform_id && x.platform === c.platform ? { ...x, _blocked: true } : x))
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
   }
 
@@ -259,6 +286,10 @@ function Queue({ t, toast, onChanged }) {
                   className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-danger text-white disabled:opacity-50"><Trash2 size={13} />{t('comments.mod.approve')}</button>
                 <button disabled={busy === c.id} onClick={() => decide(c.id, 'reject')}
                   className="flex-1 min-w-[120px] inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium bg-surface-3 text-fg disabled:opacity-50"><Check size={13} />{t('comments.mod.reject')}</button>
+                {c.author_platform_id && (
+                  <button disabled={busy === c.id || c._blocked} onClick={() => block(c)}
+                    className="inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium border border-danger/40 text-danger disabled:opacity-50"><UserX size={13} />{c._blocked ? t('comments.mod.blockedShort') : t('comments.mod.block')}</button>
+                )}
               </>) : c.mod_decided_at && <span className="text-[11px] text-fg-subtle">{localeFormatDateTime(c.mod_decided_at)}</span>}
               {c.post_permalink && <a href={c.post_permalink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[11px] text-brand hover:underline"><ExternalLink size={12} />{t('comments.mod.openPost')}</a>}
             </div>
@@ -266,6 +297,44 @@ function Queue({ t, toast, onChanged }) {
         ))}
       </div>
       {hasMore && <button disabled={loading} onClick={() => load(rows.length)} className="mt-3 w-full py-2 rounded-lg bg-surface-3 text-xs text-fg-muted hover:text-fg">{t('comments.mod.loadMore')}</button>}
+    </Section>
+  )
+}
+
+// ─── المحظورين: قايمة + فك الحظر ───────────────────────────────────────
+function Blocked({ t, toast }) {
+  const [rows, setRows] = useState(null)
+  const [open, setOpen] = useState(false)
+  const load = useCallback(() => {
+    apiFetch(`${API_URL}/comments/blocked`).then(r => r.json()).then(d => setRows(d.blocked || [])).catch(() => setRows([]))
+  }, [])
+  useEffect(() => { if (open) load() }, [open, load])
+  const unblock = async (b) => {
+    if (!window.confirm(t('comments.mod.unblockConfirm', { name: b.author_name || '—' }))) return
+    try {
+      const res = await apiFetch(`${API_URL}/comments/blocked/${b.id}`, { method: 'DELETE' })
+      const d = await res.json()
+      if (!res.ok) throw new Error(d.error)
+      if (d.note) toast.error(d.note); else toast.success(t('comments.mod.unblocked'))
+      setRows(r => r.filter(x => x.id !== b.id))
+    } catch (err) { toast.error(err.message) }
+  }
+  return (
+    <Section title={t('comments.mod.blockedTitle')} hint={t('comments.mod.blockedHint')}
+      right={<button onClick={() => setOpen(o => !o)} className="px-3 py-1 rounded-full text-xs font-medium bg-surface-3 text-fg-muted hover:text-fg">{open ? t('comments.mod.hide') : t('comments.mod.show')}</button>}>
+      {open && (rows === null
+        ? <div className="py-4 flex justify-center"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+        : !rows.length ? <p className="text-xs text-fg-subtle py-2">{t('comments.mod.blockedEmpty')}</p>
+        : <div className="space-y-1.5">{rows.map(b => (
+            <div key={b.id} className="flex items-center gap-2 bg-surface rounded-lg border border-surface-3 px-3 py-2">
+              {PLATFORM_ICONS[b.platform]}
+              <div className="flex-1 min-w-0">
+                <p className="text-[13px] text-fg truncate">{b.author_name || b.author_platform_id}</p>
+                <p className="text-[10px] text-fg-subtle truncate">{b.platform_blocked ? t('comments.mod.blockedOnPlatform') : t('comments.mod.blockedLocalOnly')}{b.blocked_by_agent?.name ? ` · ${b.blocked_by_agent.name}` : ''} · {localeFormatDateTime(b.created_at)}</p>
+              </div>
+              <button onClick={() => unblock(b)} className="px-2.5 py-1 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg">{t('comments.mod.unblock')}</button>
+            </div>
+          ))}</div>)}
     </Section>
   )
 }
