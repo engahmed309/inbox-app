@@ -358,7 +358,7 @@
         "readOnlyHint": "This key is read-only â€” it grants no permission to reply, delete, or reach anything private on the channel. Replying and deleting need Google to approve the app (a later stage).",
         "connectButton": "Connect channel",
         "connecting": "Connectingâ€¦",
-        "connected": "{{name}} connected â€” comments will start arriving within minutes",
+        "connected": "{{name}} connected â€” comments will start arriving within minutes",
         "replyTitle": "Replying to comments",
         "replyOn": "Replying is on — replies are posted as \"{{name}}\"",
         "replyOff": "Replying is off (read-only). Turn it on with the steps below.",
@@ -1646,8 +1646,16 @@
   },
   "notificationBell": {
     "title": "Notifications",
-    "tab": { "delays": "Delays", "comments": "Comment issues", "requests": "Staff requests" },
-    "empty": { "delays": "No delays", "comments": "No comment issues 👌", "requests": "No requests" },
+    "tab": {
+      "delays": "Delays",
+      "comments": "Comment issues",
+      "requests": "Staff requests"
+    },
+    "empty": {
+      "delays": "No delays",
+      "comments": "No comment issues 👌",
+      "requests": "No requests"
+    },
     "unreadOnly": "Unread only",
     "allEmployees": "All employees",
     "noEmployee": "No employee",
@@ -2145,7 +2153,8 @@
         "posts": "Posts",
         "ai": "AI replies",
         "interest": "Interested",
-        "followup": "Follow-up"
+        "followup": "Follow-up",
+        "conversion": "Comments → bookings"
       },
       "ranges": {
         "today": "Today",
@@ -2244,7 +2253,28 @@
         "missedHint": "possible lost opportunities",
         "note": "Interest words are configured in the agent settings. “Booked” is the customer's current stage, not necessarily caused by the comment alone."
       },
-      "export": "Export CSV"
+      "export": "Export CSV",
+      "conv": {
+        "noTag": "No \"from comments\" tag is set — pick it in the comments AI settings.",
+        "contacts": "Customers from comments {{m}}",
+        "booked": "Reached \"Booked\"",
+        "rate": "Conversion rate",
+        "bookedNow": "Still \"Booked\"",
+        "bookedNowHint": "Current stage now",
+        "byMonth": "By month (last 6 months)",
+        "month": "Month",
+        "contactsCol": "Customers",
+        "stages": "Their current stages (whole period)",
+        "hint": "A customer counts in the month of their first contact (when they got a private reply to their comment). \"Reached Booked\" = reached that stage at any time, even if moved later."
+      },
+      "att": {
+        "title": "Comments team attendance",
+        "active": "Active time",
+        "days": "Days present",
+        "lastSeen": "Last seen",
+        "pending": "Pending now",
+        "hint": "Active time is measured from the app being open in front of the agent (a heartbeat every 90s), not from the status button."
+      }
     },
     "thread": {
       "view": "View conversation",
@@ -2267,7 +2297,11 @@
       "saved": "Saved",
       "modeTitle": "Protection mode",
       "modeHint": "Detects spam and abusive comments on Facebook, Instagram and YouTube. Runs independently of the reply agent, and a failure here never stops a comment from reaching the team.",
-      "mode": { "off": "Off", "approve": "Hide now + delete on your approval", "auto": "Auto-delete" },
+      "mode": {
+        "off": "Off",
+        "approve": "Hide now + delete on your approval",
+        "auto": "Auto-delete"
+      },
       "modeDesc": {
         "off": "No checking and no holding of any comment.",
         "approve": "A violating comment is hidden from the page right away (hidden, not deleted) and you get a notification. Approve → deleted for good, reject → shown again and handed back to the team.",
@@ -2278,8 +2312,14 @@
       "catTitle": "What gets held",
       "catHint": "Turn off any category you do not want handled.",
       "cat": {
-        "spam": "Spam and ads", "profanity": "Profanity", "insult": "Insults", "accusation": "Accusations and defamation",
-        "hate": "Hate and racism", "sexual": "Sexual content", "threat": "Threats", "none": "Not a violation"
+        "spam": "Spam and ads",
+        "profanity": "Profanity",
+        "insult": "Insults",
+        "accusation": "Accusations and defamation",
+        "hate": "Hate and racism",
+        "sexual": "Sexual content",
+        "threat": "Threats",
+        "none": "Not a violation"
       },
       "catDesc": {
         "spam": "Promo links, trading/earn-money pitches, flooding from one account, text pasted from many accounts.",
@@ -2334,13 +2374,23 @@
       "loadMore": "Show more",
       "banner": "{{n}} violating comment(s) (spam/abuse) waiting for your decision",
       "bannerOpen": "Review",
-      "confidence": { "high": "Clear violation", "medium": "Ambiguous" },
-      "source": { "keyword": "Word list", "ai": "AI", "burst": "Flooding", "duplicate": "Pasted text" },
-      "status": { "approved": "Deleted on your approval", "rejected": "Kept", "auto_deleted": "Auto-deleted" },
+      "confidence": {
+        "high": "Clear violation",
+        "medium": "Ambiguous"
+      },
+      "source": {
+        "keyword": "Word list",
+        "ai": "AI",
+        "burst": "Flooding",
+        "duplicate": "Pasted text"
+      },
+      "status": {
+        "approved": "Deleted on your approval",
+        "rejected": "Kept",
+        "auto_deleted": "Auto-deleted"
+      },
       "wordsTitle": "Abusive word list",
       "wordsHint": "The words protection checks against, gathered by reviewing your comment archive (20,000+ comments) plus common Arabic dialect and French terms. “Explicit” = held directly, “Check context” = judged by the AI (or sent to your approval when it is unavailable).",
-      "show": "Show",
-      "hide": "Hide",
       "testTitle": "Test a comment",
       "testPlaceholder": "Type a comment to try against the list without holding anything",
       "testButton": "Test",
@@ -2352,14 +2402,21 @@
       "wordPlaceholder": "Word or phrase",
       "add": "Add",
       "wordAdded": "Added",
-      "severity": { "high": "Explicit", "review": "Check context" },
+      "severity": {
+        "high": "Explicit",
+        "review": "Check context"
+      },
       "severityHint": "“Explicit”: held immediately (use only for unmistakable curses). “Check context”: a word that can appear in perfectly fine comments.",
       "severityToggle": "Change severity",
       "search": "Search words",
       "allCats": "All categories",
       "total": "{{n}} words",
       "hits": "seen {{n}} times in the archive",
-      "sourceLabel": { "builtin": "Built-in", "archive": "From the archive", "admin": "Added by you" },
+      "sourceLabel": {
+        "builtin": "Built-in",
+        "archive": "From the archive",
+        "admin": "Added by you"
+      },
       "enabled": "Enable / disable",
       "wordDeleteConfirm": "Remove “{{w}}” from the list?",
       "noWords": "No matching words."

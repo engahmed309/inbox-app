@@ -8,7 +8,7 @@ import { formatDateTime as localeFormatDateTime } from '../lib/locale'
 
 const RANGES = ['today', '7d', '30d', 'custom']
 const PLATFORMS = ['all', 'facebook', 'instagram', 'youtube']
-const TABS = ['overview', 'staff', 'posts', 'interest', 'followup', 'ai']
+const TABS = ['overview', 'conversion', 'staff', 'posts', 'interest', 'followup', 'ai']
 const SLAS = [60, 240, 1440]
 const COLORS = { facebook: '#60a5fa', instagram: '#f472b6', youtube: '#ef4444', brand: '#8b7cf6', ok: '#34d399', warn: '#fbbf24', bad: '#f87171', muted: '#9ca3af' }
 
@@ -95,8 +95,9 @@ export default function CommentsReports({ onOpenPost }) {
       const qs = new URLSearchParams({ from: b.from, platform })
       if (b.to) qs.set('to', b.to)
       qs.set('sla', String(sla))
-      const endpoint = tab === 'ai' ? 'ai' : tab === 'interest' ? 'funnel' : 'overview'
-      const res = await apiFetch(`${API_URL}/comments/reports/${endpoint}?${qs}`)
+      const endpoint = tab === 'ai' ? 'ai' : tab === 'interest' ? 'funnel' : tab === 'staff' ? 'staff' : tab === 'conversion' ? 'conversion' : 'overview'
+      // التحويل بالشهور (آخر ٦) مش بالفترة المختارة
+      const res = await apiFetch(tab === 'conversion' ? `${API_URL}/comments/reports/conversion?months=6` : `${API_URL}/comments/reports/${endpoint}?${qs}`)
       const json = await res.json()
       if (!res.ok) throw new Error(json.error)
       setData(json)
@@ -207,11 +208,14 @@ export default function CommentsReports({ onOpenPost }) {
               <Bars rows={['facebook', 'instagram', 'youtube'].map(p => ({ label: t(`comments.platforms.${p}`), value: data.by_platform?.[p] || 0, color: p === 'facebook' ? 'bg-blue-400' : p === 'instagram' ? 'bg-pink-400' : 'bg-red-500' }))} />
             </Card>
           </div>
-        </>) : tab === 'interest' ? (
+        </>) : tab === 'conversion' ? (
+          <Conversion data={data} t={t} />
+        ) : tab === 'interest' ? (
           <Funnel data={data} t={t} />
         ) : tab === 'followup' ? (
           <Followup data={data} t={t} sla={sla} setSla={setSla} />
-        ) : tab === 'staff' ? (
+        ) : tab === 'staff' ? (<>
+          <Attendance rows={data.attendance || []} t={t} />
           <Card title={t('comments.reports.tabs.staff')}>
             <SlaPicker sla={sla} setSla={setSla} t={t} />
             {(data.by_agent || []).length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
@@ -243,7 +247,7 @@ export default function CommentsReports({ onOpenPost }) {
               </div>
             )}
           </Card>
-        ) : tab === 'posts' ? (
+        </>) : tab === 'posts' ? (
           <Card title={t('comments.reports.topPosts')}>
             {(data.top_posts || []).length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
               <div className="space-y-2">
@@ -375,6 +379,7 @@ function exportCsv(tab, data, t) {
   if (!data) return
   const pick = {
     overview: () => [[t('comments.reports.perDay'), 'facebook', 'instagram', 'youtube', 'total'], ...(data.by_day || []).map(d => [d.day, d.facebook, d.instagram, d.youtube, d.total])],
+    conversion: () => [['month', 'contacts', 'booked', 'booked_now', 'conversion_pct'], ...(data.months || []).map(m => [m.month, m.contacts, m.booked, m.booked_now, m.contacts ? Math.round((m.booked / m.contacts) * 1000) / 10 : 0])],
     staff: () => [['name', 'role', 'handled', 'public_replies', 'private_replies', 'median_min', 'p90_min', 'within_sla'], ...(data.by_agent || []).map(a => [a.name, a.role, a.handled, a.public_replies, a.private_replies, a.median_minutes, a.p90_minutes, a.within_sla])],
     posts: () => [['post', 'platform', 'comments', 'waiting', 'link'], ...(data.top_posts || []).map(p => [p.caption, p.platform, p.n, p.pending, p.permalink])],
     interest: () => [['step', 'count'], ...['interested', 'public_replied', 'private_sent', 'private_by_ai', 'conversations', 'customer_replied', 'booked_now'].map(k => [k, data[k]])],
@@ -389,6 +394,79 @@ function exportCsv(tab, data, t) {
   a.href = url; a.download = `comments-${tab}-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// ─── من الكومنتات ← حجز ───────────────────────────────────────────────
+function Conversion({ data, t }) {
+  const months = data?.months || []
+  const cur = months[0]
+  const pct = (m) => (m?.contacts ? `${Math.round((m.booked / m.contacts) * 1000) / 10}%` : '—')
+  const monthLabel = (d) => { try { return new Date(d).toLocaleDateString(undefined, { month: 'long', year: 'numeric' }) } catch { return d } }
+  if (!data?.tag_id) return <Card><p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.conv.noTag')}</p></Card>
+  return (<>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <Kpi label={t('comments.reports.conv.contacts', { m: cur ? monthLabel(cur.month) : '' })} value={fmt(cur?.contacts)} />
+      <Kpi label={t('comments.reports.conv.booked')} value={fmt(cur?.booked)} tone="text-success" />
+      <Kpi label={t('comments.reports.conv.rate')} value={pct(cur)} />
+      <Kpi label={t('comments.reports.conv.bookedNow')} value={fmt(cur?.booked_now)} hint={t('comments.reports.conv.bookedNowHint')} />
+    </div>
+    <Card title={t('comments.reports.conv.byMonth')}>
+      {!months.length ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
+        <table className="w-full text-xs">
+          <thead><tr className="text-fg-subtle">
+            <th className="text-start font-medium pb-2">{t('comments.reports.conv.month')}</th>
+            <th className="font-medium pb-2">{t('comments.reports.conv.contactsCol')}</th>
+            <th className="font-medium pb-2">{t('comments.reports.conv.booked')}</th>
+            <th className="font-medium pb-2">{t('comments.reports.conv.rate')}</th>
+          </tr></thead>
+          <tbody>{months.map(m => (
+            <tr key={m.month} className="border-t border-surface-3 text-center tabular-nums">
+              <td className="py-2 text-start text-fg">{monthLabel(m.month)}</td>
+              <td className="py-2 text-fg">{fmt(m.contacts)}</td>
+              <td className="py-2 text-success">{fmt(m.booked)}</td>
+              <td className="py-2 text-fg-muted">{pct(m)}</td>
+            </tr>
+          ))}</tbody>
+        </table>
+      )}
+      <p className="text-[10px] text-fg-subtle mt-2 leading-relaxed">{t('comments.reports.conv.hint')}</p>
+    </Card>
+    <Card title={t('comments.reports.conv.stages')}>
+      <Bars rows={(data.stages || []).map(s => ({ label: s.name, value: s.n, color: s.name === 'تم الحجز' ? 'bg-success' : undefined }))} />
+    </Card>
+  </>)
+}
+
+// ─── حضور فريق التعليقات (من نبضات الحضور) ──────────────────────────────
+function Attendance({ rows, t }) {
+  const hrs = (m) => (m >= 60 ? `${Math.floor(m / 60)} ${t('comments.reports.hr')}${m % 60 ? ` ${m % 60} ${t('comments.reports.min')}` : ''}` : `${m} ${t('comments.reports.min')}`)
+  return (
+    <Card title={t('comments.reports.att.title')}>
+      {!rows.length ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
+        <div className="overflow-x-auto">
+          <table className="w-full text-xs">
+            <thead><tr className="text-fg-subtle">
+              <th className="text-start font-medium pb-2">{t('comments.reports.agent')}</th>
+              <th className="font-medium pb-2">{t('comments.reports.att.active')}</th>
+              <th className="font-medium pb-2">{t('comments.reports.att.days')}</th>
+              <th className="font-medium pb-2">{t('comments.reports.att.lastSeen')}</th>
+              <th className="font-medium pb-2">{t('comments.reports.att.pending')}</th>
+            </tr></thead>
+            <tbody>{rows.map(a => (
+              <tr key={a.id} className="border-t border-surface-3 text-center tabular-nums">
+                <td className="py-2 text-start text-fg font-medium">{a.name}</td>
+                <td className="py-2 text-fg">{hrs(a.active_minutes || 0)}</td>
+                <td className="py-2 text-fg-muted">{fmt(a.days)}</td>
+                <td className="py-2 text-fg-muted">{a.last_seen ? localeFormatDateTime(a.last_seen) : '—'}</td>
+                <td className={`py-2 ${a.pending ? 'text-amber-500' : 'text-fg-muted'}`}>{fmt(a.pending)}</td>
+              </tr>
+            ))}</tbody>
+          </table>
+        </div>
+      )}
+      <p className="text-[10px] text-fg-subtle mt-2 leading-relaxed">{t('comments.reports.att.hint')}</p>
+    </Card>
+  )
 }
 
 function slaLabel(minutes, t) {
