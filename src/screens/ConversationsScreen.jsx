@@ -2,6 +2,7 @@ import { useState, useEffect, useLayoutEffect, useRef, useCallback, useMemo } fr
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch } from '../lib/supabase'
+import { getLifecycleStages, getChannels, getTags, getCustomFieldDefinitions, getQuickReplies } from '../lib/staticData'
 import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
@@ -478,8 +479,8 @@ export default function ConversationsScreen() {
     setAgentsMap(aMap); screenCache.agentsMap = aMap
     setAgentsList(agentsData || []); screenCache.agentsList = agentsData || []
 
-    const { data: lcStages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
-    setLifecycles(lcStages || []); screenCache.lifecycles = lcStages || []
+    const lcStages = await getLifecycleStages().catch(() => [])
+    setLifecycles(lcStages); screenCache.lifecycles = lcStages
 
     const { data: aiSettings } = await supabase.from('ai_settings').select('enabled').limit(1).maybeSingle()
     setAiEnabled(!!aiSettings?.enabled); screenCache.aiEnabled = !!aiSettings?.enabled
@@ -487,14 +488,12 @@ export default function ConversationsScreen() {
     // كل القنوات المتربطة (ممكن يكون أكتر من واحدة لنفس المنصة) — عشان نعرض تاب منفصل لكل واحدة
     // بدل ما يترصوا فوق بعض، ونوري اسم القناة جوه كل كارت محادثة وجوه الشات نفسه
     try {
-      const res = await apiFetch(`${API_URL}/channels`)
-      const data = await res.json()
-      const chs = (data.channels || []).filter(c => c.id && c.status === 'active')
+      const chs = (await getChannels()).filter(c => c.id && c.status === 'active')
       setAllChannels(chs); screenCache.allChannels = chs
     } catch { /* لو فشل، هتفضل التابات العادية شغالة زي ما هي */ }
 
-    const { data: tagRows } = await supabase.from('tags').select('id, name, color').order('name')
-    setTagsList(tagRows || []); screenCache.tagsList = tagRows || []
+    const tagRows = await getTags().catch(() => [])
+    setTagsList(tagRows); screenCache.tagsList = tagRows
 
     if (agent?.id) {
       // team_members جدول RLS مقفول بالكامل (إدارة الفرق بالباك إند بس) — استعلام مباشر منه هنا
@@ -1023,12 +1022,13 @@ export default function ConversationsScreen() {
     screenCache.selectedSegmentId = selectedSegmentId
   }, [status, channel, search, viewMode, agentFilter, selectedLifecycle, unrepliedOnly, sidebarOpen, visibleLimit, selectedTagIds, selectedAdIds, dateFrom, dateTo, selectedSegmentId])
 
-  // بيانات الموظفين/التاجات/الـ lifecycle نادراً ما بتتغير، فبنجيبها مرة لما الشاشة تفتح وبعدين كل دقيقتين بس
+  // بيانات الموظفين/التاجات/الـ lifecycle/القنوات/الحملات نادراً ما بتتغير: بتتجاب أول مرة الشاشة تفتح بس، ومش تاني لحد ١٠ دقايق
+  // (الرجوع من محادثة للقائمة على الموبايل كان بيعيد ٨ طلبات كل مرة، غير التحديث كل دقيقتين)
   useEffect(() => {
     if (!agent) return
+    if (screenCache.staticAt && Date.now() - screenCache.staticAt < 10 * 60 * 1000) return
+    screenCache.staticAt = Date.now()
     fetchStaticLists()
-    const staticInterval = setInterval(fetchStaticLists, 120000)
-    return () => clearInterval(staticInterval)
   }, [fetchStaticLists, agent])
 
   // بنستخدم ref (مش state) عشان نعرف لحظيًا لو فيه بحث شغال دلوقتي، من غير ما نضطر نضيف search

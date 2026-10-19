@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch, FB_APP_ID, WHATSAPP_EMBEDDED_SIGNUP_CONFIG_ID, INSTAGRAM_APP_ID, FACEBOOK_LOGIN_CONFIG_ID, TIKTOK_APP_ID, TIKTOK_SCOPES } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
+import { invalidateStaticData } from '../lib/staticData'
 import i18n from '../i18n'
 import BackArrow from '../components/BackArrow'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -40,6 +41,8 @@ const TABS = [
 
 export default function SettingsScreen() {
   const { t } = useTranslation()
+  // مراحل الـlifecycle/التاجات/القنوات/الردود السريعة/الحقول المخصصة بتتعدل هنا: نمسح الكاش المشترك أول ما الأدمن يخرج من الإعدادات
+  useEffect(() => () => invalidateStaticData(), [])
   const [tab, setTab] = useState('agents')
   const { agent, signOut } = useAuth()
   const navigate = useNavigate()

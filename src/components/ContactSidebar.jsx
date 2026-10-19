@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch } from '../lib/supabase'
+import { getLifecycleStages, getChannels, getTags, getCustomFieldDefinitions, getQuickReplies } from '../lib/staticData'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
@@ -105,14 +106,13 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   }, [contact?.id])
 
   const loadData = async () => {
-    const { data: stages } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
-    setLifecycles(stages || [])
-
-    const { data: defs } = await supabase.from('custom_field_definitions').select('*').order('field_order')
-    setCustomFields(defs || [])
-
-    const { data: allTagsData } = await supabase.from('tags').select('*').order('name')
-    setAllTags(allTagsData || [])
+    // القوائم الثابتة من الكاش المشترك (مش من الداتابيز مع كل فتح عميل)
+    const [stages, defs, allTagsData] = await Promise.all([
+      getLifecycleStages().catch(() => []), getCustomFieldDefinitions().catch(() => []), getTags().catch(() => [])
+    ])
+    setLifecycles(stages)
+    setCustomFields(defs)
+    setAllTags(allTagsData)
 
     const { data: pkgs } = await supabase.from('contact_packages').select('*').order('sort_order')
     setPackages(pkgs || [])

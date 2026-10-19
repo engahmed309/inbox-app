@@ -2,6 +2,7 @@ import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch } from '../lib/supabase'
+import { getLifecycleStages, getChannels, getTags, getCustomFieldDefinitions, getQuickReplies } from '../lib/staticData'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
@@ -355,14 +356,14 @@ export default function ChatScreen() {
       setAgents(ags || [])
 
       // Quick replies
-      const { data: qrs } = await supabase.from('quick_replies').select('*').order('name')
+      const qrs = await getQuickReplies().catch(() => [])
       if (cancelled) return
-      setQuickReplies(qrs || [])
+      setQuickReplies(qrs)
 
       // Lifecycle stages
-      const { data: lcs } = await supabase.from('lifecycle_stages').select('*').order('stage_order')
+      const lcs = await getLifecycleStages().catch(() => [])
       if (cancelled) return
-      setLifecycles(lcs || [])
+      setLifecycles(lcs)
     }
 
     loadData()
@@ -513,11 +514,10 @@ export default function ChatScreen() {
     let cancelled = false
     const checkChannel = async () => {
       try {
-        const res = await apiFetch(`${API_URL}/channels`)
-        const data = await res.json()
+        const channels = await getChannels()   // مشتركة ومتخزّنة ١٠ دقايق — مش طلب كل دقيقة لكل محادثة مفتوحة
         if (cancelled) return
         // لو المحادثة دي مرتبطة برقم/قناة معينة، اتأكد من القناة دي بالظبط (مش أي قناة من نفس المنصة)
-        const platformChannels = data.channels?.filter(c => c.platform === conv.platform) || []
+        const platformChannels = channels.filter(c => c.platform === conv.platform)
         const ch = conv.channel_id
           ? platformChannels.find(c => c.id === conv.channel_id)
           : platformChannels[0]
