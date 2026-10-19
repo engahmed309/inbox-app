@@ -738,7 +738,8 @@ export default function CommentsScreen() {
                                 <MenuItem icon={<UserPlus size={13} />} label={t('comments.assign')}
                                   onClick={() => { setMenuFor(null); setAssignFor(c) }} />
                               )}
-                              {isAdmin && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
+                              {/* ردّ بالذكاء الاصطناعي: للأدمن ولموظف التعليقات على التعليق اللي يقدر يتصرف فيه (مش مع زميل) */}
+                              {(isAdmin || !other) && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
                                 <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} onClick={() => { setMenuFor(null); setAiFor(c) }} />
                               )}
                               <MenuItem icon={<Archive size={13} />} label={t('comments.archive')} disabled={other}
