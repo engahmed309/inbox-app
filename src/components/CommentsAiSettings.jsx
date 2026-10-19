@@ -263,6 +263,12 @@ export default function CommentsAiSettings() {
 
           <Section title={t('comments.ai.liveTitle')} hint={t('comments.ai.liveHint')}>
             <Toggle checked={form.ignore_live_comments !== false} onChange={v => set({ ignore_live_comments: v })} label={t('comments.ai.liveIgnore')} />
+            {form.ignore_live_comments !== false && (
+              <div className="mt-3">
+                <Toggle checked={form.live_protection_enabled !== false} onChange={v => set({ live_protection_enabled: v })} label={t('comments.ai.liveProtect')} />
+                <p className="text-[10px] text-fg-subtle mt-1.5 leading-relaxed">{t('comments.ai.liveProtectHint')}</p>
+              </div>
+            )}
           </Section>
 
           <Section title={t('comments.ai.originTagTitle')} hint={t('comments.ai.originTagHint')}>

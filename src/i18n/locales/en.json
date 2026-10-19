@@ -2450,6 +2450,8 @@
       "liveTitle": "Live video comments (Facebook)",
       "liveHint": "Live-stream comments come in the hundreds per hour (“no sound”, “hello”…) and answering them with AI is costly and pointless. When on, live comments are not stored, not shown in Comments, not checked and not replied to. A post is recognised as a live by Facebook itself (running or finished).",
       "liveIgnore": "Ignore live video comments",
+      "liveProtect": "Live comment protection (hide abuse and links)",
+      "liveProtectHint": "No AI, no cost: a live comment with an explicit abusive word or a link is hidden on the page and shown in Comment protection for the admin (approve deletion or restore it). Other live comments are ignored. Facebook only.",
       "originTagTitle": "\"Came from comments\" tag",
       "originTagHint": "Any customer whose first contact with us was a private reply to a comment (by the AI or a team member) gets this tag automatically. At month end, filter customers by this tag + the \"Booked\" lifecycle stage to see how many bookings came from comments.",
       "originTagLabel": "Tag",
