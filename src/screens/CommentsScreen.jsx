@@ -183,13 +183,16 @@ export default function CommentsScreen() {
 
   // العدّاد مابيعدّش نتيجة البحث، فمؤشر "فيه جديد" بيتوقف أثناء البحث
   const pendingChanges = !debouncedSearch && !postFilter && seenCount !== null && counts[status] !== undefined && counts[status] !== seenCount
+  // الزرار بيظهر بس لما فيه تعليقات جديدة وصلت. لو العدد قلّ (الذكاء الاصطناعي أو زميل عالج تعليقات) ده مش "تحديث" يستاهل زرار —
+  // القائمة بتتحدّث لوحدها لما الموظف يكون فوق، وإلا بيفضل اللي قدامه زي ما هو
+  const showRefreshButton = pendingChanges && counts[status] > seenCount
 
   // التعليقات الجديدة تظهر لوحدها: لو الموظف فوق في القائمة ومش في نص إجراء (رد/تعيين/قايمة مفتوحة) بنحدّث من غير ما يضغط.
   // لو نازل في القائمة أو بيرد على حاجة، بنسيب الزرار بدل ما نقفز بالقائمة تحت إيده. التحميل من غير سبينر عشان ماترمّش
   useEffect(() => {
     if (!pendingChanges || loading) return
     const idle = !replyTo && !assignFor && !menuFor && !deleting && !busy
-    if (idle && (scrollRef.current?.scrollTop ?? 0) < 80) load()
+    if (idle && (scrollRef.current?.scrollTop ?? 0) < 200) load()
   }, [pendingChanges, loading, replyTo, assignFor, menuFor, deleting, busy, load])
 
   // بعد أي إجراء بنعدّل الصف مكانه ونحدّث العدادات بس — مابنعيدش تحميل القائمة، عشان الموظف
@@ -557,7 +560,7 @@ export default function CommentsScreen() {
           </div>
         )}
 
-        {pendingChanges && !loading && (
+        {showRefreshButton && !loading && (
           <button onClick={() => { setLoading(true); load() }}
             className="mx-4 mt-2 py-1.5 rounded-full bg-brand/15 text-brand text-[11px] font-medium">
             {t('comments.refreshAvailable')}
