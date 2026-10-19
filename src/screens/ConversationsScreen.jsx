@@ -1054,11 +1054,22 @@ export default function ConversationsScreen() {
     // الصفوف بصفحات متوازية). مع رسايل كتير واردة في نفس الوقت (طبيعي مع قاعدة عملاء بالحجم ده)،
     // ده كان بيسبب عشرات نداءات fetchConversations المتكدسة فوق بعض كل ثانية = بطء حقيقي وواضح.
     // الحل: نجمع أي عدد أحداث توصل خلال نافذة قصيرة (١.٥ ثانية) ونعمل fetch واحد بس بعد ما تهدأ
+    // الـdebounce لوحده ماكانش كفاية: مع رسايل بتوصل كل كام ثانية طول اليوم، كل جهاز فاتح الشاشة (موظفين + موبايلات + تابات
+    // في الخلفية) كان بيعمل الجلب التقيل ده (محادثات + عدادات + قراءات + آخر رسالة + تاجات) كل ٢-٤ ثواني، والداتابيز الصغيرة
+    // بتقع تحت الحمل ده (١٩ أكتوبر). دلوقتي: جلب واحد كل ١٥ ثانية بالكتير لكل جهاز، ومفيش جلب خالص والتاب مش ظاهرة —
+    // أول ما الموظف يرجع للتاب بتتحدّث فورًا (handleVisibility تحت)
+    const MIN_GAP_MS = 15000
     const debounceTimerRef = { current: null }
+    let lastRealtimeFetch = 0
     const debouncedFetch = () => {
-      if (searchActiveRef.current) return
-      clearTimeout(debounceTimerRef.current)
-      debounceTimerRef.current = setTimeout(fetchConversations, 1500)
+      if (searchActiveRef.current || document.hidden || debounceTimerRef.current) return
+      const wait = Math.max(1500, lastRealtimeFetch + MIN_GAP_MS - Date.now())
+      debounceTimerRef.current = setTimeout(() => {
+        debounceTimerRef.current = null
+        if (document.hidden) return
+        lastRealtimeFetch = Date.now()
+        fetchConversations()
+      }, wait)
     }
 
     // لما الـeffect ده يتنضّف (فلتر اتغيّر) القناة القديمة بتتقفل، وحدث الإقفال بيوصل لـcallback الـsubscribe
@@ -1072,8 +1083,9 @@ export default function ConversationsScreen() {
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
     realtimeRef.current = supabase
       .channel(`convs-list-${Date.now()}`)
+      // الاشتراك على كل رسايل النظام (messages INSERT) اتشال: كل رسالة بتحدّث صف المحادثة نفسه (last_message_at)
+      // فحدث conversations كفاية، والاشتراك ده كان بيخلّي Realtime يفحص كل رسالة لكل موظف فاتح الشاشة
       .on('postgres_changes', { event: '*', schema: 'public', table: 'conversations' }, debouncedFetch)
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, debouncedFetch) // تحديث آخر رسالة
       .subscribe((status) => {
         if (disposed) return
         if (status === 'CLOSED' || status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
@@ -1088,7 +1100,7 @@ export default function ConversationsScreen() {
     // بيعيد إنشاء الـslot) — فقبل كده لو حدث فات، القايمة كانت بتفضل قديمة لحد ٥ دقايق. دلوقتي شبكة الأمان ذكية:
     // كل ٢٠ ثانية استعلام واحد خفيف (آخر نشاط في النظام كله، ~٠.١ مللي ثانية بفهرس) — لو اتغيّر نجيب القايمة فورًا،
     // ولو ما اتغيّرش مفيش جلب تقيل. وجلب كامل كل دقيقة لو Realtime سليم، وكل ٢٠ ثانية لو واقع
-    const handleVisibility = () => { if (!searchActiveRef.current) fetchConversations() }
+    const handleVisibility = () => { if (!searchActiveRef.current && !document.hidden) fetchConversations() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
     let ticks = 0
@@ -1104,10 +1116,12 @@ export default function ConversationsScreen() {
     }
     const pollInterval = setInterval(async () => {
       ticks++
-      if (searchActiveRef.current) return
+      if (searchActiveRef.current || document.hidden) return
+      // Realtime سليم: هو اللي بيحدّث، والجلب الكامل الاحتياطي كل دقيقة. Realtime واقع: الفحص الخفيف كل ٢٠ ثانية زي الأول
+      if (realtimeHealthyRef.current) { if (ticks % 3 === 0) fetchConversations(); return }
       let changed = false
       try { changed = await latestActivityChanged() } catch { /* لو فشل الاستعلام الخفيف، الجلب الدوري تحت كفاية */ }
-      if (changed || !realtimeHealthyRef.current || ticks % 3 === 0) fetchConversations()
+      if (changed || ticks % 3 === 0) fetchConversations()
     }, 20000)
 
     return () => {
