@@ -88,6 +88,9 @@ export default function CommentsAiSettings() {
       if (!res.ok) throw new Error(d.error)
       setForm(d.settings); setSaved(d.settings)
       toast.success(t('comments.ai.saved'))
+      if (body.origin_tag_new_name) {   // تاج جديد اتعمل: نحدّث القائمة
+        apiFetch(`${API_URL}/comments/ai/settings`).then(r => r.json()).then(m => m.tags && setMeta(prev => ({ ...prev, tags: m.tags }))).catch(() => {})
+      }
     } catch (err) { toast.error(err.message) } finally { setSaving(false) }
   }
 
@@ -260,6 +263,25 @@ export default function CommentsAiSettings() {
 
           <Section title={t('comments.ai.liveTitle')} hint={t('comments.ai.liveHint')}>
             <Toggle checked={form.ignore_live_comments !== false} onChange={v => set({ ignore_live_comments: v })} label={t('comments.ai.liveIgnore')} />
+          </Section>
+
+          <Section title={t('comments.ai.originTagTitle')} hint={t('comments.ai.originTagHint')}>
+            <div className="flex flex-wrap items-end gap-3">
+              <label className="block">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.originTagLabel')}</span>
+                <select value={form.origin_tag_id || ''} onChange={e => set({ origin_tag_id: e.target.value || null, origin_tag_new_name: '' })}
+                  className="w-full sm:w-64 bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg">
+                  <option value="">{t('comments.ai.originTagNone')}</option>
+                  {(meta.tags || []).map(tg => <option key={tg.id} value={tg.id}>{tg.name}</option>)}
+                </select>
+              </label>
+              <label className="block">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.originTagNew')}</span>
+                <input value={form.origin_tag_new_name || ''} onChange={e => set({ origin_tag_new_name: e.target.value })} maxLength={60}
+                  placeholder={t('comments.ai.originTagNewPh')} className="w-full sm:w-56 bg-surface-3 rounded-lg px-2.5 py-2 text-sm text-fg" />
+              </label>
+            </div>
+            <p className="text-[10px] text-fg-subtle mt-2 leading-relaxed">{t('comments.ai.originTagNote')}</p>
           </Section>
 
           <Section title={t('comments.ai.likeTitle')} hint={t('comments.ai.likeHint')}>
