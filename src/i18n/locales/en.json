@@ -2308,6 +2308,7 @@
       "selectAll": "Select all",
       "selected": "{{n}} selected",
       "hiddenOnPage": "Hidden on the page",
+      "live": "Live",
       "noText": "(comment without text)",
       "openPost": "Open post",
       "loadMore": "Show more",

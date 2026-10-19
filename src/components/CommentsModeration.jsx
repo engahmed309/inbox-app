@@ -237,6 +237,7 @@ function Queue({ t, toast, onChanged }) {
                 <div className="flex items-center gap-1.5 flex-wrap text-[11px] text-fg-subtle">
                   {PLATFORM_ICONS[c.platform]}
                   <span className="text-fg font-semibold text-[13px] truncate">{c.author_name || '—'}</span>
+                  {c.from_live && <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-danger/15 text-danger">🔴 {t('comments.mod.live')}</span>}
                   <span>·</span><span>{localeFormatDateTime(c.posted_at)}</span>
                   {c.hidden_at && pending && <span className="inline-flex items-center gap-1 text-amber-500"><EyeOff size={11} />{t('comments.mod.hiddenOnPage')}</span>}
                 </div>
