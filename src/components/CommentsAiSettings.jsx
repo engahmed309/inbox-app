@@ -258,6 +258,10 @@ export default function CommentsAiSettings() {
 
           <LearningSection form={form} set={set} />
 
+          <Section title={t('comments.ai.liveTitle')} hint={t('comments.ai.liveHint')}>
+            <Toggle checked={form.ignore_live_comments !== false} onChange={v => set({ ignore_live_comments: v })} label={t('comments.ai.liveIgnore')} />
+          </Section>
+
           <Section title={t('comments.ai.likeTitle')} hint={t('comments.ai.likeHint')}>
             <Toggle checked={!!form.auto_like_enabled} onChange={v => set({ auto_like_enabled: v })} label={t('comments.ai.likeEnable')} />
           </Section>
