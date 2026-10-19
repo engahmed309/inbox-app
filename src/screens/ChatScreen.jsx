@@ -318,6 +318,12 @@ export default function ChatScreen() {
         if (ag) setConv(prev => ({ ...prev, agentName: ag.name, agentAvatarUrl: ag.avatar_url }))
       }
 
+      // محادثة مقفولة ممكن تكون رسايلها متأرشفة (ساكتة من ٣ شهور): بنرجّعها للجدول الأساسي الأول (ثواني) وبعدين نجيبها
+      if (convData?.status === 'closed') {
+        try { await apiFetch(`${API_URL}/conversations/${id}/restore-history`, { method: 'POST' }) } catch { /* لو فشل بنعرض اللي موجود */ }
+        if (cancelled) return
+      }
+
       // Messages + Assignment log
       await fetchMessages(false)
       if (cancelled) return
@@ -387,7 +393,8 @@ export default function ChatScreen() {
           // شيل أي temp messages وضيف الحقيقي
           const withoutTemps = prev.filter(m => !m._temp)
           if (withoutTemps.find(m => m.id === newMsg.id)) return withoutTemps
-          return [...withoutTemps, newMsg]
+          // بالترتيب الزمني: رسايل قديمة راجعة من الأرشيف بتوصل كـ INSERT برضه، ومكانها مش آخر الشات
+          return [...withoutTemps, newMsg].sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
         })
         scrollToBottom()
         // ملحوظة: مبنعملش mark as read هنا — تفضل غير مقروءة لحد ما نرد فعلياً
