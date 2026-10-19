@@ -7,7 +7,7 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert, ThumbsUp
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert, ThumbsUp, LogOut
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
@@ -45,7 +45,7 @@ function readSidebarPref() {
 
 export default function CommentsScreen() {
   const { t } = useTranslation()
-  const { agent } = useAuth()
+  const { agent, signOut, setStatus: setAgentStatus } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [view, setView] = useState('inbox')       // inbox | reports | ai | protection
@@ -499,6 +499,24 @@ export default function CommentsScreen() {
           </Section>
         )}
       </div>
+      {/* موظف التعليقات بس مابيشوفش شاشة المحادثات (اللي فيها الحالة والخروج) — فبنحطهم هنا عشان مايتزنقش:
+          يقدر يبقى "نشط" (التوزيع بيعتمد عليها) ويسجّل خروج */}
+      {!isAdmin && agent?.access_scope === 'comments' && (
+        <div className="border-t border-surface-3 px-3 pt-3 pb-safe pb-3 space-y-2">
+          <div className="flex items-center gap-2">
+            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${agent?.status === 'online' ? 'bg-success' : agent?.status === 'busy' ? 'bg-follow' : 'bg-fg-subtle'}`} />
+            <span className="flex-1 min-w-0 text-[13px] text-fg truncate">{agent?.name}</span>
+            <select value={agent?.status || 'offline'} onChange={e => setAgentStatus(agent.id, e.target.value)}
+              className="bg-surface-3 rounded-lg px-2 py-1 text-[12px] text-fg">
+              {['online', 'busy', 'offline'].map(k => <option key={k} value={k}>{t(`conversations.agentStatus.${k}`)}</option>)}
+            </select>
+          </div>
+          <button onClick={async () => { await signOut(); navigate('/login') }}
+            className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-danger hover:bg-danger/10">
+            <LogOut size={15} /><span>{t('comments.signOut')}</span>
+          </button>
+        </div>
+      )}
     </aside>
   )
 
