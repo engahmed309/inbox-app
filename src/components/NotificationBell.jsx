@@ -68,17 +68,30 @@ export default function NotificationBell() {
     .eq('agent_id', agent.id).eq('is_read', false).in('type', types)
 
   // دايمًا بيرجّع لأول صفحة من القسم الحالي (أول تحميل، تغيير القسم/الفلتر، أو أي حدث لحظي جديد)
+  // القايمة نفسها (استعلام فيه joins) بتتجاب بس والجرس مفتوح؛ وهو مقفول بنحدّث الأرقام بس — كل إشعار جديد كان بيعمل
+  // ٤ استعلامات على كل جهاز للأدمن حتى والجرس مقفول (جزء من حمل الداتابيز يوم ١٩ أكتوبر)
+  const openRef = useRef(false)
+  openRef.current = open
   const load = async () => {
     if (!agent?.id) return
-    const [{ data, error }, ...unread] = await Promise.all([
-      buildQuery(0, NOTIFICATIONS_PAGE_SIZE),
+    const withList = openRef.current
+    const [listRes, ...unread] = await Promise.all([
+      withList ? buildQuery(0, NOTIFICATIONS_PAGE_SIZE) : Promise.resolve(null),
       ...TABS.map(x => countUnread(x.types))
     ])
+    setCounts(Object.fromEntries(TABS.map((x, i) => [x.key, unread[i]?.count || 0])))
+    if (!withList) return
+    const { data, error } = listRes
     if (error) { console.error('فشل تحميل الإشعارات:', error.message); return }
     setItems(data || [])
-    setCounts(Object.fromEntries(TABS.map((x, i) => [x.key, unread[i]?.count || 0])))
     loadedCountRef.current = (data || []).length
     setHasMore((data || []).length === NOTIFICATIONS_PAGE_SIZE)
+  }
+  // تجميع الأحداث اللحظية: ١٠ إشعارات ورا بعض = تحميل واحد بعد ثانيتين
+  const loadTimerRef = useRef(null)
+  const loadSoon = () => {
+    clearTimeout(loadTimerRef.current)
+    loadTimerRef.current = setTimeout(load, 2000)
   }
 
   const loadMore = async () => {
@@ -98,17 +111,17 @@ export default function NotificationBell() {
     const channel = supabase
       .channel(`notifications-${agent.id}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'notifications', filter: `agent_id=eq.${agent.id}` }, () => {
-        load()
+        loadSoon()
       })
       .subscribe()
-    return () => { supabase.removeChannel(channel) }
+    return () => { supabase.removeChannel(channel); clearTimeout(loadTimerRef.current) }
   }, [agent?.id])
 
   const mountedRef = useRef(false)
   useEffect(() => {
     if (!mountedRef.current) { mountedRef.current = true; return } // أول تحميل بيعمله الـeffect اللي فوق
     load()
-  }, [tab, unreadOnly, employee])
+  }, [tab, unreadOnly, employee, open])
 
   // قايمة الموظفين لفلتر التأخيرات (الأدمن بس)
   useEffect(() => {

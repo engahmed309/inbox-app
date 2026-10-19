@@ -368,8 +368,9 @@ export default function ChatScreen() {
     loadData()
 
     // ─── Realtime ─────────────────────────────────────────
-    // بنستخدم subscription من غير filter سيرفر-سايد ونفلتر يدوي بالـ conversation_id،
-    // لأن الـ filtered subscriptions أحياناً بتفوت أحداث وقت التبديل بين محادثات بسرعة
+    // الاشتراكات بقت بفلتر على السيرفر (المحادثة دي بس). من غير فلتر، Realtime كان بيفحص كل رسالة في النظام لكل موظف
+    // فاتح محادثة — وده كان من أكبر أسباب تقل الداتابيز (١٩ أكتوبر). لو حدث فات وقت التبديل السريع، الاستقصاء تحت بيلحقه
+    // (الفلتر اليدوي بالـ conversation_id لسه موجود كحماية إضافية)
     if (realtimeRef.current) realtimeRef.current.unsubscribe()
     realtimeRef.current = supabase
       .channel(`messages-${id}-${Date.now()}`)
@@ -377,6 +378,7 @@ export default function ChatScreen() {
         event: 'INSERT',
         schema: 'public',
         table: 'messages',
+        filter: `conversation_id=eq.${id}`,
       }, (payload) => {
         const newMsg = payload.new
         if (newMsg.conversation_id !== id) return
@@ -393,6 +395,7 @@ export default function ChatScreen() {
         event: 'UPDATE',
         schema: 'public',
         table: 'messages',
+        filter: `conversation_id=eq.${id}`,
       }, (payload) => {
         // بيغطي تحديث حالة التسليم/القراءة (sent/delivered/read) وأي تعديل تاني على رسالة موجودة
         const updated = payload.new
@@ -405,6 +408,7 @@ export default function ChatScreen() {
         event: 'INSERT',
         schema: 'public',
         table: 'conversation_activity_log',
+        filter: `conversation_id=eq.${id}`,
       }, (payload) => {
         if (payload.new.conversation_id !== id) return
         fetchMessages(false)
@@ -413,6 +417,7 @@ export default function ChatScreen() {
         event: 'UPDATE',
         schema: 'public',
         table: 'conversations',
+        filter: `id=eq.${id}`,
       }, (payload) => {
         if (payload.new.id !== id) return
         setConv(prev => prev ? { ...prev, ...payload.new } : prev)
@@ -459,7 +464,7 @@ export default function ChatScreen() {
 
     // لو التاب/التطبيق راح للخلفية (زي فتح تطبيق تاني تبعت منه) وبعدين رجع،
     // المتصفح ممكن يكون وقف اتصال الـ Realtime، فلما يرجع نجيب أي رسايل فاتت فوراً
-    const handleVisibility = () => { fetchMessages() }
+    const handleVisibility = () => { if (!document.hidden) fetchMessages() }
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
@@ -478,13 +483,15 @@ export default function ChatScreen() {
       if (cancelled || !c) return
       setConv(prev => (prev && prev.assigned_agent_id !== c.assigned_agent_id ? { ...prev, assigned_agent_id: c.assigned_agent_id } : prev))
     }
-    // الرسايل كل ٤ ثواني، والتعيين كل ١٢ ثانية بس (الـRealtime بيوصّل تغيير التعيين لحظيًا في العادة)
+    // الرسايل كل ٦ ثواني، والتعيين كل ١٨ ثانية (الـRealtime بيوصّل الجديد لحظيًا في العادة). ومفيش استقصاء خالص والتاب مش ظاهرة:
+    // لما الموظف يرجع، handleVisibility فوق بتجيب اللي فات فورًا
     let pollTick = 0
     const pollInterval = setInterval(() => {
+      if (document.hidden) return
       pollTick++
       fetchMessages(false, pollTick % 4 === 0)
       if (pollTick % 3 === 0) refreshAssignment()
-    }, 4000)
+    }, 6000)
 
     return () => {
       cancelled = true
