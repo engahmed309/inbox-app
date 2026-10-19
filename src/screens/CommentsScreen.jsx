@@ -45,10 +45,11 @@ function readSidebarPref() {
 
 export default function CommentsScreen() {
   const { t } = useTranslation()
-  const { agent, signOut, setStatus: setAgentStatus } = useAuth()
+  const { agent, signOut } = useAuth()
   const toast = useToast()
   const navigate = useNavigate()
   const [view, setView] = useState('inbox')       // inbox | reports | ai | protection
+  const [showMoreTools, setShowMoreTools] = useState(false)
   const [canModerate, setCanModerate] = useState(false)   // الأدمن + فريق التعليقات: مراجعة المحجوز والحظر (السيرفر بيرجّع العدد ليهم بس)
   const [modPending, setModPending] = useState(0)    // تعليقات محجوزة للأدمن (سبام/إساءة) بانتظار موافقة/رفض
   const [status, setStatus] = useState('new')
@@ -387,11 +388,6 @@ export default function CommentsScreen() {
     { key: 'ignored', icon: <Ban size={15} /> },
     { key: 'archived', icon: <Archive size={15} /> },
   ]
-  const scopeItems = [
-    { key: 'all', icon: <Users size={15} /> },
-    { key: 'mine', icon: <UserCheck size={15} /> },
-    { key: 'unassigned', icon: <Inbox size={15} /> },
-  ]
 
   const NavItem = ({ active, icon, label, count, onClick }) => (
     <button onClick={onClick}
@@ -423,61 +419,17 @@ export default function CommentsScreen() {
         </button>
       </div>
       <div className="flex-1 overflow-y-auto px-2 pb-4">
+        {/* الترتيب: الأقسام ← فريق التعليقات (للأدمن: مين معاه إيه) ← الحالة ← المنصة ← الأدوات. موظف التعليقات بيشوف اللي يخصه بس */}
         <Section title={t('comments.sections.areas')}>
           <NavItem active={view === 'inbox'} icon={<MessageSquare size={15} />} label={t('comments.areas.inbox')} count={view === 'inbox' ? 0 : byPlatform.all} onClick={() => { setView('inbox'); afterPick() }} />
-          {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
-          {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
           {canModerate && <NavItem active={view === 'protection'} icon={<ShieldAlert size={15} />} label={t('comments.areas.protection')} count={modPending} onClick={() => { setView('protection'); afterPick() }} />}
+          {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
+          {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
         </Section>
-        {view === 'inbox' && (<>
-        <Section title={t('comments.sections.platform')}>
-          {platformItems.map(p => (
-            <NavItem key={p.key} active={platform === p.key} icon={p.icon} label={p.label}
-              count={byPlatform[p.key]} onClick={() => { setPlatform(p.key); afterPick() }} />
-          ))}
-        </Section>
-        <Section title={t('comments.sections.status')}>
-          {statusItems.map(s => (
-            <NavItem key={s.key} active={status === s.key} icon={s.icon} label={t(`comments.status.${s.key}`)}
-              count={counts[s.key]} onClick={() => { setStatus(s.key); afterPick() }} />
-          ))}
-        </Section>
-        <Section title={t('comments.sections.owner')}>
-          {scopeItems.map(s => (
-            <NavItem key={s.key} active={scope === s.key} icon={s.icon} label={t(`comments.scope.${s.key}`)}
-              count={s.key === 'all' ? 0 : byScope[s.key]} onClick={() => { setScope(s.key); afterPick() }} />
-          ))}
-        </Section>
-        </>)}
-        {aiStatus && (
-          <Section title={t('comments.aiCard.title')}>
-            <div className="mx-1 rounded-xl bg-surface-3 px-3 py-2.5 space-y-1">
-              <div className="flex items-center gap-2">
-                <span className={`w-2.5 h-2.5 rounded-full ${aiStatus.available && aiStatus.active ? 'bg-success' : 'bg-fg-subtle'}`} />
-                <span className={`text-[12px] font-semibold ${aiStatus.available && aiStatus.active ? 'text-success' : 'text-fg-muted'}`}>
-                  {!aiStatus.available ? t('comments.aiCard.unavailable') : t(`comments.aiCard.${aiStatus.mode === 'live' ? 'live' : aiStatus.mode === 'draft' ? 'draft' : 'off'}`)}
-                </span>
-              </div>
-              {aiStatus.active && (<>
-                <p className="text-[11px] text-fg-muted">{t('comments.aiCard.queue', { pending: aiStatus.pending, processing: aiStatus.processing, drafts: aiStatus.drafts })}</p>
-                {aiStatus.next_run_at && aiStatus.pending > 0 && (
-                  <p className="text-[11px] text-fg-subtle">{t('comments.aiCard.next', { s: Math.max(0, Math.round((new Date(aiStatus.next_run_at).getTime() - Date.now()) / 1000)) })}</p>
-                )}
-                <p className="text-[11px] text-fg-subtle">{t('comments.aiCard.day', { replied: aiStatus.replied_24h, back: aiStatus.handed_back_24h })}</p>
-              </>)}
-              <div className="flex items-center gap-3 pt-0.5">
-                {aiStatus.agent_id && (
-                  <button onClick={() => { setView('inbox'); setScope(scope === `agent:${aiStatus.agent_id}` ? 'all' : `agent:${aiStatus.agent_id}`); afterPick() }}
-                    className="text-[11px] text-brand hover:underline">{t('comments.aiCard.filter')}</button>
-                )}
-                {isAdmin && <button onClick={() => { setView('ai'); afterPick() }} className="text-[11px] text-brand hover:underline">{t('comments.aiCard.settings')}</button>}
-                {isAdmin && aiStatus.active && <button onClick={stopAllAi} className="text-[11px] text-danger hover:underline">{t('comments.aiCard.stopAll')}</button>}
-              </div>
-            </div>
-          </Section>
-        )}
-        {team && (
+
+        {isAdmin && team && (
           <Section title={team.team ? t('comments.sections.team', { name: team.team.name }) : t('comments.sections.teamNone')}>
+            <NavItem active={scope === 'all'} icon={<Users size={15} />} label={t('comments.scope.all')} onClick={() => { setView('inbox'); setScope('all'); afterPick() }} />
             {team.members.length === 0 ? (
               <p className="px-3 py-1 text-[11px] text-fg-subtle">{t('comments.noMembers')}</p>
             ) : team.members.map(m => (
@@ -492,7 +444,7 @@ export default function CommentsScreen() {
                   )}
                   <span className={`absolute -bottom-0.5 -end-0.5 w-2.5 h-2.5 rounded-full border-2 border-surface-2 ${m.online ? 'bg-success' : 'bg-fg-subtle'}`} />
                 </span>
-                <span className="flex-1 min-w-0">
+                <span className="flex-1 min-w-0 text-start">
                   <span className="block text-[13px] text-fg truncate">{m.name}</span>
                   <span className={`block text-[10px] ${m.online ? 'text-success' : 'text-fg-subtle'}`}>
                     {m.is_ai
@@ -503,33 +455,71 @@ export default function CommentsScreen() {
                 {m.pending > 0 && <span className="text-[11px] tabular-nums px-1.5 rounded-full bg-surface-3 text-fg-subtle" title={t('comments.team.pending')}>{m.pending}</span>}
               </button>
             ))}
+            <NavItem active={scope === 'unassigned'} icon={<Inbox size={15} />} label={t('comments.scope.unassigned')} count={byScope.unassigned} onClick={() => { setView('inbox'); setScope('unassigned'); afterPick() }} />
           </Section>
         )}
+
+        {view === 'inbox' && (<>
+          <Section title={t('comments.sections.status')}>
+            {statusItems.map(s => (
+              <NavItem key={s.key} active={status === s.key} icon={s.icon} label={t(`comments.status.${s.key}`)}
+                count={counts[s.key]} onClick={() => { setStatus(s.key); afterPick() }} />
+            ))}
+          </Section>
+          <Section title={t('comments.sections.platform')}>
+            {platformItems.map(p => (
+              <NavItem key={p.key} active={platform === p.key} icon={p.icon} label={p.label}
+                count={byPlatform[p.key]} onClick={() => { setPlatform(p.key); afterPick() }} />
+            ))}
+          </Section>
+        </>)}
+
+        {isAdmin && aiStatus && (
+          <Section title={t('comments.aiCard.title')}>
+            <div className="mx-1 rounded-xl bg-surface-3 px-3 py-2.5 space-y-1">
+              <div className="flex items-center gap-2">
+                <span className={`w-2.5 h-2.5 rounded-full ${aiStatus.available && aiStatus.active ? 'bg-success' : 'bg-fg-subtle'}`} />
+                <span className={`text-[12px] font-semibold ${aiStatus.available && aiStatus.active ? 'text-success' : 'text-fg-muted'}`}>
+                  {!aiStatus.available ? t('comments.aiCard.unavailable') : t(`comments.aiCard.${aiStatus.mode === 'live' ? 'live' : aiStatus.mode === 'draft' ? 'draft' : 'off'}`)}
+                </span>
+              </div>
+              {aiStatus.active && (<>
+                <p className="text-[11px] text-fg-muted">{t('comments.aiCard.queue', { pending: aiStatus.pending, processing: aiStatus.processing, drafts: aiStatus.drafts })}</p>
+                <p className="text-[11px] text-fg-subtle">{t('comments.aiCard.day', { replied: aiStatus.replied_24h, back: aiStatus.handed_back_24h })}</p>
+              </>)}
+              <div className="flex items-center gap-3 pt-0.5">
+                <button onClick={() => { setView('ai'); afterPick() }} className="text-[11px] text-brand hover:underline">{t('comments.aiCard.settings')}</button>
+                {aiStatus.active && <button onClick={stopAllAi} className="text-[11px] text-danger hover:underline">{t('comments.aiCard.stopAll')}</button>}
+              </div>
+            </div>
+          </Section>
+        )}
+
         {view === 'inbox' && (
           <Section title={t('comments.sections.tools')}>
+            <ToolItem icon={<MessageSquareText size={15} />} label={t('comments.admin.savedTitle')} count={isAdmin ? team?.pending_saved_replies : 0} onClick={() => { setShowSaved(true); afterPick() }} />
+            {platform === 'youtube' && <ToolItem icon={<Film size={15} />} label={t('comments.videos.button')} onClick={() => { setShowVideos(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<BarChart3 size={15} />} label={t('comments.stats.button')} onClick={() => { setShowStats(true); afterPick() }} />}
             {isAdmin && <ToolItem icon={<Shuffle size={15} />} label={t('comments.distribute')}
               onClick={() => { postTool('distribute', {}, 'comments.distributeConfirm', 'comments.distributeDone'); afterPick() }} />}
-            {isAdmin && <ToolItem icon={<ArrowLeftRight size={15} />} label={t('comments.admin.redistributeTitle')} onClick={() => { setShowRedistribute(true); afterPick() }} />}
-            <ToolItem icon={<MessageSquareText size={15} />} label={t('comments.admin.savedTitle')} count={isAdmin ? team?.pending_saved_replies : 0} onClick={() => { setShowSaved(true); afterPick() }} />
-            {isAdmin && <ToolItem icon={<RefreshCw size={15} />} label={t('comments.admin.backfillTitle')} onClick={() => { setShowBackfill(true); afterPick() }} />}
-            {isAdmin && <ToolItem icon={<Archive size={15} />} label={t('comments.archiveOld')}
-              onClick={() => { postTool('archive', { days: 7 }, 'comments.archiveConfirm', 'comments.archiveDone'); afterPick() }} />}
-            {platform === 'youtube' && <ToolItem icon={<Film size={15} />} label={t('comments.videos.button')} onClick={() => { setShowVideos(true); afterPick() }} />}
+            {/* أدوات نادرة الاستخدام: مقفولة افتراضيًا عشان القايمة تفضل نضيفة */}
+            {isAdmin && <ToolItem icon={<MoreHorizontal size={15} />} label={showMoreTools ? t('comments.lessTools') : t('comments.moreTools')} onClick={() => setShowMoreTools(v => !v)} />}
+            {isAdmin && showMoreTools && (<>
+              <ToolItem icon={<ArrowLeftRight size={15} />} label={t('comments.admin.redistributeTitle')} onClick={() => { setShowRedistribute(true); afterPick() }} />
+              <ToolItem icon={<RefreshCw size={15} />} label={t('comments.admin.backfillTitle')} onClick={() => { setShowBackfill(true); afterPick() }} />
+              <ToolItem icon={<Archive size={15} />} label={t('comments.archiveOld')}
+                onClick={() => { postTool('archive', { days: 7 }, 'comments.archiveConfirm', 'comments.archiveDone'); afterPick() }} />
+            </>)}
           </Section>
         )}
       </div>
-      {/* موظف التعليقات بس مابيشوفش شاشة المحادثات (اللي فيها الحالة والخروج) — فبنحطهم هنا عشان مايتزنقش:
-          يقدر يبقى "نشط" (التوزيع بيعتمد عليها) ويسجّل خروج */}
+      {/* موظف التعليقات بس: اسمه وحالته (تلقائية — متصل طول ما البرنامج مفتوح قدامه) وتسجيل الخروج */}
       {!isAdmin && agent?.access_scope === 'comments' && (
         <div className="border-t border-surface-3 px-3 pt-3 pb-safe pb-3 space-y-2">
           <div className="flex items-center gap-2">
-            <span className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${agent?.status === 'online' ? 'bg-success' : agent?.status === 'busy' ? 'bg-follow' : 'bg-fg-subtle'}`} />
+            <span className="w-2.5 h-2.5 rounded-full flex-shrink-0 bg-success" />
             <span className="flex-1 min-w-0 text-[13px] text-fg truncate">{agent?.name}</span>
-            <select value={agent?.status || 'offline'} onChange={e => setAgentStatus(agent.id, e.target.value)}
-              className="bg-surface-3 rounded-lg px-2 py-1 text-[12px] text-fg">
-              {['online', 'busy', 'offline'].map(k => <option key={k} value={k}>{t(`conversations.agentStatus.${k}`)}</option>)}
-            </select>
+            <span className="text-[11px] text-success">{t('comments.presenceOnline')}</span>
           </div>
           <button onClick={async () => { await signOut(); navigate('/login') }}
             className="w-full flex items-center gap-2.5 px-3 py-2 rounded-xl text-[13px] text-danger hover:bg-danger/10">
