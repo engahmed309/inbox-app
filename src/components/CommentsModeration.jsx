@@ -145,6 +145,10 @@ function AdminModeration({ t, toast }) {
               label={t('comments.mod.aiToggle')} hint={meta.ai_available ? t('comments.mod.aiHint') : t('comments.mod.aiNoKey')} />
             <Toggle checked={settings.moderation_hide_pending !== false} onChange={v => save({ moderation_hide_pending: v })} disabled={saving}
               label={t('comments.mod.hideToggle')} hint={t('comments.mod.hideHint')} />
+            {settings.moderation_mode === 'approve' && (
+              <Toggle checked={settings.moderation_auto_clear === true} onChange={v => save({ moderation_auto_clear: v })} disabled={saving}
+                label={t('comments.mod.autoClear')} hint={t('comments.mod.autoClearHint')} />
+            )}
           </Section>
 
           <Queue t={t} toast={toast} onChanged={loadCounts} />

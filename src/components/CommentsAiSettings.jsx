@@ -256,6 +256,12 @@ export default function CommentsAiSettings() {
                   className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-[13px] text-fg leading-relaxed" />
                 <span className="block text-[10px] text-fg-subtle mt-1">{t('comments.ai.privateInstructionsHint')}</span>
               </label>
+              <label className="block mt-3">
+                <span className="block text-[11px] text-fg-muted mb-1">{t('comments.ai.privateB')}</span>
+                <textarea value={form.private_text_b || ''} onChange={e => set({ private_text_b: e.target.value })} rows={4}
+                  className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-[13px] text-fg leading-relaxed" />
+                <span className="block text-[10px] text-fg-subtle mt-1">{t('comments.ai.privateBHint')}</span>
+              </label>
             </>)}
           </Section>
 

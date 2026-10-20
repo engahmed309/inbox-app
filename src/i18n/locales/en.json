@@ -2152,7 +2152,7 @@
       "tabs": {
         "overview": "Overview",
         "staff": "Staff",
-        "posts": "Posts",
+        "posts": "Posts & bookings",
         "ai": "AI replies",
         "interest": "Interested",
         "followup": "Follow-up",
@@ -2276,6 +2276,36 @@
         "lastSeen": "Last seen",
         "pending": "Pending now",
         "hint": "Active time is measured from the app being open in front of the agent (a heartbeat every 90s), not from the status button."
+      },
+      "pr": {
+        "privateSent": "Private messages sent",
+        "privateSentHint": "first-time customers in range",
+        "responded": "Answered the private message",
+        "rateHint": "response rate {{pct}}%",
+        "booked": "Booked",
+        "bookedRate": "{{pct}}% of those who answered",
+        "posts": "Posts in report",
+        "lowBookedWarn": "Very few bookings recorded compared to customers who answered — staff are probably not moving the contact to the “booked” stage.",
+        "abTitle": "Private message test (A/B)",
+        "abEmpty": "The test just started — version B goes to half of Arabic private messages from today. Check back in a few days.",
+        "variant": "Version {{v}}",
+        "variantLine": "{{sent}} sent · {{r}} answered · {{b}} booked",
+        "recsTitle": "🎯 Recommended for paid promotion",
+        "recsHint": "Ranked by bookings, then customers who answered privately, then interest. YouTube has no private messages, so it is ranked by interest and comments.",
+        "recsNone": "Not enough posts in this range",
+        "whyBooked": "brought {{n}} bookings",
+        "whyRate": "high private response: {{n}} ({{pct}}%)",
+        "whyResponded": "{{n}} customers answered privately",
+        "whyInterest": "{{n}} interested of {{c}} comments",
+        "allTitle": "All posts",
+        "sort": {
+          "booked": "Bookings",
+          "responded": "Answered",
+          "rate": "Response rate",
+          "comments": "Comments"
+        },
+        "line": "{{c}} comments · {{i}} interested · {{s}} private · {{r}} answered",
+        "bookedShort": "booked"
       }
     },
     "thread": {
@@ -2422,7 +2452,9 @@
       },
       "enabled": "Enable / disable",
       "wordDeleteConfirm": "Remove “{{w}}” from the list?",
-      "noWords": "No matching words."
+      "noWords": "No matching words.",
+      "autoClear": "Auto-delete clear-cut violations",
+      "autoClearHint": "Obvious spam, links and explicit profanity/sexual content are deleted automatically. Insults, hate, threats and accusations still wait for your decision."
     },
     "ai": {
       "tabs": {
@@ -2579,7 +2611,9 @@
       "defaultAck": "We have contacted you privately 💚 please check your messages",
       "alsoPublic": "Also reply publicly that we contacted them privately",
       "ackFailed": "The private message was sent, but the public reply failed: {{error}}",
-      "activeSince": "Handles new comments only, from {{d}}. Anything older stays with staff."
+      "activeSince": "Handles new comments only, from {{d}}. Anything older stays with staff.",
+      "privateB": "Private message version B (test)",
+      "privateBHint": "If set, half of Arabic private messages use this version and the report compares response rates. Empty = test off. { name} = customer name."
     },
     "admin": {
       "redistributeTitle": "Move an agent's comments",

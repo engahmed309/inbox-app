@@ -95,7 +95,7 @@ export default function CommentsReports({ onOpenPost }) {
       const qs = new URLSearchParams({ from: b.from, platform })
       if (b.to) qs.set('to', b.to)
       qs.set('sla', String(sla))
-      const endpoint = tab === 'ai' ? 'ai' : tab === 'interest' ? 'funnel' : tab === 'staff' ? 'staff' : tab === 'conversion' ? 'conversion' : 'overview'
+      const endpoint = tab === 'ai' ? 'ai' : tab === 'interest' ? 'funnel' : tab === 'staff' ? 'staff' : tab === 'conversion' ? 'conversion' : tab === 'posts' ? 'posts' : 'overview'
       // التحويل بالشهور (آخر ٦) مش بالفترة المختارة
       const res = await apiFetch(tab === 'conversion' ? `${API_URL}/comments/reports/conversion?months=6` : `${API_URL}/comments/reports/${endpoint}?${qs}`)
       const json = await res.json()
@@ -248,27 +248,7 @@ export default function CommentsReports({ onOpenPost }) {
             )}
           </Card>
         </>) : tab === 'posts' ? (
-          <Card title={t('comments.reports.topPosts')}>
-            {(data.top_posts || []).length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
-              <div className="space-y-2">
-                {data.top_posts.map(p => (
-                  <div key={p.post_id} onClick={() => onOpenPost?.(p)} role="button" tabIndex={0}
-                    className="flex items-center gap-3 bg-surface rounded-xl p-2 hover:bg-surface-3 cursor-pointer">
-                    {p.thumbnail && <img src={p.thumbnail} alt="" loading="lazy" className="w-12 h-12 rounded-lg object-cover bg-surface-3 flex-shrink-0" onError={e => { e.target.style.display = 'none' }} />}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-xs text-fg line-clamp-2">{p.caption || t('comments.untitledPost')}</p>
-                      <p className="text-[10px] text-fg-subtle mt-0.5">{t(`comments.platforms.${p.platform}`)}</p>
-                    </div>
-                    <div className="text-end flex-shrink-0">
-                      <p className="text-sm font-bold text-fg tabular-nums">{fmt(p.n)}</p>
-                      {p.pending > 0 && <p className="text-[10px] text-amber-500 tabular-nums">{t('comments.reports.pendingN', { n: fmt(p.pending) })}</p>}
-                    </div>
-                    {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-fg-subtle hover:text-fg flex-shrink-0"><ExternalLink size={12} /></a>}
-                  </div>
-                ))}
-              </div>
-            )}
-          </Card>
+          <PostsReport data={data} t={t} onOpenPost={onOpenPost} />
         ) : (<>
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
             <Kpi label={t('comments.reports.ai.totalCost')} value={usd(data.cost_usd, 3)} tone="text-brand" hint={t('comments.reports.ai.estimate')} />
@@ -381,7 +361,7 @@ function exportCsv(tab, data, t) {
     overview: () => [[t('comments.reports.perDay'), 'facebook', 'instagram', 'youtube', 'total'], ...(data.by_day || []).map(d => [d.day, d.facebook, d.instagram, d.youtube, d.total])],
     conversion: () => [['month', 'contacts', 'booked', 'booked_now', 'conversion_pct'], ...(data.months || []).map(m => [m.month, m.contacts, m.booked, m.booked_now, m.contacts ? Math.round((m.booked / m.contacts) * 1000) / 10 : 0])],
     staff: () => [['name', 'role', 'handled', 'public_replies', 'private_replies', 'median_min', 'p90_min', 'within_sla'], ...(data.by_agent || []).map(a => [a.name, a.role, a.handled, a.public_replies, a.private_replies, a.median_minutes, a.p90_minutes, a.within_sla])],
-    posts: () => [['post', 'platform', 'comments', 'waiting', 'link'], ...(data.top_posts || []).map(p => [p.caption, p.platform, p.n, p.pending, p.permalink])],
+    posts: () => [['post', 'platform', 'comments', 'interested', 'private_sent', 'answered_private', 'booked', 'link'], ...(data.posts || []).map(p => [p.caption, p.platform, p.comments, p.interested, p.private_sent, p.responded, p.booked, p.permalink])],
     interest: () => [['step', 'count'], ...['interested', 'public_replied', 'private_sent', 'private_by_ai', 'conversations', 'customer_replied', 'booked_now'].map(k => [k, data[k]])],
     followup: () => [['agent', 'late_comments', 'oldest'], ...(data.stale || []).map(x => [x.name || 'unassigned', x.n, x.oldest]), [], ['commenter', 'platform', 'comments', 'handled'], ...(data.repeat_authors || []).map(x => [x.name, x.platform, x.n, x.handled])],
     ai: () => [['day', 'replied', 'draft', 'skipped', 'escalated', 'failed', 'cost_usd'], ...(data.by_day || []).map(d => [d.day, d.replied, d.draft, d.skipped, d.escalated, d.failed, d.cost])],
@@ -394,6 +374,132 @@ function exportCsv(tab, data, t) {
   a.href = url; a.download = `comments-${tab}-${new Date().toISOString().slice(0, 10)}.csv`
   document.body.appendChild(a); a.click(); a.remove()
   setTimeout(() => URL.revokeObjectURL(url), 1000)
+}
+
+// ─── المنشورات والحجوزات + ترشيحات التمويل ────────────────────────────
+const pctOf = (a, b) => (b ? Math.round((a / b) * 100) : 0)
+// نقاط الترشيح للتمويل: الحجز أهم حاجة، بعده العميل اللي رد على الخاص (بدأ محادثة فعلًا)، بعده الاهتمام.
+// يوتيوب مفيهوش خاص، فبيتقاس بالاهتمام والتعليقات بس
+function fundScore(p) {
+  if (p.platform === 'youtube') return p.interested * 2 + p.comments * 0.5
+  return p.booked * 25 + p.responded * 3 + p.interested + p.comments * 0.1
+}
+function fundReason(p, t) {
+  if (p.booked > 0) return t('comments.reports.pr.whyBooked', { n: p.booked })
+  if (p.platform !== 'youtube' && p.responded >= 5 && pctOf(p.responded, p.private_sent) >= 30) return t('comments.reports.pr.whyRate', { n: p.responded, pct: pctOf(p.responded, p.private_sent) })
+  if (p.responded >= 5) return t('comments.reports.pr.whyResponded', { n: p.responded })
+  return t('comments.reports.pr.whyInterest', { n: p.interested, c: p.comments })
+}
+
+function PostsReport({ data, t, onOpenPost }) {
+  const [sort, setSort] = useState('booked')
+  const posts = data?.posts || []
+  const pv = data?.private || {}
+  const recs = useMemo(() => ['facebook', 'instagram', 'youtube'].map(pf => ({
+    platform: pf,
+    items: posts.filter(p => p.platform === pf && p.comments >= 10).sort((a, b) => fundScore(b) - fundScore(a)).slice(0, 3)
+  })), [posts])
+  const sorted = useMemo(() => {
+    const key = {
+      booked: (p) => p.booked * 1e6 + p.responded * 1e3 + p.comments,
+      responded: (p) => p.responded * 1e3 + p.comments,
+      rate: (p) => (p.private_sent >= 10 ? pctOf(p.responded, p.private_sent) : -1) * 1e3 + p.responded,
+      comments: (p) => p.comments
+    }[sort]
+    return [...posts].sort((a, b) => key(b) - key(a))
+  }, [posts, sort])
+  const variants = pv.by_variant || []
+
+  return (<>
+    <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5">
+      <Kpi label={t('comments.reports.pr.privateSent')} value={fmt(pv.sent)} hint={t('comments.reports.pr.privateSentHint')} />
+      <Kpi label={t('comments.reports.pr.responded')} value={fmt(pv.responded)} tone="text-brand" hint={t('comments.reports.pr.rateHint', { pct: pctOf(pv.responded, pv.sent) })} />
+      <Kpi label={t('comments.reports.pr.booked')} value={fmt(pv.booked)} tone="text-success" hint={t('comments.reports.pr.bookedRate', { pct: pctOf(pv.booked, pv.responded) })} />
+      <Kpi label={t('comments.reports.pr.posts')} value={fmt(posts.length)} />
+    </div>
+    {pv.responded > 20 && pv.booked <= Math.max(1, pv.responded * 0.01) && (
+      <p className="text-[11px] text-amber-500 bg-amber-500/10 rounded-xl px-3 py-2">{t('comments.reports.pr.lowBookedWarn')}</p>
+    )}
+
+    {/* تجربة A/B للرسالة الخاصة */}
+    <Card title={t('comments.reports.pr.abTitle')}>
+      {variants.length <= 1 && !variants.some(v => v.variant === 'B') ? (
+        <p className="text-xs text-fg-subtle">{t('comments.reports.pr.abEmpty')}</p>
+      ) : (
+        <div className="grid grid-cols-2 gap-2.5">
+          {variants.map(v => (
+            <div key={v.variant} className="bg-surface rounded-xl p-3">
+              <p className="text-xs font-semibold text-fg">{t('comments.reports.pr.variant', { v: v.variant })}</p>
+              <p className="text-xl font-bold tabular-nums text-brand mt-1">{pctOf(v.responded, v.sent)}%</p>
+              <p className="text-[10px] text-fg-subtle">{t('comments.reports.pr.variantLine', { sent: fmt(v.sent), r: fmt(v.responded), b: fmt(v.booked) })}</p>
+            </div>
+          ))}
+        </div>
+      )}
+      {(pv.by_platform || []).length > 0 && (
+        <p className="text-[11px] text-fg-subtle mt-2.5">{(pv.by_platform || []).map(x => `${t(`comments.platforms.${x.platform}`)}: ${pctOf(x.responded, x.sent)}% (${fmt(x.responded)}/${fmt(x.sent)})`).join(' · ')}</p>
+      )}
+    </Card>
+
+    {/* ترشيحات التمويل */}
+    <Card title={t('comments.reports.pr.recsTitle')}>
+      <p className="text-[11px] text-fg-subtle -mt-1 mb-3">{t('comments.reports.pr.recsHint')}</p>
+      <div className="space-y-3">
+        {recs.map(r => (
+          <div key={r.platform}>
+            <p className="text-xs font-semibold text-fg mb-1.5">{t(`comments.platforms.${r.platform}`)}</p>
+            {r.items.length === 0 ? <p className="text-[11px] text-fg-subtle">{t('comments.reports.pr.recsNone')}</p> : (
+              <div className="space-y-1.5">
+                {r.items.map((p, i) => (
+                  <div key={p.post_id} className="flex items-center gap-2.5 bg-surface rounded-xl p-2">
+                    <span className="w-5 h-5 rounded-full bg-brand/15 text-brand text-[11px] font-bold flex items-center justify-center flex-shrink-0">{i + 1}</span>
+                    {p.thumbnail && <img src={p.thumbnail} alt="" loading="lazy" className="w-10 h-10 rounded-lg object-cover bg-surface-3 flex-shrink-0" onError={e => { e.target.style.display = 'none' }} />}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-xs text-fg line-clamp-1">{p.caption || t('comments.untitledPost')}</p>
+                      <p className="text-[10px] text-success mt-0.5">{fundReason(p, t)}</p>
+                    </div>
+                    {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" className="text-fg-subtle hover:text-fg flex-shrink-0"><ExternalLink size={13} /></a>}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        ))}
+      </div>
+    </Card>
+
+    {/* كل المنشورات */}
+    <Card>
+      <div className="flex items-center gap-2 mb-3 flex-wrap">
+        <p className="text-sm font-semibold text-fg me-auto">{t('comments.reports.pr.allTitle')}</p>
+        {['booked', 'responded', 'rate', 'comments'].map(k => (
+          <button key={k} onClick={() => setSort(k)} className={`px-2.5 py-1 rounded-full text-[11px] ${sort === k ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>{t(`comments.reports.pr.sort.${k}`)}</button>
+        ))}
+      </div>
+      {sorted.length === 0 ? <p className="text-xs text-fg-subtle py-4 text-center">{t('comments.reports.noData')}</p> : (
+        <div className="space-y-1.5">
+          {sorted.map(p => (
+            <div key={p.post_id} onClick={() => onOpenPost?.(p)} role="button" tabIndex={0}
+              className="flex items-center gap-2.5 bg-surface rounded-xl p-2 hover:bg-surface-3 cursor-pointer">
+              {p.thumbnail && <img src={p.thumbnail} alt="" loading="lazy" className="w-11 h-11 rounded-lg object-cover bg-surface-3 flex-shrink-0" onError={e => { e.target.style.display = 'none' }} />}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-fg line-clamp-1">{p.caption || t('comments.untitledPost')}</p>
+                <p className="text-[10px] text-fg-subtle mt-0.5 tabular-nums">
+                  {t(`comments.platforms.${p.platform}`)} · {t('comments.reports.pr.line', { c: fmt(p.comments), i: fmt(p.interested), s: fmt(p.private_sent), r: fmt(p.responded) })}
+                  {p.private_sent >= 10 && ` (${pctOf(p.responded, p.private_sent)}%)`}
+                </p>
+              </div>
+              <div className="text-end flex-shrink-0">
+                <p className={`text-sm font-bold tabular-nums ${p.booked ? 'text-success' : 'text-fg-subtle'}`}>{fmt(p.booked)}</p>
+                <p className="text-[9px] text-fg-subtle">{t('comments.reports.pr.bookedShort')}</p>
+              </div>
+              {p.permalink && <a href={p.permalink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} className="text-fg-subtle hover:text-fg flex-shrink-0"><ExternalLink size={12} /></a>}
+            </div>
+          ))}
+        </div>
+      )}
+    </Card>
+  </>)
 }
 
 // ─── من الكومنتات ← حجز ───────────────────────────────────────────────
