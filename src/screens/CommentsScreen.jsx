@@ -663,6 +663,14 @@ export default function CommentsScreen() {
                         )}
 
                         <LinkifiedText text={c.content} className="block text-sm text-fg whitespace-pre-wrap break-words mt-1" />
+                        {/* ستيكر/GIF/صورة: من غيرها التعليق كان بيبان فاضي */}
+                        {c.media_url ? (
+                          <a href={c.media_url} target="_blank" rel="noreferrer" className="inline-block mt-1.5">
+                            <img src={c.media_url} alt="" loading="lazy" className="max-h-28 max-w-[160px] rounded-lg bg-surface-3 object-contain" />
+                          </a>
+                        ) : !c.content?.trim() && (
+                          <span className="block text-xs text-fg-subtle italic mt-1">{t('comments.mediaOnly')}</span>
+                        )}
                       </div>
                     </div>
 

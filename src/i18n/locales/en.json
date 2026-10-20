@@ -1949,6 +1949,7 @@
   },
   "comments": {
     "title": "Comments",
+    "mediaOnly": "Sticker or image comment with no text (image not available)",
     "noAccess": "Your account does not have access to comments",
     "empty": "No comments here",
     "unknownAuthor": "Unknown",
