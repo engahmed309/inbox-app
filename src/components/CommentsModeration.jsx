@@ -164,6 +164,7 @@ function Queue({ t, toast, onChanged }) {
   const [hasMore, setHasMore] = useState(false)
   const [loading, setLoading] = useState(true)
   const [busy, setBusy] = useState(null)         // id | 'bulk'
+  const [progress, setProgress] = useState(null) // { done, total } أثناء القرار الجماعي
   const [selected, setSelected] = useState(() => new Set())
 
   const load = useCallback(async (offset = 0) => {
@@ -199,17 +200,27 @@ function Queue({ t, toast, onChanged }) {
     if (!ids.length) return
     if (!window.confirm(t(action === 'approve' ? 'comments.mod.bulkApproveConfirm' : 'comments.mod.bulkRejectConfirm', { n: ids.length }))) return
     setBusy('bulk')
+    // على دفعات صغيرة عشان الأدمن يشوف التقدم (الحذف من المنصة بياخد ثواني للتعليق) بدل طلب واحد طويل من غير أي إشارة
+    let done = 0
+    const failed = []
     try {
-      const res = await apiFetch(`${API_URL}/comments/moderation/bulk`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ids })
-      })
-      const d = await res.json()
-      if (!res.ok) throw new Error(d.error)
-      toast.success(t('comments.mod.bulkDone', { n: d.done }))
-      if (d.failed?.length) toast.error(d.failed[0].error)
-      await load(0)
-      onChanged?.()
-    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+      for (let i = 0; i < ids.length; i += 8) {
+        setProgress({ done: i, total: ids.length })
+        const res = await apiFetch(`${API_URL}/comments/moderation/bulk`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ action, ids: ids.slice(i, i + 8) })
+        })
+        const d = await res.json()
+        if (!res.ok) throw new Error(d.error)
+        done += d.done || 0
+        failed.push(...(d.failed || []))
+      }
+    } catch (err) { toast.error(err.message) }
+    if (done) toast.success(t('comments.mod.bulkDone', { n: done }))
+    if (failed.length) toast.error(failed[0].error)
+    setProgress(null)
+    setBusy(null)
+    await load(0)
+    onChanged?.()
   }
 
   const block = async (c) => {
@@ -248,7 +259,7 @@ function Queue({ t, toast, onChanged }) {
             {t('comments.mod.selectAll')}
           </label>
           {selected.size > 0 && (<>
-            <span className="text-[12px] text-fg-subtle">{t('comments.mod.selected', { n: selected.size })}</span>
+            <span className="text-[12px] text-fg-subtle">{progress ? t('comments.mod.bulkProgress', { done: progress.done, total: progress.total }) : t('comments.mod.selected', { n: selected.size })}</span>
             <button disabled={busy === 'bulk'} onClick={() => bulk('approve')} className="px-3 py-1.5 rounded-lg text-xs bg-danger text-white disabled:opacity-50">{t('comments.mod.approveSel')}</button>
             <button disabled={busy === 'bulk'} onClick={() => bulk('reject')} className="px-3 py-1.5 rounded-lg text-xs bg-surface-3 text-fg disabled:opacity-50">{t('comments.mod.rejectSel')}</button>
           </>)}

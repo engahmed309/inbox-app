@@ -2351,6 +2351,7 @@
       "bulkApproveConfirm": "Delete {{n}} comments permanently from the platform?",
       "bulkRejectConfirm": "Keep {{n}} comments and hand them back to the team?",
       "bulkDone": "Decision applied to {{n}} comments",
+      "bulkProgress": "Working… {{done}} of {{total}}",
       "selectAll": "Select all",
       "selected": "{{n}} selected",
       "block": "Block author",

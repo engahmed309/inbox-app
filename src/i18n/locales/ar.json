@@ -2351,6 +2351,7 @@
       "bulkApproveConfirm": "حذف {{n}} تعليق نهائيًا من المنصة؟",
       "bulkRejectConfirm": "إبقاء {{n}} تعليق وإرجاعهم للفريق؟",
       "bulkDone": "تم تنفيذ القرار على {{n}} تعليق",
+      "bulkProgress": "جاري التنفيذ… {{done}} من {{total}}",
       "selectAll": "تحديد الكل",
       "selected": "{{n}} محدد",
       "block": "حظر صاحبه",
