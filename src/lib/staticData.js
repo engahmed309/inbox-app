@@ -32,6 +32,7 @@ export const getLifecycleStages = () => cached('lifecycle_stages', table('lifecy
 export const getTags = () => cached('tags', table('tags', 'name'))
 export const getCustomFieldDefinitions = () => cached('custom_field_definitions', table('custom_field_definitions', 'field_order'))
 export const getQuickReplies = () => cached('quick_replies', table('quick_replies', 'name'))
+export const getPackages = () => cached('contact_packages', table('contact_packages', 'sort_order'))
 export const getChannels = () => cached('channels', async () => {
   const res = await apiFetch(`${API_URL}/channels`)
   const data = await res.json()

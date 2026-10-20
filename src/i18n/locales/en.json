@@ -902,7 +902,8 @@
       "tags": "Tags",
       "export": "Export Data",
       "ratings": "Ratings",
-      "templates": "Templates"
+      "templates": "Templates",
+      "subscriptions": "Subscriptions & renewals"
     },
     "ai": {
       "suggestedQuestions": {
@@ -1116,6 +1117,23 @@
       "high": "High",
       "fromCalls": "From calls",
       "noAgent": "No agent"
+    },
+    "subs": {
+      "customers": "Customers subscribed",
+      "total": "Total subscriptions",
+      "renewed": "Customers who renewed",
+      "renewedPct": "{{pct}}% of customers",
+      "byRenewals": "How many times customers renewed",
+      "noRenewal": "Never renewed",
+      "renewalsN": "Renewed {{n}}×",
+      "renewals5": "Renewed 5+×",
+      "byPackage": "Packages",
+      "package": "Package",
+      "new": "New",
+      "renewal": "Renewal",
+      "byMonth": "By month (last 12)",
+      "month": "Month",
+      "note": "Tracking is complete from today. Older customers were recorded with the least information available (current package and when they reached the booked stage), so their earlier package shows as “not recorded”."
     }
   },
   "chat": {
@@ -2660,5 +2678,24 @@
       "autoSync": "Automatic sync",
       "autoSyncHint": "Every 30 minutes it checks the last 6 hours, and after each server restart the last 24 hours."
     }
+  },
+  "booking": {
+    "title": "Choose the package — {{stage}}",
+    "hint": "Pick the package first so the subscription is recorded (then the stage is updated). This is how we know how many times a customer renewed and what they took each time.",
+    "package": "Package",
+    "choose": "Choose a package…",
+    "startDate": "Starts",
+    "expiresAt": "Ends",
+    "cancel": "Cancel",
+    "confirm": "Save & update stage",
+    "saveError": "Could not save the package: {{message}}"
+  },
+  "subscriptions": {
+    "title": "Subscriptions",
+    "summary": "{{total}} subscriptions · renewed {{renewals}}×",
+    "renewal": "Renewal",
+    "new": "Subscription",
+    "unknownPackage": "Package not recorded (before tracking started)",
+    "unknownDate": "Unknown date"
   }
 }

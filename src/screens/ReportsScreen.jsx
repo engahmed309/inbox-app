@@ -7,8 +7,9 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDate as localeFormatDate, formatTime as localeFormatTime } from '../lib/locale'
-import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star, FileText, Ban, CheckCheck, Check } from 'lucide-react'
+import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star, FileText, Ban, CheckCheck, Check, Repeat } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
+import SubscriptionsReport from '../components/SubscriptionsReport'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -25,6 +26,7 @@ const SECTIONS = [
   { key: 'templates', labelKey: 'reports.sections.templates', icon: FileText },
   { key: 'volume', labelKey: 'reports.sections.volume', icon: Radio },
   { key: 'tags', labelKey: 'reports.sections.tags', icon: Tag },
+  { key: 'subscriptions', labelKey: 'reports.sections.subscriptions', icon: Repeat },
   { key: 'export', labelKey: 'reports.sections.export', icon: Download },
 ]
 
@@ -72,6 +74,7 @@ export default function ReportsScreen() {
         {section === 'templates' && <TemplatesReportTab />}
         {section === 'volume' && <ChannelVolumeTab />}
         {section === 'tags' && <TagsReportTab />}
+        {section === 'subscriptions' && <SubscriptionsReport />}
         {section === 'export' && <ExportTab />}
       </div>
     </div>

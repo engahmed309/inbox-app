@@ -266,6 +266,9 @@ function displayName(contact) {
 
 // كود الدولة عندنا متخزن ISO حرفين (SA/EG/DZ...) — بنحوّله لعلم بترجمة كل حرف لـ Regional Indicator.
 // في صفوف قديمة قليلة القيمة متكتوبة بالعربي ("مصر") أو فاضية، فبنرجّع null وقتها بدل ما نطلّع رموز غريبة.
+// عملاء الخليج (أعلى نسبة حجز): شريط ذهبي على الصف وبادج بلد مميز — بياخدوا فريق الإغلاق (راجع services/assignment.js)
+const GULF_COUNTRIES = new Set(['SA', 'AE', 'KW', 'QA', 'OM', 'BH'])
+
 function countryFlag(code) {
   if (!code || !/^[A-Za-z]{2}$/.test(code)) return null
   return String.fromCodePoint(...code.toUpperCase().split('').map(c => 0x1f1e6 + c.charCodeAt(0) - 65))
@@ -1772,7 +1775,7 @@ function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, se
 
   return (
     <button onClick={onClick} data-conv-id={rowId}
-      className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-start ${selected ? 'bg-brand/10' : ''}`}>
+      className={`w-full flex items-center gap-3 px-4 py-3 border-b border-surface-3 hover:bg-surface-2 active:bg-surface-3 transition-colors text-start ${selected ? 'bg-brand/10' : ''} ${GULF_COUNTRIES.has(String(contact?.country || '').toUpperCase()) ? 'border-s-4 border-s-amber-500' : ''}`}>
       {selectionMode && (
         <span onClick={e => { e.stopPropagation(); onToggleSelect?.() }} className="flex-shrink-0 text-brand">
           {selected ? <CheckSquare size={20} /> : <Square size={20} className="text-fg-subtle" />}
@@ -1810,7 +1813,7 @@ function ConvCard({ rowId, conv, assignedAgent, lastMsg, tags, selectionMode, se
           <span className="flex items-center gap-1.5 min-w-0">
             <span className="font-semibold text-sm text-fg truncate">{displayName(contact)}</span>
             {contact?.country?.trim() && (
-              <span className="flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-3 text-fg-muted"
+              <span className={`flex-shrink-0 text-[10px] font-medium px-1.5 py-0.5 rounded-full ${GULF_COUNTRIES.has(contact.country.trim().toUpperCase()) ? 'bg-amber-500/20 text-amber-500 font-bold' : 'bg-surface-3 text-fg-muted'}`}
                 title={countryName(contact.country, i18n.language)}>
                 {countryFlag(contact.country)
                   ? `${countryFlag(contact.country)} ${contact.country.toUpperCase()}`

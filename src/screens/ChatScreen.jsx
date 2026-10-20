@@ -6,6 +6,8 @@ import { getLifecycleStages, getChannels, getTags, getCustomFieldDefinitions, ge
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import ContactSidebar from '../components/ContactSidebar'
+import BookingPackageModal from '../components/BookingPackageModal'
+import { isBookingStage, hasRecentSubscription } from '../lib/subscriptions'
 import RequestAdminModal from '../components/RequestAdminModal'
 import EmojiPicker from '../components/EmojiPicker'
 import { logActivity } from '../lib/activityLog'
@@ -784,7 +786,25 @@ export default function ChatScreen() {
     toast.success(t('chat.toast.followUpSaved', { time: readableTime }))
   }
 
+  // مرحلة «تم الحجز»/«تجديد الاشتراك»: اختيار الباقة إجباري الأول (بيسجّل الاشتراك). لو لسه مسجّل باقة من دقايق نكمّل على طول
+  const [bookingPrompt, setBookingPrompt] = useState(null)   // { stageId }
   const changeLifecycle = async (stageId) => {
+    const stage = lifecycles.find(l => l.id === stageId)
+    if (isBookingStage(stage) && contact?.id && !(await hasRecentSubscription(contact.id))) {
+      setShowLifecycle(false)
+      setBookingPrompt({ stageId })
+      return
+    }
+    await applyLifecycle(stageId)
+  }
+  const onBookingDone = async (updatedContact) => {
+    const stageId = bookingPrompt.stageId
+    setBookingPrompt(null)
+    if (updatedContact) setContact(prev => prev ? { ...prev, ...updatedContact } : prev)
+    await applyLifecycle(stageId)
+  }
+
+  const applyLifecycle = async (stageId) => {
     const oldLabel = currentLifecycle?.name || t('chat.common.noStage')
     const oldStageId = contact?.lifecycle_stage_id
     setContact(prev => prev ? { ...prev, lifecycle_stage_id: stageId || null } : prev)
@@ -1587,6 +1607,11 @@ export default function ChatScreen() {
       )}
 
       {lightbox && <Lightbox item={lightbox} onClose={() => setLightbox(null)} />}
+
+      {bookingPrompt && contact && (
+        <BookingPackageModal contact={contact} stageName={lifecycles.find(l => l.id === bookingPrompt.stageId)?.name || ''}
+          onClose={() => setBookingPrompt(null)} onDone={onBookingDone} />
+      )}
 
       {showTemplates && (
         <SendTemplateModal

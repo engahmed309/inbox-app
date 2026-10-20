@@ -2,6 +2,9 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { getLifecycleStages, getChannels, getTags, getCustomFieldDefinitions, getQuickReplies } from '../lib/staticData'
+import { isBookingStage, hasRecentSubscription } from '../lib/subscriptions'
+import BookingPackageModal from './BookingPackageModal'
+import SubscriptionHistory from './SubscriptionHistory'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { logActivity } from '../lib/activityLog'
@@ -100,10 +103,28 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const [packages, setPackages] = useState([])
   const [packageModal, setPackageModal] = useState(null) // { packageId, expiresAt } | null
   const [savingPackage, setSavingPackage] = useState(false)
+  const [bookingPrompt, setBookingPrompt] = useState(null)   // { stageId } — مرحلة «حجز» مستنية اختيار الباقة
+  const [subsRefresh, setSubsRefresh] = useState(0)
 
   useEffect(() => {
     loadData()
   }, [contact?.id])
+
+  // مرحلة «تم الحجز»/«تجديد الاشتراك»: اختيار الباقة إجباري الأول. لو الموظف لسه مسجّل باقة من دقايق مايتسألش تاني
+  const onStageSelect = async (stageId) => {
+    const stage = lifecycles.find(l => l.id === stageId)
+    if (isBookingStage(stage) && !(await hasRecentSubscription(contact.id))) { setBookingPrompt({ stageId }); return }
+    setForm(f => ({ ...f, lifecycle_stage_id: stageId }))
+  }
+  const onBookingDone = (updatedContact) => {
+    const stageId = bookingPrompt.stageId
+    setBookingPrompt(null)
+    setSubsRefresh(n => n + 1)
+    if (updatedContact) {
+      onUpdate(updatedContact)
+      setForm(f => ({ ...f, lifecycle_stage_id: stageId, package_id: updatedContact.package_id || '', package_expires_at: updatedContact.package_expires_at || null }))
+    } else setForm(f => ({ ...f, lifecycle_stage_id: stageId }))
+  }
 
   const loadData = async () => {
     // القوائم الثابتة من الكاش المشترك (مش من الداتابيز مع كل فتح عميل)
@@ -200,6 +221,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
     }
     setSavingPackage(false)
     const updated = data.contact
+    setSubsRefresh(n => n + 1)
     setForm(f => ({ ...f, package_id: packageModal.packageId, package_expires_at: expiresAtIso }))
     onUpdate(updated)
     const pkgName = packages.find(p => p.id === packageModal.packageId)?.name || ''
@@ -424,7 +446,7 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
             <label className="block text-xs text-fg-muted mb-1">{t('contactSidebar.lifecycle.label')}</label>
             <select
               value={form.lifecycle_stage_id}
-              onChange={e => setForm({ ...form, lifecycle_stage_id: e.target.value })}
+              onChange={e => onStageSelect(e.target.value)}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand"
             >
               <option value="">{t('contactSidebar.lifecycle.none')}</option>
@@ -487,6 +509,9 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
               </button>
             )}
           </div>
+
+          {/* سجل الاشتراكات: كام مرة جدّد وكل مرة أخد باقة إيه */}
+          <SubscriptionHistory contactId={contact?.id} refreshKey={subsRefresh} />
 
           {/* Custom Fields */}
           {customFields.length > 0 && (
@@ -565,6 +590,11 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
 
       {requestModalType && (
         <RequestAdminModal type={requestModalType} onClose={() => setRequestModalType(null)} />
+      )}
+
+      {bookingPrompt && (
+        <BookingPackageModal contact={contact} stageName={lifecycles.find(l => l.id === bookingPrompt.stageId)?.name || ''}
+          onClose={() => setBookingPrompt(null)} onDone={onBookingDone} />
       )}
 
       {packageModal && (
