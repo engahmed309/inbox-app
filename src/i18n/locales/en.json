@@ -1648,12 +1648,12 @@
     "title": "Notifications",
     "tab": {
       "delays": "Delays",
-      "comments": "Comment issues",
+      "comments": "System alerts",
       "requests": "Staff requests"
     },
     "empty": {
       "delays": "No delays",
-      "comments": "No comment issues 👌",
+      "comments": "No alerts — all good 👌",
       "requests": "No requests"
     },
     "unreadOnly": "Unread only",

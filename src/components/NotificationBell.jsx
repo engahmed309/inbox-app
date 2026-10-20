@@ -5,7 +5,7 @@ import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../lib/locale'
-import { Bell, Check, X, UserPlus, Tag, Clock, ShieldAlert, Bot, ArrowLeftRight } from 'lucide-react'
+import { Bell, Check, X, UserPlus, Tag, Clock, ShieldAlert, Bot, ArrowLeftRight, Server } from 'lucide-react'
 
 const NOTIFICATIONS_PAGE_SIZE = 30
 
@@ -13,7 +13,7 @@ const NOTIFICATIONS_PAGE_SIZE = 30
 // (طلبات نقل المحادثات وطلبات إضافة تاج/رد سريع/باقة وردودها). كل قسم له عدّاد غير المقروء الخاص بيه
 const TABS = [
   { key: 'delays', types: ['response_delay'], icon: Clock },
-  { key: 'comments', types: ['comment_problem'], icon: ShieldAlert, adminOnly: true },
+  { key: 'comments', types: ['comment_problem', 'system_alert'], icon: ShieldAlert, adminOnly: true },
   { key: 'requests', types: ['transfer_request', 'transfer_response', 'admin_request', 'request_response'], icon: UserPlus },
 ]
 const ACTIONABLE = ['transfer_request', 'admin_request']
@@ -219,6 +219,7 @@ export default function NotificationBell() {
   const icon = (n) => {
     if (n.type === 'admin_request') return <Tag size={13} className="text-brand" />
     if (n.type === 'response_delay') return <Clock size={13} className="text-danger" />
+    if (n.type === 'system_alert') return <Server size={13} className={/✅/.test(n.title || '') ? 'text-success' : 'text-danger'} />
     if (n.type === 'comment_problem') return /الذكاء|لحد التكلفة/.test(n.title || '') ? <Bot size={13} className="text-amber-500" /> : <ShieldAlert size={13} className="text-danger" />
     if (n.type === 'transfer_response' || n.type === 'request_response') return <ArrowLeftRight size={13} className="text-fg-muted" />
     return <UserPlus size={13} className="text-brand" />
