@@ -2075,6 +2075,7 @@
     "aiState": {
       "pending": "The AI will reply in {{s}}s",
       "pendingSoon": "The AI will start in a moment",
+      "pendingWaiting": "The AI is waiting: {{reason}}",
       "processing": "The AI is writing the reply now…",
       "draft": "AI draft ready for review",
       "replied": "Replied by the AI",

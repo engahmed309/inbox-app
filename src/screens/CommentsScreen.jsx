@@ -1079,7 +1079,9 @@ function AiBadge({ c, now, canStop, onStop, stopping }) {
   let text = null, tone = 'text-fg-muted', spin = false
   if (a.status === 'pending') {
     const s = Math.round((new Date(a.run_after).getTime() - now) / 1000)
-    text = s > 1 ? t('comments.aiState.pending', { s }) : t('comments.aiState.pendingSoon'); tone = 'text-brand'
+    text = a.reason ? t('comments.aiState.pendingWaiting', { reason: a.reason })
+      : s > 1 ? t('comments.aiState.pending', { s }) : t('comments.aiState.pendingSoon')
+    tone = a.reason ? 'text-amber-500' : 'text-brand'
   } else if (a.status === 'processing') { text = t('comments.aiState.processing'); tone = 'text-brand'; spin = true }
   else if (a.status === 'draft') { text = t('comments.aiState.draft'); tone = 'text-amber-500' }
   else if (a.status === 'replied') { text = t(a.edited ? 'comments.aiState.repliedEdited' : 'comments.aiState.replied'); tone = 'text-success' }
