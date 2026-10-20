@@ -1160,8 +1160,25 @@ function TagsReportTab() {
   const [bulkTagId, setBulkTagId] = useState(null)
   const [bulkText, setBulkText] = useState('')
   const [sendingBulk, setSendingBulk] = useState(false)
+  // أسماء عملاء التاج بتيجي لما يتفتح بس (التقرير نفسه أعداد) — { [tagId]: contacts[] | 'loading' }
+  const [tagContacts, setTagContacts] = useState({})
 
   useEffect(() => { loadReport() }, [])
+  const toggleTag = async (id) => {
+    const open = expandedTagId === id ? null : id
+    setExpandedTagId(open)
+    if (!open || Array.isArray(tagContacts[id])) return
+    setTagContacts(m => ({ ...m, [id]: 'loading' }))
+    try {
+      const res = await apiFetch(`${API_URL}/tags/${id}/report-contacts`)
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      setTagContacts(m => ({ ...m, [id]: data.contacts || [] }))
+    } catch {
+      setTagContacts(m => { const n = { ...m }; delete n[id]; return n })
+      toast.error(t('reports.tags.loadError'))
+    }
+  }
   const loadReport = async () => {
     setLoading(true)
     try {
@@ -1216,7 +1233,7 @@ function TagsReportTab() {
 
       {tags.map(tag => (
         <div key={tag.id} className="bg-surface-2 rounded-2xl border border-surface-3 overflow-hidden">
-          <button onClick={() => setExpandedTagId(expandedTagId === tag.id ? null : tag.id)}
+          <button onClick={() => toggleTag(tag.id)}
             className="w-full flex items-center gap-3 px-4 py-3 text-start hover:bg-surface-3/40 transition-colors">
             <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: tag.color }} />
             <span className="flex-1 text-sm font-medium text-fg">{tag.name}</span>
@@ -1231,11 +1248,13 @@ function TagsReportTab() {
 
           {expandedTagId === tag.id && (
             <div className="border-t border-surface-3 p-3 space-y-2">
-              {tag.contacts.length === 0 ? (
+              {!Array.isArray(tagContacts[tag.id]) ? (
+                <div className="flex justify-center py-3"><div className="w-5 h-5 border-2 border-brand border-t-transparent rounded-full animate-spin" /></div>
+              ) : tagContacts[tag.id].length === 0 ? (
                 <p className="text-center text-fg-subtle text-xs py-3">{t('reports.tags.noContactsOnTag')}</p>
               ) : (
                 <div className="space-y-1.5 max-h-56 overflow-y-auto">
-                  {tag.contacts.map(c => (
+                  {tagContacts[tag.id].map(c => (
                     <div key={c.id} className="flex items-center gap-2 text-sm px-2 py-1.5 rounded-lg bg-surface-3/40">
                       <span className="flex-1 text-fg truncate">{c.name || c.platform_id || t('reports.tags.noName')}</span>
                       {c.canBulkMessage ? (
