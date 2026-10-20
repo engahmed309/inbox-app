@@ -310,8 +310,8 @@ export default function CommentsAiSettings() {
             <div className="grid grid-cols-2 gap-3">
               <NumberField label={t('comments.ai.delayMin')} value={form.delay_min_seconds} onChange={v => set({ delay_min_seconds: v ?? 0 })} suffix={t('comments.ai.sec')} />
               <NumberField label={t('comments.ai.delayMax')} value={form.delay_max_seconds} onChange={v => set({ delay_max_seconds: v ?? 0 })} suffix={t('comments.ai.sec')} />
-              <NumberField label={t('comments.ai.perHour')} value={form.max_replies_per_hour} onChange={v => set({ max_replies_per_hour: v ?? 1 })} min={1} />
-              <NumberField label={t('comments.ai.perDay')} value={form.max_replies_per_day} onChange={v => set({ max_replies_per_day: v ?? 1 })} min={1} />
+              <NumberField label={t('comments.ai.perHour')} value={form.max_replies_per_hour} onChange={v => set({ max_replies_per_hour: v || null })} min={1} placeholder={t('comments.ai.noCap')} />
+              <NumberField label={t('comments.ai.perDay')} value={form.max_replies_per_day} onChange={v => set({ max_replies_per_day: v || null })} min={1} placeholder={t('comments.ai.noCap')} />
               <NumberField label={t('comments.ai.perAuthor')} value={form.max_replies_per_author_day} onChange={v => set({ max_replies_per_author_day: v ?? 1 })} min={1} />
               <NumberField label={t('comments.ai.dedupeDays')} value={form.private_dedupe_days} onChange={v => set({ private_dedupe_days: v ?? 0 })} suffix={t('comments.ai.days')} />
               <NumberField label={t('comments.ai.maxAge')} value={form.max_age_hours} onChange={v => set({ max_age_hours: v ?? 1 })} min={1} suffix={t('comments.ai.hours')} />

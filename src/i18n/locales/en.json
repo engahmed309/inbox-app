@@ -2489,6 +2489,7 @@
       "sec": "s",
       "hours": "h",
       "perHour": "Max replies per hour",
+      "noCap": "No limit",
       "perDay": "Max replies per day",
       "maxAge": "Do not reply to comments older than",
       "model": "Model",
