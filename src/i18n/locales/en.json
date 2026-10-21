@@ -2169,7 +2169,7 @@
     },
     "lives": {
       "title": "Live comments",
-      "hint": "One card per live — comments are recorded silently, with no replies. Read-only.",
+      "hint": "One card per live — comments are recorded silently and the AI does not reply to them. Reply or delete manually from here.",
       "liveNow": "Live now",
       "empty": "No lives recorded yet",
       "emptyLive": "No comments here",
@@ -2183,7 +2183,34 @@
       "autoRefresh": "Updating automatically",
       "noText": "(no text)",
       "reply": "Reply to a comment",
-      "openPost": "Open broadcast"
+      "openPost": "Open broadcast",
+      "actions": {
+        "public": "Public reply",
+        "private": "Private reply",
+        "like": "Like",
+        "unlike": "Remove like",
+        "hide": "Hide",
+        "unhide": "Unhide",
+        "delete": "Delete",
+        "send": "Send",
+        "cancel": "Cancel",
+        "publicPlaceholder": "Write your public reply to {{name}}…",
+        "privatePlaceholder": "Write your private message to {{name}}…",
+        "deleteConfirm": "Permanently delete {{name}}'s comment from the page? This cannot be undone.",
+        "sentPublic": "Public reply posted",
+        "sentPrivate": "Private message sent",
+        "deleted": "Comment deleted",
+        "hidden": "Comment hidden",
+        "unhidden": "Comment visible again",
+        "liked": "Liked",
+        "unliked": "Like removed"
+      },
+      "badge": {
+        "replied": "Replied publicly",
+        "privateSent": "Private sent",
+        "hidden": "Hidden",
+        "deleted": "Deleted"
+      }
     },
     "reports": {
       "tabs": {

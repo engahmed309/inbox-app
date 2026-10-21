@@ -1,6 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Facebook, Instagram, Youtube, ChevronRight, Search, CornerDownRight, ExternalLink } from 'lucide-react'
+import { Facebook, Instagram, Youtube, ChevronRight, Search, CornerDownRight, ExternalLink, MessageCircle, Send, ThumbsUp, Eye, EyeOff, Trash2 } from 'lucide-react'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime as localeFormatDateTime, formatTime as localeFormatTime } from '../lib/locale'
@@ -73,6 +73,112 @@ export default function CommentsLives() {
           </button>
         ))}
       </div>
+    </div>
+  )
+}
+
+// تعليق واحد من اللايف + عمليات عليه. نفس مسارات شاشة التعليقات العادية (رد علني/خاص/لايك/إخفاء/حذف) فنفس القواعد والرسائل:
+// الخاص فيسبوك/إنستجرام بس (ميتا بتقبله وهو لسه لايف، وبعد ما يخلص ممكن ترفضه)، الحذف والإخفاء كمان، واللايك فيسبوك بس
+function LiveComment({ t, toast, c, onPatch }) {
+  const [composer, setComposer] = useState(null)   // 'public' | 'private'
+  const [text, setText] = useState('')
+  const [busy, setBusy] = useState(false)
+  const P = PLATFORMS.find(p => p.key === c.platform)
+  const isYt = c.platform === 'youtube'
+  const isFb = c.platform === 'facebook'
+  const gone = !!c.deleted_at
+  const name = c.author_name || '—'
+
+  const call = async (path, { method = 'POST', body } = {}) => {
+    const res = await apiFetch(`${API_URL}/comments/${c.id}${path}`, {
+      method, ...(body ? { headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) } : {})
+    })
+    const d = await res.json().catch(() => ({}))
+    if (!res.ok) throw new Error(d.error || 'error')
+    return d
+  }
+  const run = async (fn) => { setBusy(true); try { await fn() } catch (err) { toast.error(err.message) } finally { setBusy(false) } }
+  const now = () => new Date().toISOString()
+
+  const send = () => run(async () => {
+    const message = text.trim()
+    if (!message) return
+    if (composer === 'public') {
+      await call('/reply', { body: { message } })
+      onPatch({ public_reply_at: now(), public_reply_text: message })
+      toast.success(t('comments.lives.actions.sentPublic'))
+    } else {
+      await call('/private-reply', { body: { message } })
+      onPatch({ private_replied_at: now() })
+      toast.success(t('comments.lives.actions.sentPrivate'))
+    }
+    setComposer(null); setText('')
+  })
+  const remove = () => {
+    if (!window.confirm(t('comments.lives.actions.deleteConfirm', { name }))) return
+    run(async () => { await call('', { method: 'DELETE' }); onPatch({ deleted_at: now() }); toast.success(t('comments.lives.actions.deleted')) })
+  }
+  const toggleHide = () => run(async () => {
+    const hide = !c.hidden_at
+    await call('/hide', { body: { hidden: hide } })
+    onPatch({ hidden_at: hide ? now() : null })
+    toast.success(t(hide ? 'comments.lives.actions.hidden' : 'comments.lives.actions.unhidden'))
+  })
+  const toggleLike = () => run(async () => {
+    const like = !c.liked_at
+    await call('/like', { body: { liked: like } })
+    onPatch({ liked_at: like ? now() : null })
+    toast.success(t(like ? 'comments.lives.actions.liked' : 'comments.lives.actions.unliked'))
+  })
+
+  const btn = 'inline-flex items-center gap-1 px-2.5 py-1 rounded-lg text-[11px] font-medium bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40'
+  const open = (mode) => { setComposer(composer === mode ? null : mode); setText('') }
+
+  return (
+    <div className={`bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5 ${gone ? 'opacity-60' : ''}`}>
+      <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle">
+        {P && <P.Icon size={12} className={P.tone} />}
+        <span className="text-[13px] font-semibold text-fg truncate">{name}</span>
+        {c.parent_comment_id && <span className="inline-flex items-center gap-0.5"><CornerDownRight size={11} />{t('comments.lives.reply')}</span>}
+        <span className="flex-1" />
+        {c.mod_status === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">⚠</span>}
+        <span className="tabular-nums">{localeFormatTime(c.posted_at || c.created_at)}</span>
+      </div>
+      <div className="mt-1 text-[13px] text-fg whitespace-pre-wrap break-words" dir="auto">
+        {c.content ? <LinkifiedText text={c.content} /> : <span className="text-fg-subtle">{c.media_type ? `[${c.media_type}]` : t('comments.lives.noText')}</span>}
+      </div>
+      {c.media_url && <a href={c.media_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-brand hover:underline"><ExternalLink size={11} />{c.media_type || 'media'}</a>}
+
+      {(c.public_reply_at || c.private_replied_at || c.hidden_at || gone) && (
+        <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+          {c.public_reply_at && <span className="text-[10px] px-2 py-0.5 rounded-full bg-success/15 text-success">{t('comments.lives.badge.replied')}</span>}
+          {c.private_replied_at && <span className="text-[10px] px-2 py-0.5 rounded-full bg-brand/15 text-brand">{t('comments.lives.badge.privateSent')}</span>}
+          {c.hidden_at && !gone && <span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-3 text-fg-subtle">{t('comments.lives.badge.hidden')}</span>}
+          {gone && <span className="text-[10px] px-2 py-0.5 rounded-full bg-danger/15 text-danger">{t('comments.lives.badge.deleted')}</span>}
+        </div>
+      )}
+
+      {!gone && (
+        <div className="mt-2 flex items-center gap-1.5 flex-wrap">
+          <button disabled={busy} onClick={() => open('public')} className={`${btn} ${composer === 'public' ? '!bg-brand !text-white' : ''}`}><MessageCircle size={12} />{t('comments.lives.actions.public')}</button>
+          {!isYt && !c.private_replied_at && <button disabled={busy} onClick={() => open('private')} className={`${btn} ${composer === 'private' ? '!bg-brand !text-white' : ''}`}><Send size={12} />{t('comments.lives.actions.private')}</button>}
+          {isFb && <button disabled={busy} onClick={toggleLike} className={btn}><ThumbsUp size={12} className={c.liked_at ? 'text-brand' : ''} />{t(c.liked_at ? 'comments.lives.actions.unlike' : 'comments.lives.actions.like')}</button>}
+          {!isYt && <button disabled={busy} onClick={toggleHide} className={btn}>{c.hidden_at ? <Eye size={12} /> : <EyeOff size={12} />}{t(c.hidden_at ? 'comments.lives.actions.unhide' : 'comments.lives.actions.hide')}</button>}
+          {!isYt && <button disabled={busy} onClick={remove} className={`${btn} !text-danger`}><Trash2 size={12} />{t('comments.lives.actions.delete')}</button>}
+        </div>
+      )}
+
+      {composer && !gone && (
+        <div className="mt-2">
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={3} dir="auto" autoFocus
+            placeholder={t(composer === 'public' ? 'comments.lives.actions.publicPlaceholder' : 'comments.lives.actions.privatePlaceholder', { name })}
+            className="w-full px-3 py-2 rounded-xl bg-surface border border-surface-3 text-[13px] text-fg placeholder:text-fg-subtle focus:outline-none focus:border-brand resize-none" />
+          <div className="mt-1.5 flex items-center gap-2 justify-end">
+            <button disabled={busy} onClick={() => { setComposer(null); setText('') }} className={btn}>{t('comments.lives.actions.cancel')}</button>
+            <button disabled={busy || !text.trim()} onClick={send} className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-[12px] font-medium bg-brand text-white disabled:opacity-40"><Send size={12} />{t('comments.lives.actions.send')}</button>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -150,25 +256,10 @@ function LiveDetail({ t, toast, live, onBack, onRefreshLives }) {
         {!loading && !rows.length && <p className="py-8 text-center text-xs text-fg-subtle">{t('comments.lives.emptyLive')}</p>}
 
         <div className="space-y-1.5">
-          {rows.map(c => {
-            const P = PLATFORMS.find(p => p.key === c.platform)
-            return (
-              <div key={c.id} className="bg-surface-2 border border-surface-3 rounded-xl px-3 py-2.5">
-                <div className="flex items-center gap-1.5 text-[11px] text-fg-subtle">
-                  {P && <P.Icon size={12} className={P.tone} />}
-                  <span className="text-[13px] font-semibold text-fg truncate">{c.author_name || '—'}</span>
-                  {c.parent_comment_id && <span className="inline-flex items-center gap-0.5"><CornerDownRight size={11} />{t('comments.lives.reply')}</span>}
-                  <span className="flex-1" />
-                  {c.mod_status === 'pending' && <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-amber-500/15 text-amber-500">⚠</span>}
-                  <span className="tabular-nums">{localeFormatTime(c.posted_at || c.created_at)}</span>
-                </div>
-                <div className="mt-1 text-[13px] text-fg whitespace-pre-wrap break-words" dir="auto">
-                  {c.content ? <LinkifiedText text={c.content} /> : <span className="text-fg-subtle">{c.media_type ? `[${c.media_type}]` : t('comments.lives.noText')}</span>}
-                </div>
-                {c.media_url && <a href={c.media_url} target="_blank" rel="noreferrer" className="mt-1 inline-flex items-center gap-1 text-[11px] text-brand hover:underline"><ExternalLink size={11} />{c.media_type || 'media'}</a>}
-              </div>
-            )
-          })}
+          {rows.map(c => (
+            <LiveComment key={c.id} t={t} toast={toast} c={c}
+              onPatch={(patch) => setRows(prev => prev.map(x => x.id === c.id ? { ...x, ...patch } : x))} />
+          ))}
         </div>
         {hasMore && <button disabled={loading} onClick={() => load(rows.length)} className="w-full py-2 rounded-lg bg-surface-3 text-xs text-fg-muted hover:text-fg">{t('comments.lives.loadMore')}</button>}
       </div>
