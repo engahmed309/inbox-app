@@ -2164,7 +2164,26 @@
       "inbox": "Comments",
       "reports": "Reports",
       "ai": "AI agent",
-      "protection": "Comment protection"
+      "protection": "Comment protection",
+      "lives": "Lives"
+    },
+    "lives": {
+      "title": "Live comments",
+      "hint": "One card per live — comments are recorded silently, with no replies. Read-only.",
+      "liveNow": "Live now",
+      "empty": "No lives recorded yet",
+      "emptyLive": "No comments here",
+      "comments": "{{n}} comments",
+      "duration": "{{n}} min",
+      "held": "{{n}} held",
+      "back": "All lives",
+      "all": "All",
+      "search": "Search live comments…",
+      "loadMore": "Load more",
+      "autoRefresh": "Updating automatically",
+      "noText": "(no text)",
+      "reply": "Reply to a comment",
+      "openPost": "Open broadcast"
     },
     "reports": {
       "tabs": {

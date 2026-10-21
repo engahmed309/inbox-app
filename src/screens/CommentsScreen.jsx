@@ -7,13 +7,14 @@ import { useToast } from '../contexts/ToastContext'
 import {
   MessageSquare, Send, Check, EyeOff, Eye, Facebook, Instagram, Youtube, ExternalLink, X, MessageCircle,
   Trash2, Film, RefreshCw, Search, Archive, RotateCcw, BarChart3, CornerDownRight, Menu, MoreHorizontal,
-  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert, ThumbsUp, LogOut
+  Users, UserCheck, UserX, Inbox, FileBarChart, Bot, ArrowLeftRight, MessageSquareText, Wand2, Ban, CheckCheck, Shuffle, UserPlus, ChevronsLeft, ShieldAlert, ThumbsUp, LogOut, Radio
 } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import LinkifiedText from '../components/LinkifiedText'
 import CommentsReports from '../components/CommentsReports'
 import CommentsAiSettings from '../components/CommentsAiSettings'
 import CommentsModeration from '../components/CommentsModeration'
+import CommentsLives from '../components/CommentsLives'
 import CommentThread from '../components/CommentThread'
 import { RedistributeModal, SavedRepliesModal, BackfillModal, loadSavedReplies, fillSavedReply } from '../components/CommentsAdminModals'
 import { formatDateTime as localeFormatDateTime } from '../lib/locale'
@@ -423,6 +424,7 @@ export default function CommentsScreen() {
         <Section title={t('comments.sections.areas')}>
           <NavItem active={view === 'inbox'} icon={<MessageSquare size={15} />} label={t('comments.areas.inbox')} count={view === 'inbox' ? 0 : byPlatform.all} onClick={() => { setView('inbox'); afterPick() }} />
           {canModerate && <NavItem active={view === 'protection'} icon={<ShieldAlert size={15} />} label={t('comments.areas.protection')} count={modPending} onClick={() => { setView('protection'); afterPick() }} />}
+          {canModerate && <NavItem active={view === 'lives'} icon={<Radio size={15} />} label={t('comments.areas.lives')} onClick={() => { setView('lives'); afterPick() }} />}
           {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
           {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
         </Section>
@@ -562,6 +564,7 @@ export default function CommentsScreen() {
         {view === 'reports' && isAdmin && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
         {view === 'ai' && isAdmin && <CommentsAiSettings />}
         {view === 'protection' && canModerate && <CommentsModeration adminView={isAdmin} />}
+        {view === 'lives' && canModerate && <CommentsLives />}
         {view === 'inbox' && canModerate && modPending > 0 && (
           <button onClick={() => setView('protection')} className="w-full flex items-center gap-2 px-4 py-2.5 bg-danger/10 border-b border-danger/30 text-danger text-[12px] font-medium hover:bg-danger/15">
             <ShieldAlert size={15} className="flex-shrink-0" />
