@@ -893,6 +893,7 @@
     "title": "Reports",
     "sections": {
       "consolidated": "Consolidated report",
+      "incentives": "Incentives board",
       "ai": "AI Reports",
       "overview": "Overview",
       "customers": "Customers",
@@ -1668,12 +1669,14 @@
     "tab": {
       "delays": "Delays",
       "comments": "System alerts",
-      "requests": "Staff requests"
+      "requests": "Staff requests",
+      "reports": "Reports & alerts"
     },
     "empty": {
       "delays": "No delays",
       "comments": "No alerts — all good 👌",
-      "requests": "No requests"
+      "requests": "No requests",
+      "reports": "No reports yet"
     },
     "unreadOnly": "Unread only",
     "allEmployees": "All employees",

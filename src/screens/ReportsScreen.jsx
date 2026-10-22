@@ -11,6 +11,7 @@ import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, 
 import BackArrow from '../components/BackArrow'
 import SubscriptionsReport from '../components/SubscriptionsReport'
 import ConsolidatedReport from '../components/ConsolidatedReport'
+import IncentivesBoard from '../components/IncentivesBoard'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
@@ -18,6 +19,7 @@ import {
 
 const SECTIONS = [
   { key: 'consolidated', labelKey: 'reports.sections.consolidated', icon: FileText },
+  { key: 'incentives', labelKey: 'reports.sections.incentives', icon: Star },
   { key: 'ai', labelKey: 'reports.sections.ai', icon: Sparkles },
   { key: 'overview', labelKey: 'reports.sections.overview', icon: BarChart3 },
   { key: 'customers', labelKey: 'reports.sections.customers', icon: Users2 },
@@ -67,6 +69,7 @@ export default function ReportsScreen() {
 
       <div className="flex-1 overflow-y-auto">
         {section === 'consolidated' && <ConsolidatedReport />}
+        {section === 'incentives' && <IncentivesBoard />}
         {section === 'ai' && <AiReportsTab />}
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}

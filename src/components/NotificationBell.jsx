@@ -5,7 +5,7 @@ import { supabase, API_URL, apiFetch } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { useToast } from '../contexts/ToastContext'
 import { formatDateTime } from '../lib/locale'
-import { Bell, Check, X, UserPlus, Tag, Clock, ShieldAlert, Bot, ArrowLeftRight, Server, TrendingUp, BarChart3 } from 'lucide-react'
+import { Bell, Check, X, UserPlus, Tag, Clock, ShieldAlert, Bot, ArrowLeftRight, Server, TrendingUp, BarChart3, AlertTriangle } from 'lucide-react'
 
 const NOTIFICATIONS_PAGE_SIZE = 30
 
@@ -15,6 +15,8 @@ const TABS = [
   { key: 'delays', types: ['response_delay'], icon: Clock },
   { key: 'comments', types: ['comment_problem', 'system_alert', 'comment_insight'], icon: ShieldAlert, adminOnly: true },
   { key: 'requests', types: ['transfer_request', 'transfer_response', 'admin_request', 'request_response'], icon: UserPlus },
+  // التقرير الأسبوعي وتنبيهات أداء الموظفين (للأدمن): الضغط عليها بيفتح التقرير المجمّع على الفترة المناسبة
+  { key: 'reports', types: ['weekly_report', 'agent_alert'], icon: BarChart3, adminOnly: true },
 ]
 const ACTIONABLE = ['transfer_request', 'admin_request']
 // "_" و"%" معناها حاجة في ilike، فبنهرّبها عشان اسم موظف فيه واحد منهم مايبوّظش الفلتر
@@ -30,7 +32,7 @@ export default function NotificationBell() {
   const tabs = TABS.filter(x => !x.adminOnly || isAdmin)
 
   const [items, setItems] = useState([])
-  const [counts, setCounts] = useState({ delays: 0, comments: 0, requests: 0 })   // غير المقروء لكل قسم
+  const [counts, setCounts] = useState({ delays: 0, comments: 0, requests: 0, reports: 0 })   // غير المقروء لكل قسم
   const [tab, setTab] = useState('delays')
   const [unreadOnly, setUnreadOnly] = useState(false)
   const [employee, setEmployee] = useState('all')   // 'all' | 'none' | اسم الموظف — فلتر تبويب التأخيرات (للأدمن)
@@ -134,7 +136,7 @@ export default function NotificationBell() {
   useEffect(() => {
     if (!open) return
     if ((counts[tab] || 0) > 0) return
-    const next = ['requests', 'comments', 'delays'].find(k => tabs.some(x => x.key === k) && (counts[k] || 0) > 0)
+    const next = ['requests', 'reports', 'comments', 'delays'].find(k => tabs.some(x => x.key === k) && (counts[k] || 0) > 0)
     if (next && next !== tab) setTab(next)
   }, [open]) // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -170,6 +172,11 @@ export default function NotificationBell() {
   const openNotification = (n) => {
     markRead(n)
     if (n.type === 'comment_problem') { setOpen(false); navigate('/comments'); return }
+    if (n.type === 'weekly_report' || n.type === 'agent_alert') {
+      // الفترة اللي الإشعار عن (prev7 = آخر ٧ أيام كاملة) بيقراها التقرير المجمّع أول ما يفتح
+      try { sessionStorage.setItem('consolidated.preset', n.type === 'weekly_report' ? 'prev7' : '7d') } catch { /* مش مهم */ }
+      setOpen(false); navigate('/reports'); return
+    }
     // منشور بينتشر: الرابط في آخر النص — بنفتح المنشور نفسه؛ الملخص اليومي بيفتح التعليقات
     if (n.type === 'comment_insight') {
       const link = (n.body || '').match(/https?:\/\/\S+/)?.[0]
@@ -226,6 +233,8 @@ export default function NotificationBell() {
   const icon = (n) => {
     if (n.type === 'admin_request') return <Tag size={13} className="text-brand" />
     if (n.type === 'response_delay') return <Clock size={13} className="text-danger" />
+    if (n.type === 'weekly_report') return <BarChart3 size={13} className="text-brand" />
+    if (n.type === 'agent_alert') return <AlertTriangle size={13} className="text-amber-500" />
     if (n.type === 'comment_insight') return /🚀/.test(n.title || '') ? <TrendingUp size={13} className="text-success" /> : <BarChart3 size={13} className="text-brand" />
     if (n.type === 'system_alert') return <Server size={13} className={/✅/.test(n.title || '') ? 'text-success' : 'text-danger'} />
     if (n.type === 'comment_problem') return /الذكاء|لحد التكلفة/.test(n.title || '') ? <Bot size={13} className="text-amber-500" /> : <ShieldAlert size={13} className="text-danger" />

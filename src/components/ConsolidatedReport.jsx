@@ -9,7 +9,7 @@ import { useToast } from '../contexts/ToastContext'
 // النصوص عربي ثابت هنا (التقرير بالعربي وناتج الذكاء الاصطناعي بالعربي) بدل مفاتيح الترجمة.
 
 const TZ = 'Africa/Cairo'
-const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'))
+export const fmt = (n) => (n == null ? '—' : Number(n).toLocaleString('en-US'))
 const ymdCairo = (d) => new Intl.DateTimeFormat('en-CA', { timeZone: TZ }).format(d)
 function cairoMidnight(ymd) {
   const noon = new Date(`${ymd}T12:00:00Z`)
@@ -20,13 +20,14 @@ function cairoMidnight(ymd) {
 const addDays = (ymd, n) => ymdCairo(new Date(new Date(`${ymd}T12:00:00Z`).getTime() + n * 86400000))
 
 const PRESETS = [
-  { key: '7d', label: 'آخر 7 أيام' }, { key: '30d', label: 'آخر 30 يوم' },
+  { key: '7d', label: 'آخر 7 أيام' }, { key: 'prev7', label: 'آخر 7 أيام كاملة' }, { key: '30d', label: 'آخر 30 يوم' },
   { key: 'month', label: 'هذا الشهر' }, { key: 'lastMonth', label: 'الشهر الماضي' }, { key: 'custom', label: 'فترة مخصصة' },
 ]
-function rangeFor(preset, customFrom, customTo) {
+export function rangeFor(preset, customFrom, customTo) {
   const today = ymdCairo(new Date())
   let a, b
   if (preset === '7d') { a = addDays(today, -6); b = addDays(today, 1) }
+  else if (preset === 'prev7') { a = addDays(today, -7); b = today }   // الأسبوع اللي خلص امبارح (من غير النهارده) — اللي التقرير الأسبوعي بيغطيه
   else if (preset === '30d') { a = addDays(today, -29); b = addDays(today, 1) }
   else if (preset === 'month') { a = `${today.slice(0, 8)}01`; b = addDays(today, 1) }
   else if (preset === 'lastMonth') {
@@ -36,7 +37,7 @@ function rangeFor(preset, customFrom, customTo) {
   return { from: cairoMidnight(a).toISOString(), to: cairoMidnight(b).toISOString(), label: `${a} → ${addDays(b, -1)}` }
 }
 
-const dur = (s) => {
+export const dur = (s) => {
   if (s == null) return '—'
   if (s < 60) return `${Math.round(s)} ث`
   if (s < 3600) return `${Math.floor(s / 60)} د${Math.round(s % 60) ? ` ${Math.round(s % 60)} ث` : ''}`
@@ -55,7 +56,7 @@ function Delta({ pct, invert = false, suffix = '%' }) {
   const Icon = pct > 0 ? TrendingUp : TrendingDown
   return <span className={`inline-flex items-center gap-0.5 text-[11px] font-medium ${good ? 'text-success' : 'text-danger'}`}><Icon size={12} />{Math.abs(pct)}{suffix}</span>
 }
-const Card = ({ title, hint, right, children, className = '' }) => (
+export const Card = ({ title, hint, right, children, className = '' }) => (
   <section className={`bg-surface-2 border border-surface-3 rounded-2xl p-4 break-inside-avoid ${className}`}>
     {(title || right) && (
       <div className="flex items-start gap-2 mb-3">
@@ -140,7 +141,7 @@ export function ReportBody({ data, ai, range, print }) {
       </Card>
 
       {/* الموظفين */}
-      <Card title="أداء الموظفين" hint="التحويل = حجوزات ÷ عملاء كلّمهم الموظف في الفترة. وسيط أول رد = وقت الرد على أول رسالة من العميل في كل دفعة (الوسيط أدق من المتوسط لأن رد الصبح على رسالة الليل بيبوّظ المتوسط). ساعات الاتصال من نبضات التطبيق.">
+      <Card title="أداء الموظفين" hint="التحويل = حجوزات ÷ عملاء كلّمهم الموظف في الفترة، من غير محادثات وكيل الكومنتات (دي بتتعرض جنب العدد). وسيط أول رد = وقت الرد على أول رسالة من العميل في كل دفعة (الوسيط أدق من المتوسط لأن رد الصبح على رسالة الليل بيبوّظ المتوسط). ساعات الاتصال من نبضات التطبيق.">
         <div className="overflow-x-auto -mx-1">
           <table className="w-full text-[12px] min-w-[860px]">
             <thead><tr className="text-fg-subtle text-start border-b border-surface-3">
@@ -154,7 +155,7 @@ export function ReportBody({ data, ai, range, print }) {
                   <tr key={a.agent_id} className="border-b border-surface-3/60">
                     <td className="py-2 px-1.5 font-semibold text-fg whitespace-nowrap">{a.name}</td>
                     {cell(a.bookings, a.bookings === bestBk && bestBk > 0)}
-                    {cell(fmt(a.customers))}
+                    <td className="py-2 px-1.5 tabular-nums whitespace-nowrap text-fg">{fmt(a.customers)}{a.customers_comments > 0 && <span className="text-[10px] text-fg-subtle"> ({fmt(a.customers_comments)} من الكومنتات)</span>}</td>
                     {cell(a.conversion_pct != null ? `${a.conversion_pct}%` : '—', a.conversion_pct === bestConv && a.customers >= awards.min_customers)}
                     {cell(dur(a.median_reply_s), a.median_reply_s === bestSpeed && a.replies_n >= 20)}
                     {cell(a.within5_pct != null ? `${a.within5_pct}%` : '—')}
@@ -269,6 +270,26 @@ export function ReportBody({ data, ai, range, print }) {
           </div>)}
       </Card>
 
+      {/* الإعلانات وتكلفة الحجز */}
+      <Card title="الإعلانات وتكلفة الحجز" hint={data.ads?.note || 'الصرف من ميتا + المحادثات اللي وصلت عندنا فعلًا من الإعلانات ووصلت لأنهي مرحلة. تكلفة الحجز = الصرف ÷ حجوزات الفترة اللي جاية من محادثات إعلانية.'}>
+        {data.ads?.available ? (<>
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
+            <Kpi label={`الصرف (${data.ads.currency || ''})`} value={fmt(Math.round(data.ads.spend))} sub={`${fmt(data.ads.impressions)} ظهور · ${fmt(data.ads.clicks)} نقرة`} />
+            <Kpi label="محادثات من الإعلانات" value={fmt(data.ads.our_conversations)} sub={data.ads.cost_per_conversation != null ? `${data.ads.cost_per_conversation} ${data.ads.currency || ''} للمحادثة` : `ميتا بتقول ${fmt(data.ads.meta_conversations)}`} />
+            <Kpi label="حجوزات من الإعلانات" value={fmt(data.ads.bookings_in_period)} sub={`وصلوا للباقات ${fmt(data.ads.packages)} · للدفع ${fmt(data.ads.payment)}`} />
+            <Kpi label="تكلفة الحجز" value={data.ads.cost_per_booking != null ? fmt(data.ads.cost_per_booking) : '—'} sub={data.ads.currency || undefined} />
+          </div>
+          {data.ads.by_ad.length > 0 && (
+            <div className="overflow-x-auto mt-3 -mx-1"><table className="w-full text-[12px] min-w-[560px]">
+              <thead><tr className="text-fg-subtle border-b border-surface-3">{['الإعلان', 'الصرف', 'محادثات', 'باقات', 'دفع', 'حجز', 'تكلفة الحجز'].map(h => <th key={h} className="py-1.5 px-1.5 font-medium text-start">{h}</th>)}</tr></thead>
+              <tbody>{data.ads.by_ad.map(a => (
+                <tr key={a.ad_id} className="border-b border-surface-3/60 text-fg"><td className="py-1.5 px-1.5 max-w-[220px] truncate">{a.name}</td><td className="px-1.5 tabular-nums">{fmt(a.spend)}</td><td className="px-1.5 tabular-nums">{a.conversations}</td><td className="px-1.5 tabular-nums">{a.packages}</td><td className="px-1.5 tabular-nums">{a.payment}</td><td className="px-1.5 tabular-nums">{a.booked}</td><td className="px-1.5 tabular-nums">{a.cost_per_booking != null ? fmt(a.cost_per_booking) : '—'}</td></tr>
+              ))}</tbody>
+            </table></div>
+          )}
+        </>) : <p className="text-xs text-fg-subtle">مفيش صرف إعلاني ولا محادثات من إعلانات في الفترة دي (الإعلانات واقفة). أول ما تشتغل التكلفة هتظهر هنا لوحدها.</p>}
+      </Card>
+
       {/* تحليل الذكاء الاصطناعي */}
       {ai && <AiSection ai={ai} />}
     </div>
@@ -327,6 +348,16 @@ function AiSection({ ai }) {
             </div>
           ))}
         </div>
+        {n.objection_replies?.length > 0 && (
+          <div className="mt-4"><p className="text-[12px] font-bold text-fg mb-1.5">ردود جاهزة للاعتراضات المتكررة</p>
+            <div className="space-y-2">{n.objection_replies.map((r, i) => (
+              <div key={i} className="rounded-xl bg-surface border border-surface-3 p-3">
+                <p className="text-[11px] text-fg-subtle">الاعتراض: «{r.objection}»</p>
+                <p className="text-[13px] text-fg mt-1 whitespace-pre-wrap leading-relaxed">{r.reply}</p>
+                <button onClick={() => { try { navigator.clipboard.writeText(r.reply) } catch { /* مش مهم */ } }} className="no-print mt-1.5 text-[11px] text-brand hover:underline">نسخ الرد</button>
+              </div>
+            ))}</div></div>
+        )}
         {n.team_ideas?.length > 0 && <div className="mt-4"><p className="text-[12px] font-bold text-fg mb-1">أفكار لتحفيز الفريق وتطويره</p><ul className="list-disc ps-5 space-y-1">{n.team_ideas.map((s, i) => <li key={i} className="text-[12px] text-fg-muted">{s}</li>)}</ul></div>}
         {n.caveats?.length > 0 && <div className="mt-4 rounded-lg bg-amber-500/10 p-3"><p className="text-[11px] font-bold text-amber-500 mb-1">حدود الأرقام</p><ul className="list-disc ps-5">{n.caveats.map((s, i) => <li key={i} className="text-[11px] text-fg-muted">{s}</li>)}</ul></div>}
       </Card>
@@ -363,7 +394,7 @@ const STEP_AR = { quality: 'بقيّم جودة محادثات الموظفين'
 
 export default function ConsolidatedReport() {
   const toast = useToast()
-  const [preset, setPreset] = useState('7d')
+  const [preset, setPreset] = useState(() => { try { const p = sessionStorage.getItem('consolidated.preset'); if (p) { sessionStorage.removeItem('consolidated.preset'); return p } } catch { /* مش مهم */ } return '7d' })
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
   const [data, setData] = useState(null)
@@ -372,6 +403,7 @@ export default function ConsolidatedReport() {
   const [error, setError] = useState(null)
   const [ai, setAi] = useState(null)
   const [aiJob, setAiJob] = useState(null)   // { step, progress }
+  const [cap, setCap] = useState(() => { try { return Number(localStorage.getItem('consolidated.aiCap')) || 0.25 } catch { return 0.25 } })   // سقف تكلفة التحليل بالدولار
   const [printing, setPrinting] = useState(false)
   const reqId = useRef(0)
 
@@ -396,7 +428,7 @@ export default function ConsolidatedReport() {
     if (!range) return
     setAiJob({ step: 'quality', progress: 0 })
     try {
-      const res = await apiFetch(`${API_URL}/reports/consolidated/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: range.from, to: range.to, force }) })
+      const res = await apiFetch(`${API_URL}/reports/consolidated/ai`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ from: range.from, to: range.to, force, max_cost_usd: cap }) })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       if (d.result) { setAi(d.result); setAiJob(null); return }
@@ -434,6 +466,7 @@ export default function ConsolidatedReport() {
           .print-root { display: block !important; padding: 16px; --color-surface: 255 255 255; --color-surface-2: 248 248 250; --color-surface-3: 228 228 231; --color-fg: 24 24 27; --color-fg-muted: 82 82 91; --color-fg-subtle: 120 120 130; --color-brand: 124 92 252; --color-success: 13 148 120; --color-danger: 220 38 38; background: #fff; color: rgb(24 24 27); }
           body { background: #fff !important; }
           .break-inside-avoid { break-inside: avoid; }
+          .no-print { display: none !important; }
           @page { size: A4; margin: 10mm; }
         }
       `}</style>
@@ -461,8 +494,8 @@ export default function ConsolidatedReport() {
 
       {data && (<>
         <Card title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-brand" />تحليل بالذكاء الاصطناعي</span>}
-          hint="بيقيّم عينة من محادثات كل موظف، ويحلّل أسباب ضياع العملاء، ويكتب التحليل والتوصيات وملاحظات كل موظف، ويضيف جودة المحادثة للموظف المثالي. بياخد حوالي دقيقة-دقيقتين وبيكلّف أقل من دولار."
-          right={!aiJob && <button onClick={() => runAi(!!ai)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-brand text-white flex-shrink-0"><Sparkles size={13} />{ai ? 'إعادة التحليل' : 'ابدأ التحليل'}</button>}>
+          hint={`بيقيّم عينة من محادثات كل موظف، ويحلّل أسباب ضياع العملاء، ويكتب التحليل والتوصيات وملاحظات كل موظف، ويضيف جودة المحادثة للموظف المثالي. بياخد حوالي دقيقة-دقيقتين. التكلفة المتوقعة ≈ ${data.ai_estimate_usd ?? '—'} والتحليل بيقف عند السقف اللي تختاره.`}
+          right={!aiJob && <div className="flex items-center gap-2 flex-shrink-0"><label className="flex items-center gap-1 text-[11px] text-fg-muted">السقف <select value={cap} onChange={e => { const v = Number(e.target.value); setCap(v); try { localStorage.setItem('consolidated.aiCap', String(v)) } catch { /* مش مهم */ } }} className="bg-surface border border-surface-3 rounded-lg px-1.5 py-1 text-fg">{[0.15, 0.25, 0.5, 1].map(v => <option key={v} value={v}>${v}</option>)}</select></label><button onClick={() => runAi(!!ai)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-brand text-white"><Sparkles size={13} />{ai ? 'إعادة التحليل' : 'ابدأ التحليل'}</button></div>}>
           {aiJob ? (
             <div className="flex items-center gap-3 text-xs text-fg-muted"><div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />{STEP_AR[aiJob.step] || 'شغّال…'}{aiJob.progress ? ` ${aiJob.progress}%` : ''}</div>
           ) : ai ? <p className="text-xs text-success">التحليل جاهز وظاهر في الصفحة (وبيدخل في PDF وExcel).</p> : <p className="text-xs text-fg-subtle">لسه ماتعملش تحليل لهذه الفترة.</p>}
