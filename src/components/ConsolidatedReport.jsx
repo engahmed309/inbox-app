@@ -4,6 +4,7 @@ import { Sparkles, Printer, FileSpreadsheet, RefreshCw, TrendingUp, TrendingDown
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
 import { API_URL, apiFetch } from '../lib/supabase'
 import { useToast } from '../contexts/ToastContext'
+import { useAuth } from '../contexts/AuthContext'
 
 // التقرير المجمّع — شاشة واحدة بكل أرقام الفترة + تحليل الذكاء الاصطناعي + تصدير PDF/Excel.
 // النصوص عربي ثابت هنا (التقرير بالعربي وناتج الذكاء الاصطناعي بالعربي) بدل مفاتيح الترجمة.
@@ -407,6 +408,8 @@ const STEP_AR = { quality: 'بقيّم جودة محادثات الموظفين'
 
 export default function ConsolidatedReport() {
   const toast = useToast()
+  const { agent } = useAuth()
+  const isAdmin = agent?.role === 'admin'   // المشرف بيشوف الأرقام وتحليل اتعمل قبل كده، لكن مابيبدأش تحليل جديد (بيصرف)
   const [preset, setPreset] = useState(() => { try { const p = sessionStorage.getItem('consolidated.preset'); if (p) { sessionStorage.removeItem('consolidated.preset'); return p } } catch { /* مش مهم */ } return '7d' })
   const [customFrom, setCustomFrom] = useState('')
   const [customTo, setCustomTo] = useState('')
@@ -431,6 +434,9 @@ export default function ConsolidatedReport() {
       if (!res.ok) throw new Error(d.error || 'تعذّر تحميل التقرير')
       if (id !== reqId.current) return
       setData(d); setRange(r)
+      // تحليل اتعمل قبل كده لنفس الفترة (من غير ما نبدأ تحليل جديد ولا نصرف): بيظهر لأي حد بيفتح التقرير، المشرف كمان
+      apiFetch(`${API_URL}/reports/consolidated/ai-cached?from=${encodeURIComponent(r.from)}&to=${encodeURIComponent(r.to)}`)
+        .then(x => x.json()).then(c => { if (id === reqId.current && c?.result) setAi(c.result) }).catch(() => {})
     } catch (err) { if (id === reqId.current) { setError(err.message); setData(null) } }
     finally { if (id === reqId.current) setLoading(false) }
   }, [preset, customFrom, customTo])
@@ -508,7 +514,7 @@ export default function ConsolidatedReport() {
       {data && (<>
         <Card title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-brand" />تحليل بالذكاء الاصطناعي</span>}
           hint={`بيقيّم عينة من محادثات كل موظف، ويحلّل أسباب ضياع العملاء، ويكتب التحليل والتوصيات وملاحظات كل موظف، ويضيف جودة المحادثة للموظف المثالي. بياخد حوالي دقيقة-دقيقتين. التكلفة المتوقعة ≈ ${data.ai_estimate_usd ?? '—'} والتحليل بيقف عند السقف اللي تختاره.`}
-          right={!aiJob && <div className="flex items-center gap-2 flex-shrink-0"><label className="flex items-center gap-1 text-[11px] text-fg-muted">السقف <select value={cap} onChange={e => { const v = Number(e.target.value); setCap(v); try { localStorage.setItem('consolidated.aiCap', String(v)) } catch { /* مش مهم */ } }} className="bg-surface border border-surface-3 rounded-lg px-1.5 py-1 text-fg">{[0.15, 0.25, 0.5, 1].map(v => <option key={v} value={v}>${v}</option>)}</select></label><button onClick={() => runAi(!!ai)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-brand text-white"><Sparkles size={13} />{ai ? 'إعادة التحليل' : 'ابدأ التحليل'}</button></div>}>
+          right={!aiJob && isAdmin && <div className="flex items-center gap-2 flex-shrink-0"><label className="flex items-center gap-1 text-[11px] text-fg-muted">السقف <select value={cap} onChange={e => { const v = Number(e.target.value); setCap(v); try { localStorage.setItem('consolidated.aiCap', String(v)) } catch { /* مش مهم */ } }} className="bg-surface border border-surface-3 rounded-lg px-1.5 py-1 text-fg">{[0.15, 0.25, 0.5, 1].map(v => <option key={v} value={v}>${v}</option>)}</select></label><button onClick={() => runAi(!!ai)} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs bg-brand text-white"><Sparkles size={13} />{ai ? 'إعادة التحليل' : 'ابدأ التحليل'}</button></div>}>
           {aiJob ? (
             <div className="flex items-center gap-3 text-xs text-fg-muted"><div className="w-4 h-4 border-2 border-brand border-t-transparent rounded-full animate-spin" />{STEP_AR[aiJob.step] || 'شغّال…'}{aiJob.progress ? ` ${aiJob.progress}%` : ''}</div>
           ) : ai ? <p className="text-xs text-success">التحليل جاهز وظاهر في الصفحة (وبيدخل في PDF وExcel).</p> : <p className="text-xs text-fg-subtle">لسه ماتعملش تحليل لهذه الفترة.</p>}

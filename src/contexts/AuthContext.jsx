@@ -4,6 +4,12 @@ import { supabase, API_URL, apiFetch } from '../lib/supabase'
 
 const AuthContext = createContext(null)
 
+// المشرف (role = 'supervisor'): عرض فقط للمحادثات والكومنتات والتقارير. صلاحيات الرؤية بتتظبط هنا في الواجهة (بيشوف كل المحادثات والكومنتات،
+// من غير المكالمات ولا الرد على محادثات الذكاء الاصطناعي)؛ منع الكتابة نفسه مفروض على السيرفر (requireAuth) وفي الداتابيز (سياسات RLS)
+const withSupervisorView = (ag) => (ag?.role === 'supervisor'
+  ? { ...ag, access_scope: 'both', can_see_all_conversations: true, can_view_calls: false, can_see_ai_chats: true, can_see_ai_comment_dms: true, can_reply_ai_chats: false, can_reply_ai_comment_dms: false }
+  : ag)
+
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
   const [agent, setAgent] = useState(null)
@@ -79,11 +85,11 @@ export function AuthProvider({ children }) {
     if (googleName && googleName !== ag.name) updates.name = googleName
     if (googleAvatar && googleAvatar !== ag.avatar_url) updates.avatar_url = googleAvatar
 
-    let finalAgent = ag
+    let finalAgent = withSupervisorView(ag)
     if (Object.keys(updates).length) {
       const { data: updated, error: syncErr } = await supabase.from('agents').update(updates).eq('id', ag.id).select().single()
       if (syncErr) console.error('فشل مزامنة بيانات الملف الشخصي من جوجل:', syncErr.message)
-      if (updated) finalAgent = updated
+      if (updated) finalAgent = withSupervisorView(updated)
     }
 
     setAuthError('')

@@ -1324,7 +1324,7 @@ export default function ConversationsScreen() {
           </div>
           <div className={`flex items-center gap-1 ${expanded ? 'flex-wrap' : 'flex-col'}`}>
             <button onClick={() => setShowNewConv(true)} title={t('conversations.newConversation.title')}
-              className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
+              className={`w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors ${agent?.role === 'supervisor' ? 'hidden' : ''}`}>
               <UserPlus size={15} />
             </button>
             <button onClick={toggleTheme}
@@ -1355,7 +1355,7 @@ export default function ConversationsScreen() {
                 <Megaphone size={15} />
               </button>
             )}
-            {agent?.role === 'admin' && (
+            {(agent?.role === 'admin' || agent?.role === 'supervisor') && (
               <button onClick={() => navigate('/reports')} title={t('conversations.sidebar.reportsTitle')}
                 className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3 transition-colors">
                 <BarChart3 size={15} />

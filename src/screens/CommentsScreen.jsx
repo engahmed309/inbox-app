@@ -84,6 +84,7 @@ export default function CommentsScreen() {
   const scrollRef = useRef(null)
 
   const isAdmin = agent?.role === 'admin'
+  const isSupervisor = agent?.role === 'supervisor'   // عرض فقط
   const canSee = isAdmin || ['comments', 'both'].includes(agent?.access_scope)
   const isWide = () => typeof window !== 'undefined' && window.innerWidth >= 1024
 
@@ -426,7 +427,7 @@ export default function CommentsScreen() {
           {canModerate && <NavItem active={view === 'protection'} icon={<ShieldAlert size={15} />} label={t('comments.areas.protection')} count={modPending} onClick={() => { setView('protection'); afterPick() }} />}
           {canModerate && <NavItem active={view === 'lives'} icon={<Radio size={15} />} label={t('comments.areas.lives')} onClick={() => { setView('lives'); afterPick() }} />}
           {isAdmin && <NavItem active={view === 'ai'} icon={<Bot size={15} />} label={t('comments.areas.ai')} onClick={() => { setView('ai'); afterPick() }} />}
-          {isAdmin && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
+          {(isAdmin || isSupervisor) && <NavItem active={view === 'reports'} icon={<FileBarChart size={15} />} label={t('comments.areas.reports')} onClick={() => { setView('reports'); afterPick() }} />}
         </Section>
 
         {isAdmin && team && (
@@ -561,7 +562,7 @@ export default function CommentsScreen() {
           )}
         </div>
 
-        {view === 'reports' && isAdmin && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
+        {view === 'reports' && (isAdmin || isSupervisor) && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
         {view === 'ai' && isAdmin && <CommentsAiSettings />}
         {view === 'protection' && canModerate && <CommentsModeration adminView={isAdmin} />}
         {view === 'lives' && canModerate && <CommentsLives />}
@@ -719,7 +720,7 @@ export default function CommentsScreen() {
                     )}
                     <AiBadge c={c} now={nowTick} canStop={isAdmin || !!aiStatus?.can_act} onStop={() => stopAi(c)} stopping={busy === c.id} />
 
-                    <div className="flex items-center gap-2 mt-3">
+                    <div className={`flex items-center gap-2 mt-3 ${isSupervisor ? 'hidden' : ''}`}>
                       {status === 'archived' ? (
                         <button onClick={() => patchComment(c, { archived: false })} disabled={busy === c.id}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40">

@@ -292,6 +292,7 @@
       "colorLabel": "اللون",
       "role": "الدور",
       "roleAgent": "موظف",
+      "roleSupervisor": "مشرف (عرض فقط)",
       "roleAdmin": "مدير",
       "name": "الاسم",
       "email": "البريد الإلكتروني",

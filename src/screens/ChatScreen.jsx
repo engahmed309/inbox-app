@@ -1097,7 +1097,8 @@ export default function ChatScreen() {
   const seesAiDms = !!(agent?.can_see_ai_comment_dms || agent?.can_reply_ai_comment_dms)
   const isForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id && !(conv.ai_active && seesAiChats) && !(conv.ai_comment_origin && seesAiDms)
   // محادثة معيّنة لزميل وأنا شايفها بس (بسماح من الأدمن) من غير صلاحية رد: نقفل مربع الكتابة بدل ما الرد يترفض من السيرفر
-  const viewOnlyForeign = !!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id
+  const isSupervisor = agent?.role === 'supervisor'
+  const viewOnlyForeign = isSupervisor || (!!conv && !canSeeAll && !!conv.assigned_agent_id && conv.assigned_agent_id !== agent?.id)
     && !(conv.ai_active && agent?.can_reply_ai_chats) && !(conv.ai_comment_origin && agent?.can_reply_ai_comment_dms)
   foreignRef.current = isForeign
   const [ownerName, setOwnerName] = useState('')
@@ -1350,7 +1351,7 @@ export default function ChatScreen() {
 
       {/* Input */}
       <div className="flex-shrink-0 px-3 py-3 bg-surface-2 border-t border-surface-3 relative">
-        <div className="flex items-center gap-1.5 mb-2">
+        <div className={`flex items-center gap-1.5 mb-2 ${isSupervisor ? 'hidden' : ''}`}>
           <button onClick={() => setShowNoteBox(v => !v)}
             className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors ${showNoteBox ? 'bg-follow text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
             <StickyNote size={13} /> {t('chat.composer.internalNoteButton')}
@@ -1440,7 +1441,7 @@ export default function ChatScreen() {
         ) : viewOnlyForeign ? (
           <div className="flex items-center gap-2.5 bg-surface-3 rounded-xl px-4 py-3 text-sm text-fg-muted">
             <Eye size={18} className="flex-shrink-0" />
-            <span>{t('chat.composer.viewOnlyNotice', { name: ownerName || '…' })}</span>
+            <span>{isSupervisor ? 'حساب مشرف: عرض فقط — مينفعش ترد أو تعدّل في المحادثة' : t('chat.composer.viewOnlyNotice', { name: ownerName || '…' })}</span>
           </div>
         ) : contact?.is_blocked ? (
           <div className="flex items-center gap-2.5 bg-danger/10 rounded-xl px-4 py-3 text-sm text-danger">

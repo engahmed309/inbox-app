@@ -40,7 +40,8 @@ export default function ReportsScreen() {
   const { agent } = useAuth()
   const navigate = useNavigate()
 
-  if (agent?.role !== 'admin') return (
+  const canView = agent?.role === 'admin' || agent?.role === 'supervisor'
+  if (!canView) return (
     <div className="h-full flex items-center justify-center text-fg-muted">
       <p>{t('reports.unauthorized')}</p>
     </div>
@@ -58,7 +59,7 @@ export default function ReportsScreen() {
 
       {/* Sections */}
       <div className="flex border-b border-surface-3 bg-surface-2 overflow-x-auto">
-        {SECTIONS.map(s => (
+        {SECTIONS.filter(s => agent?.role === 'admin' || s.key !== 'export').map(s => (
           <button key={s.key} onClick={() => setSection(s.key)}
             className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors ${section === s.key ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
             <s.icon size={14} />

@@ -355,6 +355,7 @@ function AgentsTab() {
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
               <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="supervisor">{t('settings.common.roleSupervisor')}</option>
               <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
@@ -389,6 +390,7 @@ function AgentsTab() {
             <select value={inviteForm.role} onChange={e => setInviteForm({ ...inviteForm, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
               <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="supervisor">{t('settings.common.roleSupervisor')}</option>
               <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
@@ -709,6 +711,7 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onToggleSuspend,
             <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })}
               className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg focus:outline-none focus:ring-1 focus:ring-brand">
               <option value="agent">{t('settings.common.roleAgent')}</option>
+              <option value="supervisor">{t('settings.common.roleSupervisor')}</option>
               <option value="admin">{t('settings.common.roleAdmin')}</option>
             </select>
           </div>
@@ -739,14 +742,14 @@ function AgentCard({ agent, counts, onEdit, onDelete, onUpdate, onToggleSuspend,
                   <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-follow/15 text-follow">{t('settings.agents.neverLoggedIn')}</span>
                 )}
               </div>
-              <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? t('settings.common.roleAdmin') : t('settings.common.roleAgent')}</p>
+              <p className="text-xs text-fg-muted">{agent.email} · {agent.role === 'admin' ? t('settings.common.roleAdmin') : agent.role === 'supervisor' ? t('settings.common.roleSupervisor') : t('settings.common.roleAgent')}</p>
               <p className="text-xs text-fg-subtle">{t('settings.agents.limitPrefix')} {agent.max_conversations == null ? t('settings.common.unlimited') : t('settings.common.conversationsCount', { count: agent.max_conversations })}</p>
             </div>
             <div className="flex gap-1.5">
               <button onClick={resetPassword} title={t('settings.agents.resetPasswordTitle')} className="w-8 h-8 flex items-center justify-center text-fg-muted hover:text-fg rounded-lg hover:bg-surface-3">
                 <KeyRound size={14} />
               </button>
-              {agent.role === 'agent' && (
+              {['agent', 'supervisor'].includes(agent.role) && (
                 <button onClick={onToggleSuspend} title={agent.is_suspended ? t('settings.agents.suspend.unsuspendTitle') : t('settings.agents.suspend.suspendTitle')}
                   className={`w-8 h-8 flex items-center justify-center rounded-lg hover:bg-surface-3 ${agent.is_suspended ? 'text-success hover:text-success' : 'text-fg-muted hover:text-follow'}`}>
                   {agent.is_suspended ? <PlayCircle size={14} /> : <PauseCircle size={14} />}

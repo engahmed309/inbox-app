@@ -204,6 +204,7 @@
       "colorLabel": "Color",
       "role": "Role",
       "roleAgent": "Agent",
+      "roleSupervisor": "Supervisor (view only)",
       "roleAdmin": "Admin",
       "name": "Name",
       "email": "Email",
