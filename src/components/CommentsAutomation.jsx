@@ -85,6 +85,7 @@ export default function CommentsAutomation() {
               {a.stats.failed > 0 && <span className="text-danger">فشلت: <b className="tabular-nums">{a.stats.failed}</b></span>}
             </div>
             <div className="mt-2.5 flex items-center gap-1.5 flex-wrap">
+              {a.post_permalink && <a href={a.post_permalink} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-brand/10 text-brand hover:bg-brand/20"><ExternalLink size={12} />افتح الفيديو</a>}
               <button disabled={busy === a.id} onClick={() => toggle(a)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40">{a.enabled ? 'إيقاف' : 'تشغيل'}</button>
               <button disabled={busy === a.id} onClick={() => setEditing({ ...a, public_replies: (a.public_replies || []).join('\n'), extra_keywords: (a.extra_keywords || []).join('، '), fallback_public: a.fallback_public || '' })} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg"><Pencil size={12} />تعديل</button>
               <button disabled={busy === a.id || !a.enabled} onClick={() => backfill(a)} className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-[11px] bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40"><Play size={12} />طبّق على التعليقات السابقة</button>
@@ -139,18 +140,29 @@ export function Editor({ toast, call, defaults, initial, onClose, onSaved }) {
             <div className="flex gap-3 items-center">
               {f.post_thumbnail && <img src={f.post_thumbnail} alt="" className="w-14 h-14 rounded-xl object-cover" />}
               <div className="min-w-0"><p className="text-[11px] text-fg-subtle">{PLATFORM_AR[f.platform]} · الفيديو مابيتغيّرش (اعمل أتمتة جديدة لفيديو تاني)</p><p className="text-[12px] text-fg line-clamp-2">{f.post_label}</p></div>
+              {f.post_permalink && <a href={f.post_permalink} target="_blank" rel="noreferrer" className="ms-auto flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium bg-brand text-white"><ExternalLink size={12} />افتح الفيديو</a>}
             </div>
           ) : (<>
             <div className="flex gap-1.5 mb-2"><Pill active={f.platform === 'facebook'} onClick={() => set({ platform: 'facebook', post_id: '' })}><Facebook size={12} />فيسبوك</Pill><Pill active={f.platform === 'instagram'} onClick={() => set({ platform: 'instagram', post_id: '' })}><Instagram size={12} />إنستجرام</Pill></div>
+            {f.post_id && (
+              <div className="flex gap-3 items-center rounded-xl border border-brand/40 bg-brand/5 p-2.5 mb-2">
+                {f.post_thumbnail && <img src={f.post_thumbnail} alt="" className="w-14 h-14 rounded-lg object-cover flex-shrink-0" />}
+                <div className="min-w-0 flex-1"><p className="text-[10px] text-brand font-semibold">الفيديو المختار</p><p className="text-[12px] text-fg line-clamp-2">{f.post_label}</p></div>
+                {f.post_permalink && <a href={f.post_permalink} target="_blank" rel="noreferrer" className="flex-shrink-0 inline-flex items-center gap-1 px-3 py-2 rounded-xl text-[11px] font-medium bg-brand text-white"><ExternalLink size={12} />افتح الفيديو وتأكد</a>}
+              </div>
+            )}
             {posts === null && spinner}
             {posts && !posts.length && <p className="text-xs text-fg-subtle py-4 text-center">مفيش منشورات اتجابت.</p>}
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-[420px] overflow-y-auto">
               {posts?.map(p => (
-                <button key={p.id} disabled={!!p.automation_id} onClick={() => pickPost(p)}
-                  className={`text-start rounded-xl border overflow-hidden bg-surface ${f.post_id === p.id ? 'border-brand ring-1 ring-brand' : 'border-surface-3'} ${p.automation_id ? 'opacity-50' : 'hover:border-brand/60'}`}>
+                <div key={p.id} className="relative">
+                {p.permalink && <a href={p.permalink} target="_blank" rel="noreferrer" title="افتح الفيديو في تاب جديد" onClick={e => e.stopPropagation()} className="absolute top-1.5 end-1.5 z-10 inline-flex items-center gap-1 px-2 py-1 rounded-lg text-[10px] font-medium bg-black/65 text-white hover:bg-black/80"><ExternalLink size={11} />افتح</a>}
+                <button disabled={!!p.automation_id} onClick={() => pickPost(p)}
+                  className={`w-full text-start rounded-xl border overflow-hidden bg-surface ${f.post_id === p.id ? 'border-brand ring-1 ring-brand' : 'border-surface-3'} ${p.automation_id ? 'opacity-50' : 'hover:border-brand/60'}`}>
                   {p.thumbnail ? <img src={p.thumbnail} alt="" className="w-full h-24 object-cover bg-surface-3" /> : <div className="w-full h-24 bg-surface-3" />}
                   <div className="p-2"><div className="flex items-center gap-1 text-[10px] text-fg-subtle"><span className="px-1.5 rounded-full bg-surface-3">{TYPE_AR[p.type] || p.type}</span>{p.automation_id && <span className="text-success">عليه أتمتة</span>}</div><p className="text-[11px] text-fg mt-1 line-clamp-2">{p.label}</p></div>
                 </button>
+                </div>
               ))}
             </div>
           </>)}
