@@ -2170,7 +2170,8 @@
       "reports": "Reports",
       "ai": "AI agent",
       "protection": "Comment protection",
-      "lives": "Lives"
+      "lives": "Lives",
+      "automation": "Comment automation"
     },
     "lives": {
       "title": "Live comments",
