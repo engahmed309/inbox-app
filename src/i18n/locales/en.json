@@ -892,6 +892,7 @@
     "unauthorized": "You are not authorized to access this page",
     "title": "Reports",
     "sections": {
+      "consolidated": "Consolidated report",
       "ai": "AI Reports",
       "overview": "Overview",
       "customers": "Customers",

@@ -10,12 +10,14 @@ import { formatDate as localeFormatDate, formatTime as localeFormatTime } from '
 import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, X, Zap, Radio, Globe, Sparkles, Download, Music2, Star, FileText, Ban, CheckCheck, Check, Repeat } from 'lucide-react'
 import BackArrow from '../components/BackArrow'
 import SubscriptionsReport from '../components/SubscriptionsReport'
+import ConsolidatedReport from '../components/ConsolidatedReport'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
   PieChart, Pie, Cell
 } from 'recharts'
 
 const SECTIONS = [
+  { key: 'consolidated', labelKey: 'reports.sections.consolidated', icon: FileText },
   { key: 'ai', labelKey: 'reports.sections.ai', icon: Sparkles },
   { key: 'overview', labelKey: 'reports.sections.overview', icon: BarChart3 },
   { key: 'customers', labelKey: 'reports.sections.customers', icon: Users2 },
@@ -32,7 +34,7 @@ const SECTIONS = [
 
 export default function ReportsScreen() {
   const { t } = useTranslation()
-  const [section, setSection] = useState('overview')
+  const [section, setSection] = useState('consolidated')
   const { agent } = useAuth()
   const navigate = useNavigate()
 
@@ -64,6 +66,7 @@ export default function ReportsScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
+        {section === 'consolidated' && <ConsolidatedReport />}
         {section === 'ai' && <AiReportsTab />}
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}
