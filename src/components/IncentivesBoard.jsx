@@ -141,6 +141,8 @@ export default function IncentivesBoard() {
         .print-root { display: none; }
         @media print {
           #root { display: none !important; }
+          html, body { height: auto !important; overflow: visible !important; }
+          .print-root { position: static !important; overflow: visible !important; height: auto !important; }
           .print-root { display: block !important; padding: 16px; --color-surface: 255 255 255; --color-surface-2: 248 248 250; --color-surface-3: 228 228 231; --color-fg: 24 24 27; --color-fg-muted: 82 82 91; --color-fg-subtle: 120 120 130; --color-brand: 124 92 252; --color-success: 13 148 120; background: #fff; color: rgb(24 24 27); }
           body { background: #fff !important; }
           .break-inside-avoid { break-inside: avoid; }

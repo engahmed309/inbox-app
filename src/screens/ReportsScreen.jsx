@@ -18,9 +18,9 @@ import {
 } from 'recharts'
 
 const SECTIONS = [
-  { key: 'consolidated', labelKey: 'reports.sections.consolidated', icon: FileText },
-  { key: 'incentives', labelKey: 'reports.sections.incentives', icon: Star },
   { key: 'ai', labelKey: 'reports.sections.ai', icon: Sparkles },
+  { key: 'consolidated', labelKey: 'reports.sections.consolidated', icon: FileText, adminOnly: true },
+  { key: 'incentives', labelKey: 'reports.sections.incentives', icon: Star, adminOnly: true },
   { key: 'overview', labelKey: 'reports.sections.overview', icon: BarChart3 },
   { key: 'customers', labelKey: 'reports.sections.customers', icon: Users2 },
   { key: 'countries', labelKey: 'reports.sections.countries', icon: Globe },
@@ -36,7 +36,7 @@ const SECTIONS = [
 
 export default function ReportsScreen() {
   const { t } = useTranslation()
-  const [section, setSection] = useState('consolidated')
+  const [section, setSection] = useState('ai')
   const { agent } = useAuth()
   const navigate = useNavigate()
 
@@ -59,7 +59,7 @@ export default function ReportsScreen() {
 
       {/* Sections */}
       <div className="flex border-b border-surface-3 bg-surface-2 overflow-x-auto">
-        {SECTIONS.filter(s => agent?.role === 'admin' || s.key !== 'export').map(s => (
+        {SECTIONS.filter(s => agent?.role === 'admin' || (s.key !== 'export' && !s.adminOnly)).map(s => (
           <button key={s.key} onClick={() => setSection(s.key)}
             className={`flex items-center gap-1.5 px-4 py-3 text-xs font-medium whitespace-nowrap transition-colors ${section === s.key ? 'text-brand border-b-2 border-brand' : 'text-fg-subtle'}`}>
             <s.icon size={14} />
@@ -69,8 +69,8 @@ export default function ReportsScreen() {
       </div>
 
       <div className="flex-1 overflow-y-auto">
-        {section === 'consolidated' && <ConsolidatedReport />}
-        {section === 'incentives' && <IncentivesBoard />}
+        {section === 'consolidated' && agent?.role === 'admin' && <ConsolidatedReport />}
+        {section === 'incentives' && agent?.role === 'admin' && <IncentivesBoard />}
         {section === 'ai' && <AiReportsTab />}
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}

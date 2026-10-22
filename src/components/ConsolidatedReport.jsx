@@ -292,7 +292,61 @@ export function ReportBody({ data, ai, range, print }) {
       </Card>
 
       {/* تحليل الذكاء الاصطناعي */}
+      {print && !ai && <div className="rounded-xl border border-surface-3 p-3 text-xs text-fg-muted">لم يتم تنفيذ تحليل الذكاء الاصطناعي لهذه الفترة.</div>}
       {ai && <SectionBoundary label="تحليل الذكاء الاصطناعي"><AiSection ai={ai} /></SectionBoundary>}
+      {print && <Appendix data={data} ai={ai} />}
+    </div>
+  )
+}
+
+// ملحق التفاصيل الكاملة في ملف الـPDF: كل الجداول اللي في الشاشة مختصرة (أحسن ٤-٦ بوستات، أرقام يومية مخفية...) هنا بتتفرد كاملة
+const th = 'py-1.5 px-1.5 font-medium text-start whitespace-nowrap border-b border-surface-3 text-fg-subtle'
+const td = 'py-1 px-1.5 tabular-nums whitespace-nowrap text-fg border-b border-surface-3/60'
+function Appendix({ data, ai }) {
+  const q = ai?.quality || {}
+  const m = data.messages
+  const days = m.platforms[0]?.daily?.map(d => d.day) || []
+  return (
+    <div className="space-y-4 pt-2" style={{ breakBefore: 'page' }}>
+      <h2 className="text-lg font-bold text-fg">ملحق: التفاصيل الكاملة</h2>
+
+      <Card title="الحجوزات اليومية">
+        <table className="w-full text-[11px]"><thead><tr>{['اليوم', 'حجوزات'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{data.bookings.daily.map(d => <tr key={d.day}><td className={td}>{d.day}</td><td className={td}>{d.count}</td></tr>)}</tbody></table>
+      </Card>
+
+      <Card title="مسار المبيعات (الفترة الحالية مقابل السابقة)">
+        <table className="w-full text-[11px]"><thead><tr>{['المرحلة', 'الحالية', 'السابقة'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{[['محادثات جديدة', 'new_conversations'], ['اتبعتلهم الباقات', 'packages'], ['اتبعتلهم طريقة الدفع', 'payment'], ['حجزوا', 'booked']].map(([l, k]) => <tr key={k}><td className={td}>{l}</td><td className={td}>{fmt(data.funnel.cur[k])}</td><td className={td}>{fmt(data.funnel.prev[k])}</td></tr>)}</tbody></table>
+        <p className="text-[11px] text-fg-muted mt-1">نسب: باقات {data.funnel.rates.packages_pct ?? '—'}% من المحادثات · دفع {data.funnel.rates.payment_of_packages_pct ?? '—'}% من الباقات · حجز {data.funnel.rates.booked_of_payment_pct ?? '—'}% من الدفع · حجز {data.funnel.rates.booked_of_conversations_pct ?? '—'}% من المحادثات</p>
+      </Card>
+
+      <Card title="الموظفين — كل المقاييس">
+        <table className="w-full text-[10px]"><thead><tr>{['الموظف', 'حجوزات', 'حجوزات كومنتات', 'عملاء', 'من الكومنتات', 'رسائل', 'تحويل %', 'ردود', 'وسيط رد', 'متوسط رد', 'P75', '≤5د %', '≤15د %', 'سرعة قبل الحجز', 'وسيط ردود الحجز', 'ساعات اتصال', 'حجز/ساعة', 'تأخيرات', 'للأدمن', 'تقييم عملاء', ...(ai ? ['جودة', 'إقناع'] : [])].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{data.agents.map(a => <tr key={a.agent_id}>{[a.name, a.bookings, a.bookings_comments, fmt(a.customers), fmt(a.customers_comments), fmt(a.messages), a.conversion_pct ?? '—', a.replies_n, dur(a.median_reply_s), dur(a.avg_reply_s), dur(a.p75_reply_s), a.within5_pct ?? '—', a.within15_pct ?? '—', dur(a.booked_first_reply_median_s), dur(a.booked_median_reply_s), a.online_hours, a.bookings_per_online_hour ?? '—', a.delayed_alerts, a.escalated_alerts, a.rating_avg != null ? `${a.rating_avg} (${a.rating_n})` : '—', ...(ai ? [q[a.agent_id]?.quality_score ?? '—', q[a.agent_id]?.persuasion_score ?? '—'] : [])].map((v, i) => <td key={i} className={td}>{v}</td>)}</tr>)}</tbody></table>
+      </Card>
+
+      <Card title="الرسايل الواردة اليومية لكل منصة">
+        <table className="w-full text-[10px]"><thead><tr><th className={th}>اليوم</th>{m.platforms.map(p => <th key={p.key} className={th}>{PLATFORM_AR[p.key] || p.key}</th>)}</tr></thead>
+          <tbody>{days.map((d, i) => <tr key={d}><td className={td}>{d}</td>{m.platforms.map(p => <td key={p.key} className={td}>{p.daily[i]?.count ?? 0}</td>)}</tr>)}</tbody></table>
+        <table className="w-full text-[11px] mt-3"><thead><tr>{['المنصة', 'وارد', 'السابق', 'تغيّر %', 'صادر', 'عملاء', 'محادثات جديدة', 'من الكومنتات'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{m.platforms.map(p => <tr key={p.key}>{[PLATFORM_AR[p.key] || p.key, fmt(p.inbound), fmt(p.prev_inbound), p.change_pct ?? '—', fmt(p.outbound), fmt(p.customers), fmt(p.new_conversations), fmt(p.from_comments || 0)].map((v, i) => <td key={i} className={td}>{v}</td>)}</tr>)}</tbody></table>
+        {m.whatsapp_numbers.length > 0 && <table className="w-full text-[11px] mt-3"><thead><tr>{['رقم واتساب', 'وارد', 'السابق', 'تغيّر %'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{m.whatsapp_numbers.map(n => <tr key={n.channel_id}>{[n.name, fmt(n.inbound), fmt(n.prev_inbound), n.change_pct ?? '—'].map((v, i) => <td key={i} className={td}>{v}</td>)}</tr>)}</tbody></table>}
+      </Card>
+
+      <Card title="البوستات — القوائم الكاملة">
+        {['instagram', 'facebook'].map(k => data.posts?.[k]?.top?.length ? (
+          <div key={k} className="mb-3"><p className="text-[12px] font-semibold text-fg mb-1">{PLATFORM_AR[k]}</p>
+            <table className="w-full text-[10px]"><thead><tr>{['البوست', 'تفاعل', 'تعليقات', k === 'instagram' ? 'وصول' : 'مشاركات', 'رابط'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+              <tbody>{data.posts[k].top.map(t => <tr key={t.id}><td className={td + ' whitespace-normal'}>{t.caption || t.type || 'منشور'}</td><td className={td}>{fmt(t.likes ?? t.reactions)}</td><td className={td}>{fmt(t.comments)}</td><td className={td}>{k === 'instagram' ? fmt(t.reach) : fmt(t.shares)}</td><td className={td + ' whitespace-normal'} dir="ltr">{t.url || ''}</td></tr>)}</tbody></table></div>
+        ) : null)}
+        {data.posts?.top_commented?.length > 0 && <table className="w-full text-[10px]"><thead><tr>{['أكتر منشورات تعليقات', 'منصة', 'تعليقات', 'أشخاص', 'حجوزات', 'رابط'].map(h => <th key={h} className={th}>{h}</th>)}</tr></thead>
+          <tbody>{data.posts.top_commented.map((t, i) => <tr key={i}><td className={td + ' whitespace-normal'}>{t.caption}</td><td className={td}>{PLATFORM_AR[t.platform] || t.platform}</td><td className={td}>{fmt(t.comments)}</td><td className={td}>{fmt(t.authors)}</td><td className={td}>{fmt(t.bookings)}</td><td className={td + ' whitespace-normal'} dir="ltr">{t.url || ''}</td></tr>)}</tbody></table>}
+      </Card>
+
+      {data.posts?.notes?.length > 0 && <p className="text-[11px] text-fg-muted">ملاحظات على البيانات: {data.posts.notes.join(' · ')}</p>}
+      <p className="text-[10px] text-fg-subtle">الحجز = تغيير مرحلة العميل لـ«تم الحجز» (محادثة تتعدّ مرة). التحويل = حجوزات ÷ عملاء كلّمهم الموظف، من غير محادثات وكيل الكومنتات. الإيراد تقديري (اشتراكات مسجّلة × سعر الباقة).</p>
     </div>
   )
 }
@@ -465,7 +519,10 @@ export default function ConsolidatedReport() {
   }
 
   // PDF: بنرسم نسخة الطباعة (فاتحة، من غير أزرار) في portal على الـbody وبنطبع، والـCSS بيخفي باقي التطبيق وقت الطباعة بس
-  const printPdf = () => setPrinting(true)
+  const printPdf = () => {
+    if (!ai && !window.confirm('مفيش تحليل بالذكاء الاصطناعي للفترة دي، فملف الـPDF هيطلع بالأرقام والتفاصيل من غير التحليل. تكمّل؟')) return
+    setPrinting(true)
+  }
   useEffect(() => {
     if (!printing) return
     const done = () => setPrinting(false)
@@ -482,6 +539,8 @@ export default function ConsolidatedReport() {
         .print-root { display: none; }
         @media print {
           #root { display: none !important; }
+          html, body { height: auto !important; overflow: visible !important; }
+          .print-root { position: static !important; overflow: visible !important; height: auto !important; }
           .print-root { display: block !important; padding: 16px; --color-surface: 255 255 255; --color-surface-2: 248 248 250; --color-surface-3: 228 228 231; --color-fg: 24 24 27; --color-fg-muted: 82 82 91; --color-fg-subtle: 120 120 130; --color-brand: 124 92 252; --color-success: 13 148 120; --color-danger: 220 38 38; background: #fff; color: rgb(24 24 27); }
           body { background: #fff !important; }
           .break-inside-avoid { break-inside: avoid; }
