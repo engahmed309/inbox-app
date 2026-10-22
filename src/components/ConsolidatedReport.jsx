@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Component } from 'react'
 import { createPortal } from 'react-dom'
 import { Sparkles, Printer, FileSpreadsheet, RefreshCw, TrendingUp, TrendingDown, Trophy, Zap, MessageCircle, Award, Target, AlertTriangle, Lightbulb } from 'lucide-react'
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts'
@@ -291,39 +291,52 @@ export function ReportBody({ data, ai, range, print }) {
       </Card>
 
       {/* تحليل الذكاء الاصطناعي */}
-      {ai && <AiSection ai={ai} />}
+      {ai && <SectionBoundary label="تحليل الذكاء الاصطناعي"><AiSection ai={ai} /></SectionBoundary>}
     </div>
   )
 }
 
+// حارس محلي: لو جزء من التقرير (زي التحليل) اتكسر مايوقعش الصفحة كلها ولا يعمل ريفريش للتطبيق (الحارس العام بيعمل كده)
+class SectionBoundary extends Component {
+  state = { error: null }
+  static getDerivedStateFromError(error) { return { error } }
+  componentDidCatch(error) { console.error('Report section failed:', error) }
+  render() {
+    if (!this.state.error) return this.props.children
+    return <div className="rounded-xl bg-danger/10 border border-danger/30 p-3 text-xs text-danger">تعذّر عرض «{this.props.label}»: {String(this.state.error?.message || this.state.error).slice(0, 160)}. جرّب «إعادة التحليل».</div>
+  }
+}
+
+const A = (x) => (Array.isArray(x) ? x : [])
 function AiSection({ ai }) {
-  const n = ai.narrative
+  const n = ai.narrative || {}
+  const lost = ai.lost || { sample: 0, reasons: [], objections: [], payment_issues: [], who_stopped: {} }
   return (
     <div className="space-y-4">
-      <Card title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-brand" />{n.headline}</span>} hint={`تحليل بالذكاء الاصطناعي · ${new Date(ai.generated_at).toLocaleString('ar-EG')} · تكلفة التحليل ≈ $${ai.cost_usd}`}>
-        <ul className="space-y-1.5 list-disc ps-5">{n.summary.map((s, i) => <li key={i} className="text-[13px] text-fg leading-relaxed">{s}</li>)}</ul>
+      <Card title={<span className="flex items-center gap-2"><Sparkles size={15} className="text-brand" />{n.headline}</span>} hint={`تحليل بالذكاء الاصطناعي · ${new Date(ai.generated_at).toLocaleString('ar-EG')} · تكلفة التحليل ≈ ${ai.cost_usd}${ai.truncated ? " · ⚠ الرد اتقطع لطوله وبعض الأقسام ناقصة — ارفع السقف وأعد التحليل" : ""}`}>
+        <ul className="space-y-1.5 list-disc ps-5">{A(n.summary).map((s, i) => <li key={i} className="text-[13px] text-fg leading-relaxed">{s}</li>)}</ul>
         <div className="grid md:grid-cols-3 gap-3 mt-4">
           {[['الحجوزات', n.bookings_insight], ['الرسايل', n.messages_insight], ['البوستات', n.posts_insight]].filter(x => x[1]).map(([t, b]) => <div key={t} className="rounded-xl bg-surface border border-surface-3 p-3"><p className="text-[12px] font-bold text-fg mb-1">{t}</p><p className="text-[12px] text-fg-muted leading-relaxed">{b}</p></div>)}
         </div>
       </Card>
 
-      {ai.lost?.sample > 0 && (
-        <Card title="ليه العملاء مابيحجزوش؟" hint={`عينة ${ai.lost.sample} محادثة وصلت للباقات أو الدفع ومحجزتش (من ${fmt(ai.lost.population)} محادثة في الفترة). الأرقام تقريبية — عينة مش حصر.`}>
-          <div className="space-y-1.5">{ai.lost.reasons.map(r => (
+      {lost.sample > 0 && (
+        <Card title="ليه العملاء مابيحجزوش؟" hint={`عينة ${lost.sample} محادثة وصلت للباقات أو الدفع ومحجزتش (من ${fmt(lost.population)} محادثة في الفترة). الأرقام تقريبية — عينة مش حصر.`}>
+          <div className="space-y-1.5">{A(lost.reasons).map(r => (
             <div key={r.key} className="flex items-center gap-2"><span className="w-40 text-[12px] text-fg-muted flex-shrink-0">{r.label}</span><div className="flex-1 h-4 bg-surface-3 rounded overflow-hidden"><div className="h-full bg-brand/70" style={{ width: `${r.pct}%` }} /></div><span className="w-20 text-[12px] tabular-nums text-fg text-end">{r.pct}% ({r.count})</span></div>
           ))}</div>
           <div className="mt-3 grid sm:grid-cols-2 gap-3 text-[12px]">
-            <div><p className="font-semibold text-fg mb-1">مين وقّف المحادثة؟</p><p className="text-fg-muted">العميل: {ai.lost.who_stopped.customer} · الموظف: {ai.lost.who_stopped.agent} · غير واضح: {ai.lost.who_stopped.unclear}</p></div>
-            {ai.lost.objections.length > 0 && <div><p className="font-semibold text-fg mb-1">أكتر اعتراضات</p><p className="text-fg-muted">{ai.lost.objections.map(o => `«${o.text}» (${o.count})`).join(' · ')}</p></div>}
-            {ai.lost.payment_issues.length > 0 && <div className="sm:col-span-2"><p className="font-semibold text-fg mb-1">مشاكل الدفع المذكورة</p><p className="text-fg-muted">{ai.lost.payment_issues.map(o => `${o.text} (${o.count})`).join(' · ')}</p></div>}
+            <div><p className="font-semibold text-fg mb-1">مين وقّف المحادثة؟</p><p className="text-fg-muted">العميل: {lost.who_stopped?.customer ?? 0} · الموظف: {lost.who_stopped?.agent ?? 0} · غير واضح: {lost.who_stopped?.unclear ?? 0}</p></div>
+            {A(lost.objections).length > 0 && <div><p className="font-semibold text-fg mb-1">أكتر اعتراضات</p><p className="text-fg-muted">{A(lost.objections).map(o => `«${o.text}» (${o.count})`).join(' · ')}</p></div>}
+            {A(lost.payment_issues).length > 0 && <div className="sm:col-span-2"><p className="font-semibold text-fg mb-1">مشاكل الدفع المذكورة</p><p className="text-fg-muted">{A(lost.payment_issues).map(o => `${o.text} (${o.count})`).join(' · ')}</p></div>}
           </div>
         </Card>
       )}
 
       <Card title="ملاحظات على كل موظف" hint="مبنية على أرقامه + تقييم عينة من محادثاته (حتى ١٠ محادثات لكل موظف). الهدف المساعدة والتطوير مش المحاسبة.">
         <div className="grid md:grid-cols-2 gap-3">
-          {n.agent_notes.map(a => {
-            const q = ai.quality[a.agent_id]
+          {A(n.agent_notes).map(a => {
+            const q = ai.quality?.[a.agent_id]
             return (
               <div key={a.agent_id} className="rounded-xl bg-surface border border-surface-3 p-3.5">
                 <p className="text-sm font-bold text-fg">{a.name}</p>
@@ -341,16 +354,16 @@ function AiSection({ ai }) {
 
       <Card title="توصيات لتطوير الخدمة والمبيعات">
         <div className="space-y-2.5">
-          {n.recommendations.map((r, i) => (
+          {A(n.recommendations).map((r, i) => (
             <div key={i} className="rounded-xl bg-surface border border-surface-3 p-3 break-inside-avoid">
               <div className="flex items-center gap-2 flex-wrap"><span className="text-[13px] font-bold text-fg">{i + 1}. {r.title}</span><span className={`text-[10px] px-2 py-0.5 rounded-full ${PRIO[r.priority]?.[1]}`}>{PRIO[r.priority]?.[0]}</span><span className="text-[10px] px-2 py-0.5 rounded-full bg-surface-3 text-fg-subtle">{AREA_AR[r.area] || r.area}</span></div>
               <p className="text-[12px] text-fg-muted mt-1 leading-relaxed">{r.detail}</p>
             </div>
           ))}
         </div>
-        {n.objection_replies?.length > 0 && (
+        {A(n.objection_replies).length > 0 && (
           <div className="mt-4"><p className="text-[12px] font-bold text-fg mb-1.5">ردود جاهزة للاعتراضات المتكررة</p>
-            <div className="space-y-2">{n.objection_replies.map((r, i) => (
+            <div className="space-y-2">{A(n.objection_replies).map((r, i) => (
               <div key={i} className="rounded-xl bg-surface border border-surface-3 p-3">
                 <p className="text-[11px] text-fg-subtle">الاعتراض: «{r.objection}»</p>
                 <p className="text-[13px] text-fg mt-1 whitespace-pre-wrap leading-relaxed">{r.reply}</p>
@@ -358,8 +371,8 @@ function AiSection({ ai }) {
               </div>
             ))}</div></div>
         )}
-        {n.team_ideas?.length > 0 && <div className="mt-4"><p className="text-[12px] font-bold text-fg mb-1">أفكار لتحفيز الفريق وتطويره</p><ul className="list-disc ps-5 space-y-1">{n.team_ideas.map((s, i) => <li key={i} className="text-[12px] text-fg-muted">{s}</li>)}</ul></div>}
-        {n.caveats?.length > 0 && <div className="mt-4 rounded-lg bg-amber-500/10 p-3"><p className="text-[11px] font-bold text-amber-500 mb-1">حدود الأرقام</p><ul className="list-disc ps-5">{n.caveats.map((s, i) => <li key={i} className="text-[11px] text-fg-muted">{s}</li>)}</ul></div>}
+        {A(n.team_ideas).length > 0 && <div className="mt-4"><p className="text-[12px] font-bold text-fg mb-1">أفكار لتحفيز الفريق وتطويره</p><ul className="list-disc ps-5 space-y-1">{A(n.team_ideas).map((s, i) => <li key={i} className="text-[12px] text-fg-muted">{s}</li>)}</ul></div>}
+        {A(n.caveats).length > 0 && <div className="mt-4 rounded-lg bg-amber-500/10 p-3"><p className="text-[11px] font-bold text-amber-500 mb-1">حدود الأرقام</p><ul className="list-disc ps-5">{A(n.caveats).map((s, i) => <li key={i} className="text-[11px] text-fg-muted">{s}</li>)}</ul></div>}
       </Card>
     </div>
   )
