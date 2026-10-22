@@ -74,13 +74,18 @@ export default function NotificationBell() {
   // ٤ استعلامات على كل جهاز للأدمن حتى والجرس مقفول (جزء من حمل الداتابيز يوم ١٩ أكتوبر)
   const openRef = useRef(false)
   openRef.current = open
+  // رقم آخر تحميل: أي تحميل بدأ قبل ما المستخدم يعلّم "مقروء" (أو قبل تحميل أحدث منه) ورجع متأخر بنتجاهله — بدل ما يكتب فوق
+  // الحالة الجديدة بنسخة قديمة كلها "غير مقروء" لأن الاستعلام اتبعت قبل التعليم (قاعدة بيانات بطيئة = ردود بتوصل بترتيب مختلف)
+  const loadSeqRef = useRef(0)
   const load = async () => {
     if (!agent?.id) return
+    const seq = ++loadSeqRef.current
     const withList = openRef.current
     const [listRes, ...unread] = await Promise.all([
       withList ? buildQuery(0, NOTIFICATIONS_PAGE_SIZE) : Promise.resolve(null),
       ...TABS.map(x => countUnread(x.types))
     ])
+    if (seq !== loadSeqRef.current) return
     setCounts(Object.fromEntries(TABS.map((x, i) => [x.key, unread[i]?.count || 0])))
     if (!withList) return
     const { data, error } = listRes
@@ -150,7 +155,9 @@ export default function NotificationBell() {
 
   const markRead = async (n) => {
     if (n.is_read) return
+    loadSeqRef.current++
     const { error } = await supabase.from('notifications').update({ is_read: true }).eq('id', n.id)
+    loadSeqRef.current++
     if (error) { console.error('فشل تعليم الإشعار كمقروء:', error.message); return }
     // بتفضل ظاهرة في مكانها حتى مع "غير المقروءة فقط" لحد ما القايمة تتحدّث، بدل ما تختفي من تحت إيد المستخدم
     setItems(prev => prev.map(x => x.id === n.id ? { ...x, is_read: true } : x))
@@ -162,8 +169,10 @@ export default function NotificationBell() {
   const currentDef = TABS.find(x => x.key === tab) || TABS[0]
   const markAllRead = async () => {
     if (!agent?.id || !(counts[tab] > 0)) return
+    loadSeqRef.current++
     const { error } = await supabase.from('notifications').update({ is_read: true })
       .eq('agent_id', agent.id).eq('is_read', false).in('type', currentDef.types)
+    loadSeqRef.current++
     if (error) { console.error('فشل تحديد كل الإشعارات كمقروءة:', error.message); toast.error(t('notificationBell.markAllReadFailed')); return }
     setItems(prev => prev.map(x => ({ ...x, is_read: true })))
     setCounts(c => ({ ...c, [tab]: 0 }))
