@@ -348,27 +348,62 @@ export default function CommentsScreen() {
   useEffect(() => { loadSavedReplies().then(setSavedAll) }, [])
   const quickPrivate = savedAll.find(r => r.kind === 'private')
   const quickPublic = savedAll.find(r => r.kind === 'public')
+  // بيبعت الرسالتين لتعليق واحد ويحدّث الصف؛ بيرمي خطأ لو فشل الخاص. بيرجّع رد السيرفر
+  const postBoth = async (c) => {
+    const withAck = !!quickPublic && !c.public_reply_at && !c.deleted_at
+    const ackText = withAck ? fillSavedReply(quickPublic.body, c.author_name).trim() : ''
+    const res = await apiFetch(`${API_URL}/comments/${c.id}/private-reply`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ message: fillSavedReply(quickPrivate.body, c.author_name).trim(), ...(withAck ? { public_message: ackText } : {}) })
+    })
+    const data = await res.json()
+    if (!res.ok) throw new Error(data.error)
+    const now = new Date().toISOString()
+    patchRow(c.id, {
+      private_replied_at: now, private_reply_conversation_id: data.conversation_id || null,
+      ...(data.public?.ok ? { public_reply_at: now, public_reply_text: ackText } : {}),
+      status: 'handled', assigned_agent_id: c.assigned_agent_id || agent?.id
+    }, () => status !== 'handled')
+    return data
+  }
   const sendBoth = async (c) => {
     if (!quickPrivate || busy) return
     setBusy(c.id)
     try {
-      const withAck = !!quickPublic && !c.public_reply_at && !c.deleted_at
-      const res = await apiFetch(`${API_URL}/comments/${c.id}/private-reply`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ message: fillSavedReply(quickPrivate.body, c.author_name).trim(), ...(withAck ? { public_message: fillSavedReply(quickPublic.body, c.author_name).trim() } : {}) })
-      })
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error)
+      const data = await postBoth(c)
       toast.success(t('comments.sendBothDone'))
       if (data.public && !data.public.ok) toast.error(t('comments.ai.ackFailed', { error: data.public.error || '' }))
-      const now = new Date().toISOString()
-      patchRow(c.id, {
-        private_replied_at: now, private_reply_conversation_id: data.conversation_id || null,
-        ...(data.public?.ok ? { public_reply_at: now, public_reply_text: fillSavedReply(quickPublic.body, c.author_name).trim() } : {}),
-        status: 'handled', assigned_agent_id: c.assigned_agent_id || agent?.id
-      }, () => status !== 'handled')
       fetchCounts()
     } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
+
+  // تحديد أكتر من تعليق وبعت الرسالتين لكلهم: واحد ورا التاني (عشان ميتا والداتابيز)، مع عدّاد وزر إيقاف.
+  // اللي ماينفعش يتبعتله (يوتيوب / اتمسح / اتبعتله خاص قبل كده / عدّى ٧ أيام / مع زميل) مابيتحددش أصلًا
+  const [selectMode, setSelectMode] = useState(false)
+  const [selected, setSelected] = useState(() => new Set())
+  const [bulk, setBulk] = useState(null)   // { done, total, failed }
+  const stopBulkRef = useRef(false)
+  const canBoth = (c) => c.platform !== 'youtube' && !c.deleted_at && !c.private_replied_at
+    && Date.now() - new Date(c.posted_at || c.created_at).getTime() <= PRIVATE_WINDOW_MS && !blocked(c)
+  const toggleSelect = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
+  const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
+  const selectAllVisible = () => setSelected(new Set(comments.filter(canBoth).map(c => c.id)))
+  const runBulk = async () => {
+    const list = comments.filter(c => selected.has(c.id) && canBoth(c))
+    if (!list.length || !quickPrivate || busy) return
+    if (!window.confirm(t('comments.bulkConfirm', { n: list.length }))) return
+    stopBulkRef.current = false
+    setBusy('bulk'); setBulk({ done: 0, total: list.length, failed: 0 })
+    let ok = 0, failed = 0, lastErr = ''
+    for (const c of list) {
+      if (stopBulkRef.current) break
+      try { await postBoth(c); ok++ } catch (err) { failed++; lastErr = err.message }
+      setBulk({ done: ok + failed, total: list.length, failed })
+      await new Promise(r => setTimeout(r, 250))
+    }
+    setBusy(null); setBulk(null); exitSelect(); fetchCounts()
+    const msg = t('comments.bulkDone', { ok, failed }) + (lastErr ? ` — ${lastErr}` : '')
+    if (failed) toast.error(msg); else toast.success(msg)
   }
   const closeReply = () => setReplyTo(null)
 
@@ -590,6 +625,13 @@ export default function CommentsScreen() {
           ) : (
             <span className="flex-1 font-semibold text-fg text-sm">{t(`comments.areas.${view}`)}</span>
           )}
+          {view === 'inbox' && !isSupervisor && quickPrivate && (
+            <button onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} disabled={!!bulk} aria-pressed={selectMode}
+              title={t('comments.selectMode')}
+              className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-medium disabled:opacity-40 ${selectMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+              <CheckCheck size={14} /> {t('comments.selectMode')}
+            </button>
+          )}
         </div>
 
         {view === 'reports' && (isAdmin || isSupervisor) && <CommentsReports onOpenPost={(post) => { setPostFilter({ id: post.post_id, caption: post.caption }); setStatus('new'); setPlatform('all'); setScope('all'); setSearch(''); setView('inbox') }} />}
@@ -651,6 +693,10 @@ export default function CommentsScreen() {
                 return (
                   <div key={c.id} className={`bg-surface-2 rounded-2xl border border-surface-3 p-3.5 ${other ? 'opacity-70' : ''}`}>
                     <div className="flex items-start gap-2.5">
+                      {selectMode && (
+                        <input type="checkbox" checked={selected.has(c.id)} disabled={!canBoth(c) || !!bulk} onChange={() => toggleSelect(c.id)}
+                          className="mt-2.5 w-4 h-4 flex-shrink-0 accent-brand disabled:opacity-30" aria-label={t('comments.selectMode')} />
+                      )}
                       <div className="relative flex-shrink-0">
                         <div className="w-9 h-9 rounded-full flex items-center justify-center text-sm font-bold text-white"
                           style={{ background: `hsl(${avatarHue(c.author_name || '')} 45% 42%)` }}>
@@ -854,6 +900,22 @@ export default function CommentsScreen() {
             </div>
           )}
         </div>
+        {selectMode && (
+          <div className="border-t border-surface-3 bg-surface-2 px-3 py-2.5 pb-safe flex items-center gap-2 flex-wrap">
+            {bulk ? (<>
+              <span className="text-xs text-fg flex-1 tabular-nums">{t('comments.bulkProgress', { done: bulk.done, total: bulk.total, failed: bulk.failed })}</span>
+              <button onClick={() => { stopBulkRef.current = true }} className="px-3 py-1.5 rounded-xl text-xs bg-danger/15 text-danger font-medium">{t('comments.bulkStop')}</button>
+            </>) : (<>
+              <span className="text-xs text-fg-muted tabular-nums">{t('comments.bulkSelected', { n: selected.size })}</span>
+              <button onClick={selectAllVisible} className="px-2.5 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg">{t('comments.bulkSelectAll')}</button>
+              <button onClick={runBulk} disabled={!selected.size}
+                className="ms-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-success text-white disabled:opacity-40">
+                <Zap size={13} /> {t('comments.bulkSend', { n: selected.size })}
+              </button>
+              <button onClick={exitSelect} className="px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted">{t('comments.aiAssign.cancel')}</button>
+            </>)}
+          </div>
+        )}
         </>)}
       </div>
 
