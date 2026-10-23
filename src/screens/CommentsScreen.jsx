@@ -342,6 +342,34 @@ export default function CommentsScreen() {
   }, [inFlightIds, fetchCounts, fetchAiStatus])
 
   const openReply = (c, mode) => setReplyTo({ comment: c, mode })
+
+  // زر "الرسالتين": بيبعت الرسالة الخاصة الجاهزة + الرد العلني الجاهز (من الردود الجاهزة: أول واحد من كل نوع) بضغطة واحدة
+  const [savedAll, setSavedAll] = useState([])
+  useEffect(() => { loadSavedReplies().then(setSavedAll) }, [])
+  const quickPrivate = savedAll.find(r => r.kind === 'private')
+  const quickPublic = savedAll.find(r => r.kind === 'public')
+  const sendBoth = async (c) => {
+    if (!quickPrivate || busy) return
+    setBusy(c.id)
+    try {
+      const withAck = !!quickPublic && !c.public_reply_at && !c.deleted_at
+      const res = await apiFetch(`${API_URL}/comments/${c.id}/private-reply`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: fillSavedReply(quickPrivate.body, c.author_name).trim(), ...(withAck ? { public_message: fillSavedReply(quickPublic.body, c.author_name).trim() } : {}) })
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error)
+      toast.success(t('comments.sendBothDone'))
+      if (data.public && !data.public.ok) toast.error(t('comments.ai.ackFailed', { error: data.public.error || '' }))
+      const now = new Date().toISOString()
+      patchRow(c.id, {
+        private_replied_at: now, private_reply_conversation_id: data.conversation_id || null,
+        ...(data.public?.ok ? { public_reply_at: now, public_reply_text: fillSavedReply(quickPublic.body, c.author_name).trim() } : {}),
+        status: 'handled', assigned_agent_id: c.assigned_agent_id || agent?.id
+      }, () => status !== 'handled')
+      fetchCounts()
+    } catch (err) { toast.error(err.message) } finally { setBusy(null) }
+  }
   const closeReply = () => setReplyTo(null)
 
   // الحذف نهائي عند ميتا، فبنسأل مرة قبله. الصف عندنا بيفضل معلّم "اتمسح" مش بيختفي
@@ -740,6 +768,12 @@ export default function CommentsScreen() {
                           <button onClick={() => openReply(c, 'private')} disabled={other || busy === c.id}
                             className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40">
                             <Send size={13} /> {t('comments.privateReply')}
+                          </button>
+                        )}
+                        {!isYoutube && live && privateOpen && quickPrivate && (
+                          <button onClick={() => sendBoth(c)} disabled={other || busy === c.id} title={t('comments.sendBothHint')}
+                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-success/15 text-success hover:bg-success/25 disabled:opacity-40">
+                            <Zap size={13} /> {t('comments.sendBoth')}
                           </button>
                         )}
                         {isYoutube && (
