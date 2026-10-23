@@ -672,7 +672,7 @@ export default function CommentsScreen() {
           </button>
         )}
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto">
+        <div ref={scrollRef} className="flex-1 overflow-y-auto overflow-x-hidden">
           {loading ? (
             <div className="flex items-center justify-center h-40">
               <div className="w-6 h-6 border-2 border-brand border-t-transparent rounded-full animate-spin" />
@@ -797,7 +797,7 @@ export default function CommentsScreen() {
                     )}
                     <AiBadge c={c} now={nowTick} canStop={isAdmin || !!aiStatus?.can_act} onStop={() => stopAi(c)} stopping={busy === c.id} />
 
-                    <div className={`flex items-center gap-2 mt-3 ${isSupervisor ? 'hidden' : ''}`}>
+                    <div className={`flex flex-wrap items-center gap-2 mt-3 ${isSupervisor ? 'hidden' : ''}`}>
                       {status === 'archived' ? (
                         <button onClick={() => patchComment(c, { archived: false })} disabled={busy === c.id}
                           className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40">
@@ -806,19 +806,19 @@ export default function CommentsScreen() {
                       ) : (<>
                         {(!isYoutube || ytCanReply) && live && (
                           <button onClick={() => openReply(c, 'public')} disabled={other || busy === c.id}
-                            className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-brand text-white hover:opacity-90 disabled:opacity-40">
+                            className="whitespace-nowrap flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-brand text-white hover:opacity-90 disabled:opacity-40">
                             <MessageCircle size={13} /> {c.public_reply_at ? t('comments.publicReplyAgain') : t('comments.publicReply')}
                           </button>
                         )}
                         {!isYoutube && live && privateOpen && (
                           <button onClick={() => openReply(c, 'private')} disabled={other || busy === c.id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40">
+                            className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40">
                             <Send size={13} /> {t('comments.privateReply')}
                           </button>
                         )}
                         {!isYoutube && live && privateOpen && quickPrivate && (
                           <button onClick={() => sendBoth(c)} disabled={other || busy === c.id} title={t('comments.sendBothHint')}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-success/15 text-success hover:bg-success/25 disabled:opacity-40">
+                            className="order-first sm:order-none w-full sm:w-auto justify-center whitespace-nowrap flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-semibold bg-success/15 text-success hover:bg-success/25 disabled:opacity-40">
                             <Zap size={13} /> {t('comments.sendBoth')}
                           </button>
                         )}
@@ -831,13 +831,13 @@ export default function CommentsScreen() {
                         {c.platform === 'facebook' && live && (
                           <button onClick={() => toggleLike(c)} disabled={other || busy === c.id} aria-pressed={!!c.liked_at}
                             title={c.liked_at ? t('comments.unlike') : t('comments.like')}
-                            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs disabled:opacity-40 ${c.liked_at ? 'bg-brand/15 text-brand font-medium' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                            className={`whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs disabled:opacity-40 ${c.liked_at ? 'bg-brand/15 text-brand font-medium' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
                             <ThumbsUp size={13} className={c.liked_at ? 'fill-current' : ''} /> {c.liked_at ? t('comments.liked') : t('comments.like')}
                           </button>
                         )}
                         {status !== 'handled' && (
                           <button onClick={() => patchComment(c, { status: 'handled' })} disabled={other || busy === c.id}
-                            className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40">
+                            className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg disabled:opacity-40">
                             <Check size={13} /> {t('comments.markHandled')}
                           </button>
                         )}
