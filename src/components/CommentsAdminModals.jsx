@@ -87,7 +87,7 @@ export function SavedRepliesModal({ isAdmin, onClose, onChanged }) {
   const { t } = useTranslation()
   const toast = useToast()
   const [items, setItems] = useState(null)
-  const [draft, setDraft] = useState({ id: null, title: '', body: '' })
+  const [draft, setDraft] = useState({ id: null, title: '', body: '', kind: 'both' })
   const [busy, setBusy] = useState(false)
 
   const load = () => apiFetch(`${API_URL}/comments/saved-replies`)
@@ -102,12 +102,12 @@ export function SavedRepliesModal({ isAdmin, onClose, onChanged }) {
     setBusy(true)
     try {
       const res = await apiFetch(`${API_URL}/comments/saved-replies${draft.id ? `/${draft.id}` : ''}`, {
-        method: draft.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: draft.title, body: draft.body })
+        method: draft.id ? 'PUT' : 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ title: draft.title, body: draft.body, kind: draft.kind })
       })
       const d = await res.json()
       if (!res.ok) throw new Error(d.error)
       if (!isAdmin) toast.success(t('comments.admin.sentForApproval'))
-      setDraft({ id: null, title: '', body: '' })
+      setDraft({ id: null, title: '', body: '', kind: 'both' })
       await changed()
     } catch (err) { toast.error(err.message) } finally { setBusy(false) }
   }
@@ -137,8 +137,9 @@ export function SavedRepliesModal({ isAdmin, onClose, onChanged }) {
     <div className="bg-surface rounded-xl p-3">
       <div className="flex items-center gap-2">
         <span className="flex-1 text-sm font-semibold text-fg truncate">{r.title}</span>
+        <span className="text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 bg-surface-3 text-fg-muted">{t(`comments.admin.kind.${r.kind || 'both'}`)}</span>
         <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${STATUS_STYLE[r.status]}`}>{t(`comments.admin.status.${r.status}`)}</span>
-        {canEdit(r) && <button onClick={() => setDraft({ id: r.id, title: r.title, body: r.body })} className="text-fg-subtle hover:text-fg"><Pencil size={13} /></button>}
+        {canEdit(r) && <button onClick={() => setDraft({ id: r.id, title: r.title, body: r.body, kind: r.kind || 'both' })} className="text-fg-subtle hover:text-fg"><Pencil size={13} /></button>}
         {canEdit(r) && <button onClick={() => remove(r)} className="text-fg-subtle hover:text-danger"><Trash2 size={13} /></button>}
       </div>
       <p className="text-xs text-fg-muted mt-1 whitespace-pre-wrap break-words">{r.body}</p>
@@ -160,12 +161,18 @@ export function SavedRepliesModal({ isAdmin, onClose, onChanged }) {
           className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg" />
         <textarea value={draft.body} onChange={e => setDraft(d => ({ ...d, body: e.target.value }))} rows={3} placeholder={t('comments.admin.replyBody')}
           className="w-full bg-surface-3 rounded-lg px-3 py-2 text-sm text-fg" />
+        <div className="flex gap-1.5">
+          {['public', 'private', 'both'].map(k => (
+            <button key={k} type="button" onClick={() => setDraft(d => ({ ...d, kind: k }))}
+              className={`flex-1 px-2 py-1.5 rounded-lg text-[11px] font-medium ${draft.kind === k ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted'}`}>{t(`comments.admin.kind.${k}`)}</button>
+          ))}
+        </div>
         <div className="flex gap-2">
           <button onClick={save} disabled={busy || !draft.title.trim() || !draft.body.trim()}
             className="flex items-center gap-1.5 px-4 py-2 rounded-xl bg-brand text-white text-xs font-semibold disabled:opacity-40">
             {draft.id ? <Check size={13} /> : <Plus size={13} />}{draft.id ? t('comments.ai.save') : t(isAdmin ? 'comments.admin.addReply' : 'comments.admin.proposeReply')}
           </button>
-          {draft.id && <button onClick={() => setDraft({ id: null, title: '', body: '' })} className="px-3 py-2 rounded-xl bg-surface-3 text-fg-muted text-xs">{t('comments.ai.discard')}</button>}
+          {draft.id && <button onClick={() => setDraft({ id: null, title: '', body: '', kind: 'both' })} className="px-3 py-2 rounded-xl bg-surface-3 text-fg-muted text-xs">{t('comments.ai.discard')}</button>}
         </div>
         {!isAdmin && <p className="text-[10px] text-fg-subtle">{t('comments.admin.needsApproval')}</p>}
       </div>

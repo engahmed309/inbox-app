@@ -1340,9 +1340,9 @@ function ReplyModal({ comment, mode, onClose, onSent }) {
               <p className="text-[10px] text-fg-subtle">{t('comments.ai.learnedFrom', { n: sug.examples })}</p>
             </div>
           )}
-          {saved.length > 0 && (
+          {saved.some(r => !r.kind || r.kind === 'both' || r.kind === mode) && (
             <div className="flex gap-1.5 flex-wrap">
-              {saved.map(r => (
+              {saved.filter(r => !r.kind || r.kind === 'both' || r.kind === mode).map(r => (
                 <button key={r.id} type="button" onClick={() => setText(fillSavedReply(r.body, comment.author_name))}
                   className="px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg text-[11px]">{r.title}</button>
               ))}

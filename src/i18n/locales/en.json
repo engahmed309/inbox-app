@@ -2694,6 +2694,7 @@
       "move": "Move comments",
       "moved": "Moved {{count}} comments",
       "savedTitle": "Saved replies",
+      "kind": { "public": "Public reply", "private": "Private message", "both": "Both" },
       "savedHint": "Replies agents can insert with one tap in the reply window. Write {name} to insert the commenter's first name.",
       "replyTitle": "Reply title",
       "replyBody": "Reply text…",
