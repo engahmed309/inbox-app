@@ -863,7 +863,7 @@ export default function CommentsScreen() {
                                   onClick={() => { setMenuFor(null); setAssignFor(c) }} />
                               )}
                               {/* ردّ بالذكاء الاصطناعي: للأدمن ولموظف التعليقات على التعليق اللي يقدر يتصرف فيه (مش مع زميل) */}
-                              {(isAdmin || !other) && !isYoutube && live && !c.hidden_at && !(c.public_reply_at && c.private_replied_at) && (
+                              {(isAdmin || !other) && (!isYoutube || ytCanReply) && live && !c.hidden_at && !(c.public_reply_at && (c.private_replied_at || isYoutube)) && (
                                 <MenuItem icon={<Bot size={13} />} label={t('comments.assignAi')} onClick={() => { setMenuFor(null); setAiFor(c) }} />
                               )}
                               {canModerate && c.author_platform_id && (
