@@ -318,6 +318,7 @@
       "missingFbConfig": "FACEBOOK_LOGIN_CONFIG_ID needs to be added first",
       "linkPageFailed": "Failed to link the page",
       "fbPagesLinked": "{{count}} Facebook page(s) linked successfully",
+      "fbSubscribeFailed": "Page linked, but the live comments subscription failed: {{error}}. Add the pages_manage_metadata permission to the login configuration in Meta and reconnect.",
       "missingIgConfig": "INSTAGRAM_APP_ID needs to be added to the server settings first",
       "missingTiktokConfig": "TIKTOK_APP_ID needs to be added first",
       "startLinkFailed": "Failed to start linking",

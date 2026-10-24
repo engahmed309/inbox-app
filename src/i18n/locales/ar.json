@@ -406,6 +406,7 @@
       "missingFbConfig": "يجب إضافة FACEBOOK_LOGIN_CONFIG_ID أولًا",
       "linkPageFailed": "تعذّر ربط الصفحة",
       "fbPagesLinked": "تم ربط {{count}} صفحة فيسبوك بنجاح",
+      "fbSubscribeFailed": "اتربطت الصفحة لكن اشتراك التعليقات اللحظية فشل: {{error}}. أضف صلاحية pages_manage_metadata في إعداد تسجيل الدخول على ميتا وأعد الربط.",
       "missingIgConfig": "يجب إضافة INSTAGRAM_APP_ID في إعدادات السيرفر أولًا",
       "missingTiktokConfig": "يجب إضافة TIKTOK_APP_ID أولًا",
       "startLinkFailed": "تعذّر بدء الربط",

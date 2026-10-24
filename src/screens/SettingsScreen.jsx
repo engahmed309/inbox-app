@@ -1828,6 +1828,8 @@ function ConnectNewChannel() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || t('settings.channels.linkPageFailed'))
       toast.success(t('settings.channels.fbPagesLinked', { count: data.channels?.length || 1 }))
+      // الربط نجح لكن الاشتراك في أحداث الصفحة (feed) فشل: تعليقات فيسبوك مش هتوصل لحظيًا. غالبًا الإعداد في ميتا ناقصه pages_manage_metadata
+      if (data.subscribe_errors?.length) toast.error(t('settings.channels.fbSubscribeFailed', { error: data.subscribe_errors[0].error }))
     } catch (err) {
       toast.error(t('settings.common.errorWithMessage', { message: err.message }))
     } finally {
