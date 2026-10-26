@@ -311,6 +311,7 @@ export default function CommentsScreen() {
   // الذكاء الاصطناعي كموظف: حالته (نشط/متوقف) وطابوره، ويتحدّث كل ١٥ ثانية. وأي تعليق هو ماسكه دلوقتي (في الطابور/بيكتب)
   // بنحدّث حالته كل ٥ ثواني لوحده من غير ما القايمة تتحمّل وتتحرك تحت إيد الموظف
   const [aiStatus, setAiStatus] = useState(null)
+  const privatePaused = !!aiStatus?.private_paused   // الرد الخاص على التعليقات موقوف مؤقتًا (من السيرفر): الرد العام شغّال
   const [nowTick, setNowTick] = useState(Date.now())
   const fetchAiStatus = useCallback(async () => {
     try {
@@ -626,7 +627,7 @@ export default function CommentsScreen() {
           ) : (
             <span className="flex-1 font-semibold text-fg text-sm">{t(`comments.areas.${view}`)}</span>
           )}
-          {view === 'inbox' && !isSupervisor && quickPrivate && (
+          {view === 'inbox' && !isSupervisor && quickPrivate && !privatePaused && (
             <button onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} disabled={!!bulk} aria-pressed={selectMode}
               title={t('comments.selectMode')}
               className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-medium disabled:opacity-40 ${selectMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -812,13 +813,13 @@ export default function CommentsScreen() {
                           </button>
                         )}
                         {!isYoutube && live && privateOpen && (
-                          <button onClick={() => openReply(c, 'private')} disabled={other || busy === c.id}
+                          <button onClick={() => openReply(c, 'private')} disabled={other || busy === c.id || privatePaused} title={privatePaused ? t('comments.privatePaused') : undefined}
                             className="whitespace-nowrap flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-medium bg-brand/10 text-brand hover:bg-brand/20 disabled:opacity-40">
                             <Send size={13} /> {t('comments.privateReply')}
                           </button>
                         )}
                         {!isYoutube && live && privateOpen && quickPrivate && (
-                          <button onClick={() => askSendBoth([c])} disabled={other || busy === c.id} title={t('comments.sendBothHint')}
+                          <button onClick={() => askSendBoth([c])} disabled={other || busy === c.id || privatePaused} title={privatePaused ? t('comments.privatePaused') : t('comments.sendBothHint')}
                             className="order-first sm:order-none w-full sm:w-auto justify-center whitespace-nowrap flex items-center gap-1.5 px-3 py-2.5 sm:py-1.5 rounded-xl text-xs font-semibold bg-success/15 text-success hover:bg-success/25 disabled:opacity-40">
                             <Zap size={13} /> {t('comments.sendBoth')}
                           </button>

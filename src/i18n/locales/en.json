@@ -2010,6 +2010,7 @@
     "sendBothNoPublic": "No saved public reply — only the private message will be sent.",
     "sendBothSkipPublic": "{{n}} of them already got a public reply: only the private message goes to them.",
     "sendBothConfirm": "Confirm and send",
+    "privatePaused": "Private replies are paused for now — use a public reply",
     "sendBoth": "Send both",
     "sendBothHint": "Sends the saved private message and the saved public reply",
     "sendBothDone": "Private message and public reply sent",
