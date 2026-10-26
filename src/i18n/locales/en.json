@@ -2016,6 +2016,7 @@
     "bulkPublicPlaceholder": "Write the public reply…",
     "bulkPublicPreview": "Example for the first comment ({{name}}):",
     "bulkPublicHint": "The same reply will be posted publicly on {{n}} comments; each first name replaces {name}. One confirmation only.",
+    "bulkPublicPausedWarn": "Note: private replies are paused — this text mentions a private message that will not be sent.",
     "bulkPublicSend": "Send public reply ({{n}})",
     "sendBoth": "Send both",
     "sendBothHint": "Sends the saved private message and the saved public reply",

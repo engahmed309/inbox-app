@@ -972,7 +972,7 @@ export default function CommentsScreen() {
 
       {pubBulk && (
         <BulkPublicReply list={pubBulk.list}
-          saved={savedAll.filter(r => (!r.kind || r.kind === 'both' || r.kind === 'public') && !(privatePaused && /الخاص/.test(r.body)))}
+          saved={savedAll.filter(r => r.kind !== 'private')} privatePaused={privatePaused}
           onCancel={() => setPubBulk(null)}
           onConfirm={(text) => { const list = pubBulk.list; setPubBulk(null); runPublicBulk(list, text) }} />
       )}
@@ -1407,7 +1407,7 @@ function AiAssignModal({ comment, onClose, onDone }) {
 
 // تأكيد "الرسالتين": بيوضّح نص الرسالة الخاصة والرد العلني اللي هيتبعتوا. مرة واحدة بس مهما كان عدد التعليقات المحددة
 // رد عام واحد على عدد من التعليقات: بيكتب النص مرة، وبيتبعت لكل واحد (الاسم الأول بيتبدّل بدل {name})، وتأكيد واحد بس
-function BulkPublicReply({ list, saved, onCancel, onConfirm }) {
+function BulkPublicReply({ list, saved, privatePaused, onCancel, onConfirm }) {
   const { t } = useTranslation()
   const [text, setText] = useState('')
   const first = list[0]
@@ -1420,10 +1420,13 @@ function BulkPublicReply({ list, saved, onCancel, onConfirm }) {
         </div>
         <div className="p-4 space-y-3">
           {saved.length > 0 && (
-            <div className="flex gap-1.5 flex-wrap">
+            <div className="space-y-1.5 max-h-44 overflow-y-auto">
               {saved.map(r => (
                 <button key={r.id} type="button" onClick={() => setText(r.body)}
-                  className="px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg text-[11px]">{r.title}</button>
+                  className={`w-full text-start px-3 py-2 rounded-xl text-[11px] ${text === r.body ? 'bg-brand/15 ring-1 ring-brand text-fg' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
+                  <span className="font-semibold block">{r.title}</span>
+                  <span className="block line-clamp-2 opacity-80">{r.body}</span>
+                </button>
               ))}
             </div>
           )}
@@ -1435,6 +1438,9 @@ function BulkPublicReply({ list, saved, onCancel, onConfirm }) {
               <p className="text-[11px] font-semibold text-fg-muted mb-1">{t('comments.bulkPublicPreview', { name: first.author_name || '' })}</p>
               <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap break-words">{fillSavedReply(text, first.author_name)}</div>
             </div>
+          )}
+          {privatePaused && /الخاص|رسالة خاصة|رسالتك/.test(text) && (
+            <p className="text-[11px] text-warning">{t('comments.bulkPublicPausedWarn')}</p>
           )}
           <p className="text-[11px] text-fg-subtle">{t('comments.bulkPublicHint', { n: list.length })}</p>
           <div className="flex gap-2 pt-1">
