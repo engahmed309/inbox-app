@@ -388,7 +388,7 @@ export default function CommentsScreen() {
     && Date.now() - new Date(c.posted_at || c.created_at).getTime() <= PRIVATE_WINDOW_MS && !blocked(c)
   const toggleSelect = (id) => setSelected(prev => { const n = new Set(prev); n.has(id) ? n.delete(id) : n.add(id); return n })
   const exitSelect = () => { setSelectMode(false); setSelected(new Set()) }
-  const selectAllVisible = () => setSelected(new Set(comments.filter(canBoth).map(c => c.id)))
+  const selectAllVisible = () => setSelected(new Set(comments.filter(c => c.platform !== 'youtube' || ytCanReply).filter(c => !c.deleted_at && !c.public_reply_at && !blocked(c) || canBoth(c)).map(c => c.id)))
   // تأكيد واحد قبل أي إرسال (لتعليق واحد أو لعدد محدد): بيعرض نص الرسالتين، وبعد التأكيد بيبعت من غير ما يسأل تاني على كل تعليق
   const [confirmSend, setConfirmSend] = useState(null)   // { list }
   const askSendBoth = (list) => { if (list.length && quickPrivate && !busy) setConfirmSend({ list }) }
@@ -406,6 +406,33 @@ export default function CommentsScreen() {
     setBusy(null); setBulk(null); exitSelect(); fetchCounts()
     const msg = t('comments.bulkDone', { ok, failed }) + (lastErr ? ` — ${lastErr}` : '')
     if (failed) toast.error(msg); else toast.success(msg)
+  }
+  // رد عام واحد على أكتر من تعليق (بيشتغل حتى والرد الخاص موقوف): نفس النص لكل المحددين، الاسم الأول بيتبدّل لكل واحد، واحد ورا التاني
+  const canPublic = (c) => !c.deleted_at && !c.public_reply_at && !blocked(c) && (c.platform !== 'youtube' || ytCanReply)
+  const selectable = (c) => canPublic(c) || canBoth(c)
+  const [pubBulk, setPubBulk] = useState(null)   // { list }
+  const askPublicBulk = () => { const list = comments.filter(c => selected.has(c.id) && canPublic(c)); if (list.length && !busy) setPubBulk({ list }) }
+  const runPublicBulk = async (list, text) => {
+    if (!list.length || !text.trim() || busy) return
+    stopBulkRef.current = false
+    setBusy('bulk'); setBulk({ done: 0, total: list.length, failed: 0 })
+    let ok = 0, failed = 0, lastErr = ''
+    for (const c of list) {
+      if (stopBulkRef.current) break
+      const msg = fillSavedReply(text, c.author_name).trim()
+      try {
+        const res = await apiFetch(`${API_URL}/comments/${c.id}/reply`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ message: msg }) })
+        const data = await res.json()
+        if (!res.ok) throw new Error(data.error)
+        ok++
+        patchRow(c.id, { public_reply_at: new Date().toISOString(), public_reply_text: msg, status: 'handled', assigned_agent_id: c.assigned_agent_id || agent?.id }, () => status !== 'handled')
+      } catch (err) { failed++; lastErr = err.message }
+      setBulk({ done: ok + failed, total: list.length, failed })
+      await new Promise(r => setTimeout(r, 250))
+    }
+    setBusy(null); setBulk(null); exitSelect(); fetchCounts()
+    const m = t('comments.bulkDone', { ok, failed }) + (lastErr ? ` — ${lastErr}` : '')
+    if (failed) toast.error(m); else toast.success(m)
   }
   const closeReply = () => setReplyTo(null)
 
@@ -627,7 +654,7 @@ export default function CommentsScreen() {
           ) : (
             <span className="flex-1 font-semibold text-fg text-sm">{t(`comments.areas.${view}`)}</span>
           )}
-          {view === 'inbox' && !isSupervisor && quickPrivate && !privatePaused && (
+          {view === 'inbox' && !isSupervisor && (
             <button onClick={() => (selectMode ? exitSelect() : setSelectMode(true))} disabled={!!bulk} aria-pressed={selectMode}
               title={t('comments.selectMode')}
               className={`h-8 px-2.5 flex items-center gap-1.5 rounded-lg text-xs font-medium disabled:opacity-40 ${selectMode ? 'bg-brand text-white' : 'bg-surface-3 text-fg-muted hover:text-fg'}`}>
@@ -696,7 +723,7 @@ export default function CommentsScreen() {
                   <div key={c.id} className={`bg-surface-2 rounded-2xl border border-surface-3 p-3.5 ${other ? 'opacity-70' : ''}`}>
                     <div className="flex items-start gap-2.5">
                       {selectMode && (
-                        <input type="checkbox" checked={selected.has(c.id)} disabled={!canBoth(c) || !!bulk} onChange={() => toggleSelect(c.id)}
+                        <input type="checkbox" checked={selected.has(c.id)} disabled={!selectable(c) || !!bulk} onChange={() => toggleSelect(c.id)}
                           className="mt-2.5 w-4 h-4 flex-shrink-0 accent-brand disabled:opacity-30" aria-label={t('comments.selectMode')} />
                       )}
                       <div className="relative flex-shrink-0">
@@ -910,10 +937,16 @@ export default function CommentsScreen() {
             </>) : (<>
               <span className="text-xs text-fg-muted tabular-nums">{t('comments.bulkSelected', { n: selected.size })}</span>
               <button onClick={selectAllVisible} className="px-2.5 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted hover:text-fg">{t('comments.bulkSelectAll')}</button>
-              <button onClick={() => askSendBoth(comments.filter(c => selected.has(c.id) && canBoth(c)))} disabled={!selected.size}
-                className="ms-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-success text-white disabled:opacity-40">
-                <Zap size={13} /> {t('comments.bulkSend', { n: selected.size })}
+              <button onClick={askPublicBulk} disabled={!selected.size}
+                className="ms-auto flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-brand text-white disabled:opacity-40">
+                <MessageCircle size={13} /> {t('comments.bulkPublic', { n: selected.size })}
               </button>
+              {quickPrivate && !privatePaused && (
+                <button onClick={() => askSendBoth(comments.filter(c => selected.has(c.id) && canBoth(c)))} disabled={!selected.size}
+                  className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl text-xs font-semibold bg-success text-white disabled:opacity-40">
+                  <Zap size={13} /> {t('comments.bulkSend', { n: selected.size })}
+                </button>
+              )}
               <button onClick={exitSelect} className="px-3 py-1.5 rounded-xl text-xs bg-surface-3 text-fg-muted">{t('comments.aiAssign.cancel')}</button>
             </>)}
           </div>
@@ -935,6 +968,13 @@ export default function CommentsScreen() {
             setAssignFor(null)
             fetchCounts()
           }} />
+      )}
+
+      {pubBulk && (
+        <BulkPublicReply list={pubBulk.list}
+          saved={savedAll.filter(r => (!r.kind || r.kind === 'both' || r.kind === 'public') && !(privatePaused && /الخاص/.test(r.body)))}
+          onCancel={() => setPubBulk(null)}
+          onConfirm={(text) => { const list = pubBulk.list; setPubBulk(null); runPublicBulk(list, text) }} />
       )}
 
       {confirmSend && quickPrivate && (
@@ -1366,6 +1406,50 @@ function AiAssignModal({ comment, onClose, onDone }) {
 }
 
 // تأكيد "الرسالتين": بيوضّح نص الرسالة الخاصة والرد العلني اللي هيتبعتوا. مرة واحدة بس مهما كان عدد التعليقات المحددة
+// رد عام واحد على عدد من التعليقات: بيكتب النص مرة، وبيتبعت لكل واحد (الاسم الأول بيتبدّل بدل {name})، وتأكيد واحد بس
+function BulkPublicReply({ list, saved, onCancel, onConfirm }) {
+  const { t } = useTranslation()
+  const [text, setText] = useState('')
+  const first = list[0]
+  return (
+    <div className="fixed inset-0 z-50 flex items-end lg:items-center justify-center bg-black/60" onClick={onCancel}>
+      <div onClick={e => e.stopPropagation()} className="bg-surface-2 rounded-t-2xl lg:rounded-2xl w-full lg:w-[440px] max-h-[85vh] overflow-y-auto">
+        <div className="flex items-center justify-between px-4 py-3 border-b border-surface-3">
+          <span className="font-semibold text-fg text-sm">{t('comments.bulkPublicTitle', { n: list.length })}</span>
+          <button onClick={onCancel} className="text-fg-subtle hover:text-fg"><X size={18} /></button>
+        </div>
+        <div className="p-4 space-y-3">
+          {saved.length > 0 && (
+            <div className="flex gap-1.5 flex-wrap">
+              {saved.map(r => (
+                <button key={r.id} type="button" onClick={() => setText(r.body)}
+                  className="px-2.5 py-1 rounded-full bg-surface-3 text-fg-muted hover:text-fg text-[11px]">{r.title}</button>
+              ))}
+            </div>
+          )}
+          <textarea value={text} onChange={e => setText(e.target.value)} rows={4} autoFocus
+            placeholder={t('comments.bulkPublicPlaceholder')}
+            className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg" />
+          {text.trim() && first && (
+            <div>
+              <p className="text-[11px] font-semibold text-fg-muted mb-1">{t('comments.bulkPublicPreview', { name: first.author_name || '' })}</p>
+              <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap break-words">{fillSavedReply(text, first.author_name)}</div>
+            </div>
+          )}
+          <p className="text-[11px] text-fg-subtle">{t('comments.bulkPublicHint', { n: list.length })}</p>
+          <div className="flex gap-2 pt-1">
+            <button onClick={() => onConfirm(text)} disabled={!text.trim()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-brand text-white text-sm font-semibold disabled:opacity-40">
+              <MessageCircle size={14} /> {t('comments.bulkPublicSend', { n: list.length })}
+            </button>
+            <button onClick={onCancel} className="px-4 py-2.5 rounded-xl bg-surface-3 text-fg-muted text-sm">{t('comments.aiAssign.cancel')}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function SendBothConfirm({ list, privateBody, publicBody, onCancel, onConfirm }) {
   const { t } = useTranslation()
   const first = list[0]
