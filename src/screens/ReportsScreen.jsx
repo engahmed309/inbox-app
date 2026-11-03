@@ -11,6 +11,7 @@ import { BarChart3, Users2, Facebook, Instagram, Phone, Tag, ChevronDown, Send, 
 import BackArrow from '../components/BackArrow'
 import SubscriptionsReport from '../components/SubscriptionsReport'
 import ConsolidatedReport from '../components/ConsolidatedReport'
+import QualityReport from '../components/QualityReport'
 import IncentivesBoard from '../components/IncentivesBoard'
 import {
   ResponsiveContainer, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend,
@@ -21,6 +22,7 @@ const SECTIONS = [
   { key: 'ai', labelKey: 'reports.sections.ai', icon: Sparkles },
   { key: 'consolidated', labelKey: 'reports.sections.consolidated', icon: FileText, adminOnly: true },
   { key: 'incentives', labelKey: 'reports.sections.incentives', icon: Star, adminOnly: true },
+  { key: 'quality', labelKey: 'reports.sections.quality', icon: CheckCheck, adminOnly: true },
   { key: 'overview', labelKey: 'reports.sections.overview', icon: BarChart3 },
   { key: 'customers', labelKey: 'reports.sections.customers', icon: Users2 },
   { key: 'countries', labelKey: 'reports.sections.countries', icon: Globe },
@@ -71,6 +73,7 @@ export default function ReportsScreen() {
       <div className="flex-1 overflow-y-auto">
         {section === 'consolidated' && agent?.role === 'admin' && <ConsolidatedReport />}
         {section === 'incentives' && agent?.role === 'admin' && <IncentivesBoard />}
+        {section === 'quality' && agent?.role === 'admin' && <QualityReport />}
         {section === 'ai' && <AiReportsTab />}
         {section === 'overview' && <OverviewTab />}
         {section === 'customers' && <CustomersTab />}
