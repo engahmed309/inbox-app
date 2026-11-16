@@ -1623,6 +1623,7 @@
       "blockToastBlocked": "Customer blocked",
       "blockToastUnblocked": "Customer unblocked",
       "blockError": "An error occurred, try again",
+      "blockMetaPending": "Blocked on our side. Meta declined to block them (usually no message in the last 24h); we'll block them on Meta as soon as they message or call",
       "deleteConfirm1": "Are you sure you want to permanently delete all of \"{{name}}\"'s data? This action cannot be undone.",
       "deleteConfirmFallbackName": "this customer",
       "deleteConfirm2": "Final confirmation: the conversation and all messages linked to this customer will be permanently deleted. Are you sure?",

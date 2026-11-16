@@ -319,12 +319,24 @@ export default function ContactSidebar({ contact, conv, channelLabel, onClose, o
   const toggleBlock = async () => {
     const newVal = !contact.is_blocked
     setBlocking(true)
-    const { error } = await supabase.from('contacts').update({ is_blocked: newVal }).eq('id', contact.id)
+    // من السيرفر: بيسجّل الحظر عندنا وكمان عند ميتا (واتساب الرسمي) فرسايله ومكالماته مابتوصلش
+    let result = null
+    try {
+      const res = await apiFetch(`${API_URL}/contacts/${contact.id}/block`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ blocked: newVal })
+      })
+      if (res.ok) result = await res.json()
+    } catch { /* بيتعامل معاه تحت */ }
     setBlocking(false)
-    if (error) { toast.error(t('contactSidebar.dangerZone.blockError')); return }
+    if (!result?.success) { toast.error(t('contactSidebar.dangerZone.blockError')); return }
     onUpdate({ ...contact, is_blocked: newVal })
     logActivity(conv?.id, agent?.id, newVal ? t('contactSidebar.dangerZone.blockActivityBlocked') : t('contactSidebar.dangerZone.blockActivityUnblocked'))
     toast.success(newVal ? t('contactSidebar.dangerZone.blockToastBlocked') : t('contactSidebar.dangerZone.blockToastUnblocked'))
+    // ميتا رفضت (غالبًا العميل ماكلمناش آخر ٢٤ ساعة): الحظر عندنا شغال، وهيتحظر عند ميتا أول ما يبعت
+    const metaFailed = (result.meta?.results || []).some(r => !r.ok)
+    if (metaFailed) toast.info(t('contactSidebar.dangerZone.blockMetaPending'), 8000)
   }
 
   // بيمسح كل أثر العميل نهائيًا — لازم يتم من السيرفر مش من هنا مباشرة: عميل حقيقي بيكون ليه
