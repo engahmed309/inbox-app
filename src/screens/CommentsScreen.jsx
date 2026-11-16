@@ -350,12 +350,14 @@ export default function CommentsScreen() {
   const quickPrivate = savedAll.find(r => r.kind === 'private')
   const quickPublic = savedAll.find(r => r.kind === 'public')
   // بيبعت الرسالتين لتعليق واحد ويحدّث الصف؛ بيرمي خطأ لو فشل الخاص. بيرجّع رد السيرفر
-  const postBoth = async (c) => {
-    const withAck = !!quickPublic && !c.public_reply_at && !c.deleted_at
-    const ackText = withAck ? fillSavedReply(quickPublic.body, c.author_name).trim() : ''
+  // ov = { priv, pub }: نص معدّل من نافذة التأكيد (للإرسال ده بس، مش بيغيّر الرد الجاهز المحفوظ). {name} بيتبدّل لكل تعليق
+  const postBoth = async (c, ov) => {
+    const pubBody = ov ? ov.pub : quickPublic?.body
+    const withAck = !!(pubBody && pubBody.trim()) && !c.public_reply_at && !c.deleted_at
+    const ackText = withAck ? fillSavedReply(pubBody, c.author_name).trim() : ''
     const res = await apiFetch(`${API_URL}/comments/${c.id}/private-reply`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: fillSavedReply(quickPrivate.body, c.author_name).trim(), ...(withAck ? { public_message: ackText } : {}) })
+      body: JSON.stringify({ message: fillSavedReply(ov?.priv ?? quickPrivate.body, c.author_name).trim(), ...(withAck ? { public_message: ackText } : {}) })
     })
     const data = await res.json()
     if (!res.ok) throw new Error(data.error)
@@ -367,11 +369,11 @@ export default function CommentsScreen() {
     }, () => status !== 'handled')
     return data
   }
-  const sendBoth = async (c) => {
+  const sendBoth = async (c, ov) => {
     if (!quickPrivate || busy) return
     setBusy(c.id)
     try {
-      const data = await postBoth(c)
+      const data = await postBoth(c, ov)
       toast.success(t('comments.sendBothDone'))
       if (data.public && !data.public.ok) toast.error(t('comments.ai.ackFailed', { error: data.public.error || '' }))
       fetchCounts()
@@ -392,14 +394,14 @@ export default function CommentsScreen() {
   // تأكيد واحد قبل أي إرسال (لتعليق واحد أو لعدد محدد): بيعرض نص الرسالتين، وبعد التأكيد بيبعت من غير ما يسأل تاني على كل تعليق
   const [confirmSend, setConfirmSend] = useState(null)   // { list }
   const askSendBoth = (list) => { if (list.length && quickPrivate && !busy) setConfirmSend({ list }) }
-  const runBulk = async (list) => {
+  const runBulk = async (list, ov) => {
     if (!list.length || !quickPrivate || busy) return
     stopBulkRef.current = false
     setBusy('bulk'); setBulk({ done: 0, total: list.length, failed: 0 })
     let ok = 0, failed = 0, lastErr = ''
     for (const c of list) {
       if (stopBulkRef.current) break
-      try { await postBoth(c); ok++ } catch (err) { failed++; lastErr = err.message }
+      try { await postBoth(c, ov); ok++ } catch (err) { failed++; lastErr = err.message }
       setBulk({ done: ok + failed, total: list.length, failed })
       await new Promise(r => setTimeout(r, 250))
     }
@@ -980,7 +982,7 @@ export default function CommentsScreen() {
       {confirmSend && quickPrivate && (
         <SendBothConfirm list={confirmSend.list} privateBody={quickPrivate.body} publicBody={quickPublic?.body || ''}
           onCancel={() => setConfirmSend(null)}
-          onConfirm={() => { const list = confirmSend.list; setConfirmSend(null); if (list.length === 1) sendBoth(list[0]); else runBulk(list) }} />
+          onConfirm={(ov) => { const list = confirmSend.list; setConfirmSend(null); if (list.length === 1) sendBoth(list[0], ov); else runBulk(list, ov) }} />
       )}
 
       {replyTo && (
@@ -1461,10 +1463,14 @@ function SendBothConfirm({ list, privateBody, publicBody, onCancel, onConfirm })
   const first = list[0]
   const firstName = (first?.author_name || '').trim().split(/\s+/)[0] || ''
   const alreadyPublic = list.filter(c => c.public_reply_at).length
-  const Box = ({ label, text }) => (
+  // قابلين للتعديل قبل الإرسال (للإرسال ده بس): لتعليق واحد بنعرض النص بالاسم، ولأكتر من تعليق بنعرض {name} زي ما هو وبيتبدّل لكل واحد
+  const [priv, setPriv] = useState(() => (list.length === 1 ? fillSavedReply(privateBody, first?.author_name) : privateBody))
+  const [pub, setPub] = useState(() => (list.length === 1 ? fillSavedReply(publicBody, first?.author_name) : publicBody))
+  const box = (label, value, onChange) => (
     <div>
       <p className="text-[11px] font-semibold text-fg-muted mb-1">{label}</p>
-      <div className="bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap break-words">{text}</div>
+      <textarea value={value} onChange={e => onChange(e.target.value)} rows={Math.min(8, Math.max(3, value.split('\n').length + 1))}
+        className="w-full bg-surface-3 rounded-xl px-3 py-2.5 text-sm text-fg whitespace-pre-wrap break-words resize-y outline-none focus:ring-1 focus:ring-success/50" />
     </div>
   )
   return (
@@ -1478,15 +1484,15 @@ function SendBothConfirm({ list, privateBody, publicBody, onCancel, onConfirm })
           <p className="text-xs font-semibold text-success">
             {list.length > 1 ? t('comments.sendBothConfirmCount', { n: list.length }) : (first?.author_name || t('comments.unknownAuthor'))}
           </p>
-          <Box label={t('comments.sendBothPrivateLabel')} text={fillSavedReply(privateBody, first?.author_name)} />
+          {box(t('comments.sendBothPrivateLabel'), priv, setPriv)}
           {publicBody
-            ? <Box label={t('comments.sendBothPublicLabel')} text={fillSavedReply(publicBody, first?.author_name)} />
+            ? box(t('comments.sendBothPublicLabel'), pub, setPub)
             : <p className="text-[11px] text-amber-500">{t('comments.sendBothNoPublic')}</p>}
           {list.length > 1 && firstName && <p className="text-[11px] text-fg-subtle">{t('comments.sendBothNameHint', { name: firstName })}</p>}
           {publicBody && alreadyPublic > 0 && <p className="text-[11px] text-amber-500">{t('comments.sendBothSkipPublic', { n: alreadyPublic })}</p>}
           <div className="flex gap-2 pt-1">
-            <button onClick={onConfirm}
-              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-success text-white text-sm font-semibold">
+            <button onClick={() => onConfirm({ priv, pub: publicBody ? pub : '' })} disabled={!priv.trim()}
+              className="flex-1 flex items-center justify-center gap-1.5 py-2.5 rounded-xl bg-success text-white text-sm font-semibold disabled:opacity-50">
               <Zap size={14} /> {t('comments.sendBothConfirm')}
             </button>
             <button onClick={onCancel} className="px-4 py-2.5 rounded-xl bg-surface-3 text-fg-muted text-sm">{t('comments.aiAssign.cancel')}</button>
