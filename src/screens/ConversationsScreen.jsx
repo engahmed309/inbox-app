@@ -7,7 +7,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { useLanguage } from '../contexts/LanguageContext'
 import { useToast } from '../contexts/ToastContext'
-import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, UserPlus, QrCode, MessageSquareText, Pin } from 'lucide-react'
+import { Settings, Search, MessageSquare, Facebook, Instagram, Phone, LogOut, ChevronDown, ChevronsRight, ChevronsLeft, Users, User, Sun, Moon, CircleDot, Menu, X, Download, Share, BarChart3, CheckSquare, Square, Send, UserX, StickyNote, Bot, DollarSign, Filter, Tag as TagIcon, Megaphone, Calendar, Music2, Smartphone, UserPlus, QrCode, MessageSquareText, Pin } from 'lucide-react'
 import NotificationBell from '../components/NotificationBell'
 import PushNotificationToggle from '../components/PushNotificationToggle'
 import i18n from '../i18n'
@@ -33,6 +33,7 @@ const CHANNELS = [
   { key: 'tiktok', labelKey: 'settings.channels.platforms.tiktok', icon: <Music2 size={12} className="text-fg" /> },
   { key: 'whatsapp_qr', labelKey: 'settings.channels.platforms.whatsapp_qr', icon: <QrCode size={12} className="text-emerald-400" /> },
   { key: 'telegram', labelKey: 'settings.channels.platforms.telegram', icon: <Send size={12} className="text-sky-400" /> },
+  { key: 'seha_app', labelKey: 'settings.channels.platforms.seha_app', icon: <Smartphone size={12} className="text-teal-400" /> },
 ]
 
 const PLATFORM_ICONS = {
@@ -42,6 +43,7 @@ const PLATFORM_ICONS = {
   tiktok: <Music2 size={12} className="text-fg" />,
   whatsapp_qr: <QrCode size={12} className="text-emerald-400" />,
   telegram: <Send size={12} className="text-sky-400" />,
+  seha_app: <Smartphone size={12} className="text-teal-400" />,
 }
 
 // لو فيه أكتر من قناة لنفس المنصة (أرقام واتساب متعددة، أو أكتر من صفحة فيسبوك...) مفتاح الفلتر
@@ -462,6 +464,8 @@ export default function ConversationsScreen() {
     for (const c of CHANNELS) {
       if (c.key === 'all') { tabs.push({ ...c, label: t(c.labelKey) }); continue }
       const chsForPlatform = visibleChannels.filter(ch => ch.platform === c.key)
+      // تطبيق صحة وعافية: فلتر مخصص بيظهر بس لما القناة موجودة ومفعّلة (السيرفر مابيرجّعهاش وهي مقفولة)
+      if (c.key === 'seha_app' && chsForPlatform.length === 0) continue
       if (chsForPlatform.length > 1) {
         chsForPlatform.forEach(ch => tabs.push({
           key: `${c.key}:${ch.id}`, label: getChannelLabel(ch), icon: PLATFORM_ICONS[c.key]

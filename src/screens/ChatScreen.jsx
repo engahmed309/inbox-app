@@ -18,7 +18,7 @@ import LinkifiedText from '../components/LinkifiedText'
 import { copyText } from '../lib/clipboard'
 import {
   Send, Paperclip, ChevronDown, Search, X,
-  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Eye, Wand2, Megaphone, Music2, FileText, QrCode, Languages
+  User, Check, CheckCheck, Facebook, Instagram, Phone, Mic, Trash2, UserCog, Clock, Ban, StickyNote, MessageSquareText, FolderOpen, Copy, Reply, Smile, Bot, Eye, Wand2, Megaphone, Music2, Smartphone, FileText, QrCode, Languages
 } from 'lucide-react'
 
 const STATUS_OPTS = [
@@ -37,7 +37,8 @@ const MESSAGE_WINDOW_HOURS = 24
 // whatsapp_qr مالوش قيد نافذة الـ٢٤ ساعة أصلاً — ده بالظبط سبب وجود القناة دي — فـ Infinity
 // بتخلّي شرط isWindowExpired تحت دايمًا false ليها من غير أي شرط إضافي في أي مكان تاني
 // تليجرام كمان مفيهوش نافذة خالص — البوت يقدر يبعت لأي حد بدأ معاه محادثة، في أي وقت
-const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity, telegram: Infinity }
+// تطبيق صحة وعافية: شات داخل التطبيق، مفيش نافذة رد
+const PLATFORM_WINDOW_HOURS = { tiktok: 48, whatsapp_qr: Infinity, telegram: Infinity, seha_app: Infinity }
 // كل قيمة هنا مفتاح ترجمة (مش نص جاهز) — بيتحل بـ t() وقت الاستخدام جوه الكومبوننت
 const WINDOW_EXPIRED_KEYS = {
   tiktok: 'chat.windowExpired.tiktok',
@@ -1058,10 +1059,12 @@ export default function ChatScreen() {
   const isWindowExpired = conv?.last_inbound_at
     ? (Date.now() - new Date(conv.last_inbound_at).getTime()) / 3600000 > (PLATFORM_WINDOW_HOURS[conv.platform] || MESSAGE_WINDOW_HOURS)
     : conv?.platform === 'whatsapp' // لسه ما كلمناش خالص على واتساب الرسمي — لازم قالب معتمد لأول رسالة
-  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : conv?.platform === 'telegram' ? Send : Facebook
+  const PlatformIcon = conv?.platform === 'instagram' ? Instagram : conv?.platform === 'whatsapp' ? Phone : conv?.platform === 'whatsapp_qr' ? QrCode : conv?.platform === 'tiktok' ? Music2 : conv?.platform === 'telegram' ? Send : conv?.platform === 'seha_app' ? Smartphone : Facebook
   // تيك توك بيقبل نص وصور بس في الـ Business Messaging API — لا فيديو ولا صوت ولا ملفات،
   // فبنخفي أزرار الحاجات دي بدل ما الموظف يبعتها ويكتشف إنها فشلت (أو الأسوأ: توصل كنص فيه اسم الملف)
   const isTiktok = conv?.platform === 'tiktok'
+  // تطبيق صحة وعافية: ردود نصية فقط (تعاقدهم مابيقبلش مرفقات ولا صوت) — بنقفل زرار المرفقات والمايك
+  const isSehaApp = conv?.platform === 'seha_app'
 
   // خريطة id → رسالة، عشان نقدر نعرض معاينة سريعة للرسالة الأصلية لما رسالة تانية ترد عليها
   const messagesById = useMemo(() => {
@@ -1531,8 +1534,9 @@ export default function ChatScreen() {
                 accept={isTiktok ? 'image/*' : 'image/*,video/*,audio/*,.pdf,.doc,.docx'} />
               <div className="relative flex-shrink-0">
                 <button onClick={() => setShowAttachMenu(v => !v)}
-                  title={isTiktok ? t('chat.composer.tiktokImagesOnlyTitle') : undefined}
-                  className="w-10 h-10 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors">
+                  disabled={isSehaApp}
+                  title={isSehaApp ? t('chat.composer.sehaTextOnlyTitle') : isTiktok ? t('chat.composer.tiktokImagesOnlyTitle') : undefined}
+                  className="w-10 h-10 flex items-center justify-center text-fg-muted hover:text-fg rounded-xl hover:bg-surface-3 transition-colors disabled:opacity-30 disabled:cursor-not-allowed">
                   <Paperclip size={18} />
                 </button>
                 {showAttachMenu && (
@@ -1587,8 +1591,8 @@ export default function ChatScreen() {
                     : <Send size={16} />
                   }
                 </button>
-              ) : isTiktok ? (
-                // تيك توك مابيدعمش رسايل صوتية خالص — بنخفي الزرار بدل ما الموظف يسجل ويكتشف إنها فشلت
+              ) : isTiktok || isSehaApp ? (
+                // تيك توك وتطبيق صحة وعافية مابيدعموش رسايل صوتية خالص — بنخفي الزرار بدل ما الموظف يسجل ويكتشف إنها فشلت
                 null
               ) : (
                 <button onClick={startRecording}

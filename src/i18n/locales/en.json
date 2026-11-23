@@ -350,7 +350,8 @@
         "tiktok": "TikTok",
         "whatsapp_qr": "WhatsApp (Quick Pairing)",
         "telegram": "Telegram",
-        "youtube": "YouTube"
+        "youtube": "YouTube",
+        "seha_app": "Seha w Afya App"
       },
       "youtube": {
         "title": "Connect a YouTube channel",
@@ -1208,6 +1209,7 @@
       "typingIndicator_many": "{{names}} are typing...",
       "typingIndicator_other": "{{names}} are typing...",
       "tiktokImagesOnlyTitle": "TikTok accepts images only",
+      "sehaTextOnlyTitle": "Seha w Afya App accepts text replies only",
       "fromLibrary": "From library",
       "fromDevice": "From device",
       "approvedTemplateMenuItem": "Approved template",

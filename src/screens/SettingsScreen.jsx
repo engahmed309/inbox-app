@@ -16,7 +16,7 @@ import {
   Users, Tag, List, Settings2, Plus, Trash2,
   Save, Edit2, Check, X, ToggleLeft, ToggleRight, LogOut,
   MessageSquareText, Search, Paperclip, Facebook, Instagram, AlertTriangle, KeyRound,
-  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2,
+  Radio, Phone, UserCog, ChevronUp, ChevronDown, Bot, BookOpen, Link2, FileText, RefreshCw, Music2, Smartphone,
   QrCode, Filter, Send, Youtube, Activity, Star, Package, Clock, Lock, Users2, PauseCircle, PlayCircle, GitBranch
 } from 'lucide-react'
 
@@ -800,6 +800,7 @@ const PLATFORM_META = {
   whatsapp_qr: { labelKey: 'settings.channels.platforms.whatsapp_qr', icon: QrCode, color: 'text-emerald-400' },
   telegram: { labelKey: 'settings.channels.platforms.telegram', icon: Send, color: 'text-sky-400' },
   youtube: { labelKey: 'settings.channels.platforms.youtube', icon: Youtube, color: 'text-red-500' },
+  seha_app: { labelKey: 'settings.channels.platforms.seha_app', icon: Smartphone, color: 'text-teal-400' },
 }
 
 function ChannelsTab() {

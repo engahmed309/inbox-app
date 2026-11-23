@@ -438,7 +438,8 @@
         "tiktok": "تيك توك",
         "whatsapp_qr": "واتساب (ربط سريع)",
         "telegram": "تليجرام",
-        "youtube": "يوتيوب"
+        "youtube": "يوتيوب",
+        "seha_app": "تطبيق صحة وعافية"
       },
       "youtube": {
         "title": "ربط قناة يوتيوب",
@@ -1208,6 +1209,7 @@
       "typingIndicator_many": "{{names}} يكتبون الآن...",
       "typingIndicator_other": "{{names}} يكتبون الآن...",
       "tiktokImagesOnlyTitle": "تيك توك يقبل الصور فقط",
+      "sehaTextOnlyTitle": "تطبيق صحة وعافية يقبل الردود النصية فقط",
       "fromLibrary": "من المكتبة",
       "fromDevice": "من الجهاز",
       "approvedTemplateMenuItem": "قالب معتمد",

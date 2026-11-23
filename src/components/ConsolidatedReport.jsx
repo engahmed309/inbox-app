@@ -44,8 +44,8 @@ export const dur = (s) => {
   if (s < 3600) return `${Math.floor(s / 60)} د${Math.round(s % 60) ? ` ${Math.round(s % 60)} ث` : ''}`
   return `${Math.floor(s / 3600)} س ${Math.round((s % 3600) / 60)} د`
 }
-const PLATFORM_AR = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'إنستجرام', telegram: 'تيليجرام', tiktok: 'تيك توك' }
-const PLATFORM_COLOR = { whatsapp: '#16A34A', facebook: '#3B82F6', instagram: '#EC4899', telegram: '#0EA5E9', tiktok: '#64748B' }
+const PLATFORM_AR = { whatsapp: 'واتساب', facebook: 'فيسبوك', instagram: 'إنستجرام', telegram: 'تيليجرام', tiktok: 'تيك توك', seha_app: 'تطبيق صحة وعافية' }
+const PLATFORM_COLOR = { whatsapp: '#16A34A', facebook: '#3B82F6', instagram: '#EC4899', telegram: '#0EA5E9', tiktok: '#64748B', seha_app: '#14B8A6' }
 const AREA_AR = { sales: 'مبيعات', service: 'خدمة', content: 'محتوى', ads: 'إعلانات', team: 'فريق', tech: 'تقنية' }
 const PRIO = { high: ['أولوية عالية', 'bg-danger/15 text-danger'], medium: ['متوسطة', 'bg-amber-500/15 text-amber-500'], low: ['منخفضة', 'bg-surface-3 text-fg-subtle'] }
 const FLAG_AR = { rude_or_dismissive: 'أسلوب جاف/مستهين', ignored_question: 'تجاهل سؤال', pushy: 'إلحاح زائد', wrong_or_risky_info: 'معلومة خاطئة/خطرة', too_short_or_cold: 'ردود باردة/مقتضبة', no_next_step: 'من غير خطوة تالية', copy_paste_feel: 'إحساس نسخ ولصق', slow_gaps: 'فجوات بطيئة' }
